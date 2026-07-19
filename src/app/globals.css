@@ -222,6 +222,12 @@ textarea {
   text-transform: uppercase;
 }
 
+.data-table .total-row td {
+  background: #f7f5ef;
+  color: #1f2523;
+  font-weight: 800;
+}
+
 .account-row {
   align-items: flex-start;
   border: 1px solid rgba(0, 0, 0, 0.1);

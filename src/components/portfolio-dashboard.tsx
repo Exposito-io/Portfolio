@@ -63,6 +63,14 @@ export function PortfolioDashboard() {
     snapshot?.positions.filter((position) => position.kind === "asset") ?? [];
   const debtPositions =
     snapshot?.positions.filter((position) => position.kind === "debt") ?? [];
+  const totalAssetValueUsd = assetPositions.reduce(
+    (sum, position) => sum + position.valueUsd,
+    0,
+  );
+  const totalDebtValueUsd = debtPositions.reduce(
+    (sum, position) => sum + position.debtUsd,
+    0,
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -210,7 +218,6 @@ export function PortfolioDashboard() {
                   <th>Asset</th>
                   <th>Source</th>
                   <th>Account</th>
-                  <th>Qty</th>
                   <th>Value</th>
                 </tr>
               </thead>
@@ -225,13 +232,18 @@ export function PortfolioDashboard() {
                     </td>
                     <td className="capitalize">{position.source}</td>
                     <td>{position.accountLabel}</td>
-                    <td>{formatQuantity(position.quantity)}</td>
                     <td>{formatCurrency(position.valueUsd)}</td>
                   </tr>
                 ))}
+                {assetPositions.length ? (
+                  <tr className="total-row">
+                    <td colSpan={3}>Total</td>
+                    <td>{formatCurrency(totalAssetValueUsd)}</td>
+                  </tr>
+                ) : null}
                 {!assetPositions.length ? (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center text-[#69706c]">
+                    <td colSpan={4} className="py-10 text-center text-[#69706c]">
                       No positions to display.
                     </td>
                   </tr>
@@ -254,7 +266,6 @@ export function PortfolioDashboard() {
                 <th>Asset</th>
                 <th>Source</th>
                 <th>Account</th>
-                <th>Qty</th>
                 <th>Debt</th>
               </tr>
             </thead>
@@ -269,13 +280,18 @@ export function PortfolioDashboard() {
                   </td>
                   <td className="capitalize">{position.source}</td>
                   <td>{position.accountLabel}</td>
-                  <td>{formatQuantity(position.quantity)}</td>
                   <td>{formatCurrency(position.debtUsd)}</td>
                 </tr>
               ))}
+              {debtPositions.length ? (
+                <tr className="total-row">
+                  <td colSpan={3}>Total</td>
+                  <td>{formatCurrency(totalDebtValueUsd)}</td>
+                </tr>
+              ) : null}
               {!debtPositions.length ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-[#69706c]">
+                  <td colSpan={4} className="py-10 text-center text-[#69706c]">
                     No debts to display.
                   </td>
                 </tr>
@@ -325,12 +341,5 @@ function formatCurrency(value: number | null | undefined) {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatQuantity(value: number | null) {
-  if (value === null) return "N/A";
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 6,
   }).format(value);
 }
