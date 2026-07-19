@@ -1,0 +1,255 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f4ef;
+  --foreground: #1f2523;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.nav-link {
+  align-items: center;
+  border-radius: 8px;
+  color: #38413d;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 600;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+}
+
+.nav-link:hover {
+  background: #ece8de;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.06);
+  padding: 1.25rem;
+}
+
+.panel-heading h1,
+.panel-heading h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.panel-heading p {
+  color: #69706c;
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
+}
+
+.metric {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.55rem;
+  min-height: 8.25rem;
+  padding: 1rem;
+}
+
+.metric-icon {
+  align-items: center;
+  background: #e6efe9;
+  border-radius: 8px;
+  color: #1f7a68;
+  display: flex;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.metric span {
+  color: #69706c;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.metric strong {
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  line-height: 1.1;
+}
+
+.input {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  color: #1f2523;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.7rem;
+  width: 100%;
+}
+
+.input:focus {
+  border-color: #1f7a68;
+  box-shadow: 0 0 0 3px rgba(31, 122, 104, 0.16);
+  outline: none;
+}
+
+.field-label {
+  align-items: center;
+  color: #4f5753;
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 700;
+  gap: 0.4rem;
+}
+
+.button-primary,
+.button-secondary,
+.icon-button {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 0.45rem;
+  justify-content: center;
+}
+
+.button-primary,
+.button-secondary {
+  min-height: 2.5rem;
+  padding: 0 0.85rem;
+}
+
+.button-primary {
+  background: #123d34;
+  color: #fff;
+}
+
+.button-primary:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.button-secondary {
+  background: #ece8de;
+  color: #26312d;
+}
+
+.icon-button {
+  background: #f1eee7;
+  color: #26312d;
+  height: 2.25rem;
+  width: 2.25rem;
+}
+
+.icon-button.danger {
+  color: #9b3d30;
+}
+
+.alert {
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0.75rem 0;
+  padding: 0.75rem 0.85rem;
+}
+
+.alert-error {
+  background: #f7e5df;
+  color: #842f25;
+}
+
+.alert-warning {
+  background: #fff3d7;
+  color: #73501b;
+}
+
+.empty-state {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  color: #52605a;
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.empty-state h2 {
+  color: #1f2523;
+  font-weight: 700;
+}
+
+.empty-state p {
+  font-size: 0.9rem;
+  margin-top: 0.15rem;
+}
+
+.data-table {
+  border-collapse: collapse;
+  min-width: 760px;
+  width: 100%;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+}
+
+.data-table th {
+  color: #65706b;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.account-row {
+  align-items: flex-start;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+}
+
+.account-row h3 {
+  font-weight: 700;
+}
+
+.tag {
+  align-items: center;
+  background: #f1eee7;
+  border-radius: 999px;
+  color: #4d5753;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  gap: 0.25rem;
+  min-height: 1.45rem;
+  padding: 0 0.55rem;
+}
+
+.tag-green {
+  background: #e6efe9;
+  color: #1f7a68;
+}
