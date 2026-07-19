@@ -19,6 +19,16 @@ import type {
   SourceSummary,
 } from "@/lib/types";
 
+const LIVE_CACHE_TTL_MS = 60_000;
+
+type LivePortfolioCacheEntry = {
+  key: string;
+  capturedAtMs: number;
+  snapshot: PortfolioSnapshot;
+};
+
+let livePortfolioCache: LivePortfolioCacheEntry | null = null;
+
 export async function getPortfolio(
   db: Db,
   selectedDateKey?: string,
@@ -46,7 +56,7 @@ export async function getPortfolio(
     };
   }
 
-  const liveSnapshot = await refreshPortfolio(accounts, todayKey);
+  const liveSnapshot = await getCachedOrRefreshPortfolio(accounts, todayKey);
   const savedSnapshot = accounts.length
     ? await upsertDailySnapshot(db, liveSnapshot)
     : liveSnapshot;
@@ -63,6 +73,30 @@ export async function getPortfolio(
     snapshot: snapshotWithPnl,
     accountsCount: accounts.length,
   };
+}
+
+async function getCachedOrRefreshPortfolio(
+  accounts: PortfolioAccount[],
+  dateKey: string,
+) {
+  const cacheKey = getLiveCacheKey(accounts, dateKey);
+  const now = Date.now();
+
+  if (
+    livePortfolioCache?.key === cacheKey &&
+    now - livePortfolioCache.capturedAtMs < LIVE_CACHE_TTL_MS
+  ) {
+    return livePortfolioCache.snapshot;
+  }
+
+  const snapshot = await refreshPortfolio(accounts, dateKey);
+  livePortfolioCache = {
+    key: cacheKey,
+    capturedAtMs: now,
+    snapshot,
+  };
+
+  return snapshot;
 }
 
 async function refreshPortfolio(
@@ -87,10 +121,7 @@ async function refreshPortfolio(
         source: account.source,
         accountId: account.id,
         accountLabel: account.label,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to refresh this account.",
+        message: toSourceErrorMessage(error),
       });
     }
   }
@@ -108,4 +139,39 @@ async function refreshPortfolio(
 
 export function yearOfPortfolio(response: PortfolioResponse) {
   return getYearFromDateKey(response.selectedDateKey);
+}
+
+function getLiveCacheKey(accounts: PortfolioAccount[], dateKey: string) {
+  const accountKey = accounts
+    .map((account) =>
+      [
+        account.id,
+        account.source,
+        account.address,
+        account.enabled,
+        account.updatedAt,
+      ].join(":"),
+    )
+    .join("|");
+
+  return `${dateKey}:${accountKey}`;
+}
+
+function toSourceErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Unable to refresh this account.";
+  }
+
+  const status = error.message.match(/Status:\s*(\d+)/)?.[1];
+  const details = error.message.match(/Details:\s*([^\n]+)/)?.[1];
+
+  if (status === "429") {
+    return "RPC provider rate limit reached while reading this account. Try again in a minute or use a higher-limit Ethereum RPC URL.";
+  }
+
+  if (status) {
+    return `RPC request failed with status ${status}${details ? `: ${details}` : ""}.`;
+  }
+
+  return error.message.split("\n")[0] || "Unable to refresh this account.";
 }

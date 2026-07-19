@@ -59,6 +59,10 @@ export function PortfolioDashboard() {
   }, [date]);
 
   const snapshot = data?.snapshot;
+  const assetPositions =
+    snapshot?.positions.filter((position) => position.kind === "asset") ?? [];
+  const debtPositions =
+    snapshot?.positions.filter((position) => position.kind === "debt") ?? [];
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -197,7 +201,7 @@ export function PortfolioDashboard() {
         <div className="panel overflow-hidden">
           <div className="panel-heading">
             <h2>Positions</h2>
-            <p>Protocol-normalized holdings and debt</p>
+            <p>Protocol-normalized positive asset exposure</p>
           </div>
           <div className="overflow-x-auto">
             <table className="data-table">
@@ -208,11 +212,10 @@ export function PortfolioDashboard() {
                   <th>Account</th>
                   <th>Qty</th>
                   <th>Value</th>
-                  <th>Debt</th>
                 </tr>
               </thead>
               <tbody>
-                {(snapshot?.positions ?? []).map((position) => (
+                {assetPositions.map((position) => (
                   <tr key={position.id}>
                     <td>
                       <span className="font-medium">{position.symbol}</span>
@@ -224,12 +227,11 @@ export function PortfolioDashboard() {
                     <td>{position.accountLabel}</td>
                     <td>{formatQuantity(position.quantity)}</td>
                     <td>{formatCurrency(position.valueUsd)}</td>
-                    <td>{formatCurrency(position.debtUsd)}</td>
                   </tr>
                 ))}
-                {!snapshot?.positions.length ? (
+                {!assetPositions.length ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-[#69706c]">
+                    <td colSpan={5} className="py-10 text-center text-[#69706c]">
                       No positions to display.
                     </td>
                   </tr>
@@ -237,6 +239,49 @@ export function PortfolioDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <section className="panel overflow-hidden">
+        <div className="panel-heading">
+          <h2>Debts</h2>
+          <p>Borrowed balances and liability exposure</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Source</th>
+                <th>Account</th>
+                <th>Qty</th>
+                <th>Debt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {debtPositions.map((position) => (
+                <tr key={position.id}>
+                  <td>
+                    <span className="font-medium">{position.symbol}</span>
+                    <span className="block text-xs text-[#737a76]">
+                      {position.name}
+                    </span>
+                  </td>
+                  <td className="capitalize">{position.source}</td>
+                  <td>{position.accountLabel}</td>
+                  <td>{formatQuantity(position.quantity)}</td>
+                  <td>{formatCurrency(position.debtUsd)}</td>
+                </tr>
+              ))}
+              {!debtPositions.length ? (
+                <tr>
+                  <td colSpan={5} className="py-10 text-center text-[#69706c]">
+                    No debts to display.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </section>
     </main>

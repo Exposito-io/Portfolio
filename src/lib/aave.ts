@@ -96,12 +96,8 @@ export async function fetchAaveAccount(
   client = createEthereumClient(),
 ): Promise<AaveAccountResult> {
   const user = account.address as Address;
-  const [
-    accountData,
-    baseCurrencyUnit,
-    reserveData,
-    prices,
-  ] = await Promise.all([
+  const assets = getAaveAssets();
+  const [accountData, baseCurrencyUnit, reserveData] = await Promise.all([
     client.readContract({
       address: AaveV3Ethereum.POOL as Address,
       abi: poolAbi,
@@ -113,35 +109,48 @@ export async function fetchAaveAccount(
       abi: oracleAbi,
       functionName: "BASE_CURRENCY_UNIT",
     }),
-    Promise.all(
-      getAaveAssets().map((asset) =>
-        client.readContract({
-          address: AaveV3Ethereum.AAVE_PROTOCOL_DATA_PROVIDER as Address,
-          abi: protocolDataProviderAbi,
-          functionName: "getUserReserveData",
-          args: [asset.address, user],
-        }),
-      ),
-    ),
-    Promise.all(
-      getAaveAssets().map((asset) =>
-        client.readContract({
+    client.multicall({
+      allowFailure: false,
+      contracts: assets.map((asset) => ({
+        address: AaveV3Ethereum.AAVE_PROTOCOL_DATA_PROVIDER as Address,
+        abi: protocolDataProviderAbi,
+        functionName: "getUserReserveData",
+        args: [asset.address, user],
+      })),
+    }),
+  ]);
+
+  const activeReserves = reserveData
+    .map((data, index) => ({
+      asset: assets[index],
+      data,
+      supplied: Number(formatUnits(data[0], assets[index].decimals)),
+      stableDebt: Number(formatUnits(data[1], assets[index].decimals)),
+      variableDebt: Number(formatUnits(data[2], assets[index].decimals)),
+    }))
+    .filter((reserve) => {
+      return (
+        reserve.supplied > 0 ||
+        reserve.stableDebt > 0 ||
+        reserve.variableDebt > 0
+      );
+    });
+
+  const prices = activeReserves.length
+    ? await client.multicall({
+        allowFailure: false,
+        contracts: activeReserves.map((reserve) => ({
           address: AaveV3Ethereum.ORACLE as Address,
           abi: oracleAbi,
           functionName: "getAssetPrice",
-          args: [asset.address],
-        }),
-      ),
-    ),
-  ]);
+          args: [reserve.asset.address],
+        })),
+      })
+    : [];
 
-  const assets = getAaveAssets();
-  const positions = reserveData.flatMap((data, index) => {
-    const asset = assets[index];
+  const positions = activeReserves.flatMap((reserve, index) => {
     const priceUsd = Number(prices[index]) / Number(baseCurrencyUnit);
-    const supplied = Number(formatUnits(data[0], asset.decimals));
-    const stableDebt = Number(formatUnits(data[1], asset.decimals));
-    const variableDebt = Number(formatUnits(data[2], asset.decimals));
+    const { asset, data, supplied, stableDebt, variableDebt } = reserve;
     const debt = stableDebt + variableDebt;
     const rows: PortfolioPosition[] = [];
 
