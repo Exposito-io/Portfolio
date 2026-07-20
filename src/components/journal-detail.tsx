@@ -189,8 +189,8 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
-      <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
-        <div className="panel h-fit">
+      <section className="grid gap-6">
+        <div className="panel">
           {editingTrade ? (
             <JournalTradeForm
               trade={trade}
@@ -228,8 +228,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           )}
         </div>
 
-        <JournalChart trade={trade} ordersState={filledOrdersState} />
       </section>
+
+      <JournalChart trade={trade} ordersState={filledOrdersState} />
 
       <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
 
