@@ -24,89 +24,128 @@ type HyperliquidClearinghouseState = {
   }>;
 };
 
+type HyperliquidPerpDex = {
+  dex: "" | "xyz";
+  label: string;
+  positionLabel: string;
+};
+
 export type HyperliquidAccountResult = {
   summary: SourceSummary;
   positions: PortfolioPosition[];
 };
 
+const PERP_DEXS: HyperliquidPerpDex[] = [
+  {
+    dex: "",
+    label: "Crypto perps",
+    positionLabel: "perpetual position",
+  },
+  {
+    dex: "xyz",
+    label: "Trade XYZ",
+    positionLabel: "Trade XYZ perpetual position",
+  },
+];
+
 export async function fetchHyperliquidAccount(
   account: PortfolioAccount,
   fetcher: typeof fetch = fetch,
 ): Promise<HyperliquidAccountResult> {
-  const response = await fetcher("https://api.hyperliquid.xyz/info", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      type: "clearinghouseState",
-      user: account.address,
-    }),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Hyperliquid returned HTTP ${response.status}.`);
-  }
-
-  const state = (await response.json()) as HyperliquidClearinghouseState;
-  const accountValue = parseUsd(state.marginSummary?.accountValue);
-  const totalNtlPos = parseUsd(state.marginSummary?.totalNtlPos);
   const positions: PortfolioPosition[] = [];
+  let netWorthUsd = 0;
+  let totalInvestmentsUsd = 0;
 
-  if (accountValue > 0) {
-    positions.push({
-      id: `${account.id}:hyperliquid:account-value`,
-      accountId: account.id,
-      accountLabel: account.label,
-      source: "hyperliquid",
-      symbol: "USDC",
-      name: "Hyperliquid account value",
-      kind: "asset",
-      quantity: accountValue,
-      valueUsd: roundCurrency(accountValue),
-      debtUsd: 0,
-      details: {
-        withdrawable: parseUsd(state.withdrawable),
-        marginUsed: parseUsd(state.marginSummary?.totalMarginUsed),
-      },
-    });
-  }
+  for (const perpDex of PERP_DEXS) {
+    const state = await fetchClearinghouseState(account, perpDex, fetcher);
+    const accountValue = parseUsd(state.marginSummary?.accountValue);
+    const totalNtlPos = parseUsd(state.marginSummary?.totalNtlPos);
+    netWorthUsd += accountValue;
+    totalInvestmentsUsd += Math.max(accountValue, totalNtlPos);
 
-  for (const item of state.assetPositions ?? []) {
-    const position = item.position;
-    if (!position?.coin) continue;
+    if (accountValue > 0) {
+      positions.push({
+        id: `${account.id}:hyperliquid:${perpDex.dex || "default"}:account-value`,
+        accountId: account.id,
+        accountLabel: account.label,
+        source: "hyperliquid",
+        symbol: "USDC",
+        name: `${perpDex.label} account value`,
+        kind: "asset",
+        quantity: accountValue,
+        valueUsd: roundCurrency(accountValue),
+        debtUsd: 0,
+        details: {
+          dex: perpDex.dex || "default",
+          withdrawable: parseUsd(state.withdrawable),
+          marginUsed: parseUsd(state.marginSummary?.totalMarginUsed),
+        },
+      });
+    }
 
-    const valueUsd = parseUsd(position.positionValue);
-    if (valueUsd <= 0) continue;
+    for (const item of state.assetPositions ?? []) {
+      const position = item.position;
+      if (!position?.coin) continue;
 
-    positions.push({
-      id: `${account.id}:hyperliquid:${position.coin}`,
-      accountId: account.id,
-      accountLabel: account.label,
-      source: "hyperliquid",
-      symbol: position.coin,
-      name: `${position.coin} perpetual position`,
-      kind: "asset",
-      quantity: parseNullableNumber(position.szi),
-      valueUsd: roundCurrency(valueUsd),
-      debtUsd: 0,
-      details: {
-        unrealizedPnl: parseUsd(position.unrealizedPnl),
-        marginUsed: parseUsd(position.marginUsed),
-      },
-    });
+      const valueUsd = parseUsd(position.positionValue);
+      if (valueUsd <= 0) continue;
+
+      positions.push({
+        id: `${account.id}:hyperliquid:${perpDex.dex || "default"}:${position.coin}`,
+        accountId: account.id,
+        accountLabel: account.label,
+        source: "hyperliquid",
+        symbol: position.coin,
+        name: `${position.coin} ${perpDex.positionLabel}`,
+        kind: "asset",
+        quantity: parseNullableNumber(position.szi),
+        valueUsd: roundCurrency(valueUsd),
+        debtUsd: 0,
+        details: {
+          dex: perpDex.dex || "default",
+          unrealizedPnl: parseUsd(position.unrealizedPnl),
+          marginUsed: parseUsd(position.marginUsed),
+        },
+      });
+    }
   }
 
   return {
     summary: {
       source: "hyperliquid",
       label: account.label,
-      netWorthUsd: roundCurrency(accountValue),
-      totalInvestmentsUsd: roundCurrency(Math.max(accountValue, totalNtlPos)),
+      netWorthUsd: roundCurrency(netWorthUsd),
+      totalInvestmentsUsd: roundCurrency(totalInvestmentsUsd),
       totalDebtUsd: 0,
       positionCount: positions.length,
     },
     positions,
   };
+}
+
+async function fetchClearinghouseState(
+  account: PortfolioAccount,
+  perpDex: HyperliquidPerpDex,
+  fetcher: typeof fetch,
+) {
+  const response = await fetcher("https://api.hyperliquid.xyz/info", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "clearinghouseState",
+      user: account.address,
+      ...(perpDex.dex ? { dex: perpDex.dex } : {}),
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Hyperliquid ${perpDex.label} returned HTTP ${response.status}.`,
+    );
+  }
+
+  return (await response.json()) as HyperliquidClearinghouseState;
 }
 
 function parseUsd(value: string | undefined) {
