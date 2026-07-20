@@ -320,25 +320,50 @@ function buildOrderMarkers(
 ): SeriesMarker<Time>[] {
   if (!candles.length || !orders.length) return [];
 
-  const markers: SeriesMarker<Time>[] = [];
+  const groups = new Map<
+    string,
+    {
+      time: UTCTimestamp;
+      side: HyperliquidFilledOrder["side"];
+      notionalUsd: number;
+      orderCount: number;
+    }
+  >();
 
   for (const order of orders) {
     const candle = findContainingCandle(order.lastTime, candles);
     if (!candle) continue;
 
-    const isBuy = order.side === "Buy";
-    markers.push({
-      id: order.id,
-      time: Math.floor(candle.time / 1000) as UTCTimestamp,
-      position: isBuy ? "belowBar" : "aboveBar",
-      color: isBuy ? "#1f7a68" : "#9b3d30",
-      shape: isBuy ? "arrowUp" : "arrowDown",
-      text: `${isBuy ? "B" : "S"} ${formatCompactSize(order.totalSize)}`,
-      size: 1.15,
-    });
+    const time = Math.floor(candle.time / 1000) as UTCTimestamp;
+    const key = `${time}:${order.side}`;
+    const group = groups.get(key) ?? {
+      time,
+      side: order.side,
+      notionalUsd: 0,
+      orderCount: 0,
+    };
+    group.notionalUsd += order.notionalUsd;
+    group.orderCount += 1;
+    groups.set(key, group);
   }
 
-  return markers.sort((a, b) => Number(a.time) - Number(b.time));
+  return [...groups.values()]
+    .map<SeriesMarker<Time>>((group) => {
+      const isBuy = group.side === "Buy";
+      const prefix = isBuy ? "B" : "S";
+      const countSuffix = group.orderCount > 1 ? ` (${group.orderCount})` : "";
+
+      return {
+        id: `${group.time}:${group.side}`,
+        time: group.time,
+        position: isBuy ? "belowBar" : "aboveBar",
+        color: isBuy ? "#1f7a68" : "#9b3d30",
+        shape: isBuy ? "arrowUp" : "arrowDown",
+        text: `${prefix} ${formatCompactUsd(group.notionalUsd)}${countSuffix}`,
+        size: 1.15,
+      };
+    })
+    .sort((a, b) => Number(a.time) - Number(b.time));
 }
 
 function findContainingCandle(
@@ -354,8 +379,11 @@ function findContainingCandle(
   return null;
 }
 
-function formatCompactSize(value: number) {
+function formatCompactUsd(value: number) {
   return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: value >= 1 ? 2 : 4,
+    currency: "USD",
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+    notation: value >= 100_000 ? "compact" : "standard",
+    style: "currency",
   }).format(value);
 }
