@@ -26,7 +26,7 @@ describe("Hyperliquid normalization", () => {
             {
               coin: "USDC",
               token: 0,
-              total: "12345.67",
+              total: "4000",
               hold: "4000",
               entryNtl: "0.0",
             },
@@ -99,9 +99,10 @@ describe("Hyperliquid normalization", () => {
         }),
       }),
     );
-    expect(result.summary.netWorthUsd).toBe(12345.67);
-    expect(result.summary.totalInvestmentsUsd).toBe(8000.42);
-    expect(result.positions).toHaveLength(2);
+    expect(result.summary.netWorthUsd).toBe(4000);
+    expect(result.summary.totalInvestmentsUsd).toBe(7500);
+    expect(result.summary.totalDebtUsd).toBe(3500);
+    expect(result.positions).toHaveLength(3);
     expect(result.positions[0]).toMatchObject({
       symbol: "SOL",
       valueUsd: 2500,
@@ -112,6 +113,12 @@ describe("Hyperliquid normalization", () => {
       name: "xyz:XYZ100 Trade XYZ perpetual position",
       valueUsd: 5000,
       quantity: 2,
+    });
+    expect(result.positions[2]).toMatchObject({
+      symbol: "USDC",
+      name: "Hyperliquid account debt",
+      kind: "debt",
+      debtUsd: 3500,
     });
   });
 });

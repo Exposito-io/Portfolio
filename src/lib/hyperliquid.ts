@@ -63,15 +63,12 @@ export async function fetchHyperliquidAccount(
   fetcher: typeof fetch = fetch,
 ): Promise<HyperliquidAccountResult> {
   const positions: PortfolioPosition[] = [];
-  let totalInvestmentsUsd = 0;
+  let totalPositionValueUsd = 0;
   const spotState = await fetchSpotClearinghouseState(account, fetcher);
   const netWorthUsd = getUsdcTotalBalance(spotState);
 
   for (const perpDex of PERP_DEXS) {
     const state = await fetchClearinghouseState(account, perpDex, fetcher);
-    const accountValue = parseUsd(state.marginSummary?.accountValue);
-    const totalNtlPos = parseUsd(state.marginSummary?.totalNtlPos);
-    totalInvestmentsUsd += Math.max(accountValue, totalNtlPos);
 
     for (const item of state.assetPositions ?? []) {
       const position = item.position;
@@ -79,6 +76,7 @@ export async function fetchHyperliquidAccount(
 
       const valueUsd = parseUsd(position.positionValue);
       if (valueUsd <= 0) continue;
+      totalPositionValueUsd += valueUsd;
 
       positions.push({
         id: `${account.id}:hyperliquid:${perpDex.dex || "default"}:${position.coin}`,
@@ -100,13 +98,37 @@ export async function fetchHyperliquidAccount(
     }
   }
 
+  const totalDebtUsd = roundCurrency(
+    Math.max(0, totalPositionValueUsd - netWorthUsd),
+  );
+
+  if (totalDebtUsd > 0) {
+    positions.push({
+      id: `${account.id}:hyperliquid:account-debt`,
+      accountId: account.id,
+      accountLabel: account.label,
+      source: "hyperliquid",
+      symbol: "USDC",
+      name: "Hyperliquid account debt",
+      kind: "debt",
+      quantity: null,
+      valueUsd: 0,
+      debtUsd: totalDebtUsd,
+      details: {
+        formula: "sum(positionValue) - USDC total balance",
+        totalPositionValueUsd: roundCurrency(totalPositionValueUsd),
+        netWorthUsd: roundCurrency(netWorthUsd),
+      },
+    });
+  }
+
   return {
     summary: {
       source: "hyperliquid",
       label: account.label,
       netWorthUsd: roundCurrency(netWorthUsd),
-      totalInvestmentsUsd: roundCurrency(totalInvestmentsUsd),
-      totalDebtUsd: 0,
+      totalInvestmentsUsd: roundCurrency(totalPositionValueUsd),
+      totalDebtUsd,
       positionCount: positions.length,
     },
     positions,
