@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const date = url.searchParams.get("date") || undefined;
+    const refresh = url.searchParams.get("refresh") === "1";
 
     if (date && !isValidDateKey(date)) {
       return NextResponse.json(
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const portfolio = await getPortfolio(await getDb(), date);
+    const portfolio = await getPortfolio(await getDb(), date, { refresh });
     return NextResponse.json(portfolio);
   } catch (error) {
     return NextResponse.json(

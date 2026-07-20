@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CircleDollarSign,
   Landmark,
+  RotateCcw,
   RefreshCw,
   TrendingUp,
 } from "lucide-react";
@@ -18,6 +19,7 @@ export function PortfolioDashboard() {
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -28,7 +30,10 @@ export function PortfolioDashboard() {
       setLoading(true);
       setError("");
       try {
-        const query = date ? `?date=${date}` : "";
+        const params = new URLSearchParams();
+        if (date) params.set("date", date);
+        if (!date && refreshNonce > 0) params.set("refresh", "1");
+        const query = params.toString() ? `?${params.toString()}` : "";
         const response = await fetch(`/api/portfolio${query}`, {
           signal: controller.signal,
         });
@@ -56,7 +61,7 @@ export function PortfolioDashboard() {
 
     loadPortfolio();
     return () => controller.abort();
-  }, [date]);
+  }, [date, refreshNonce]);
 
   const snapshot = data?.snapshot;
   const assetPositions =
@@ -100,6 +105,19 @@ export function PortfolioDashboard() {
               />
               <button className="button-secondary h-10" onClick={() => setDate("")}>
                 Live
+              </button>
+              <button
+                className="button-primary h-10"
+                disabled={loading || Boolean(date)}
+                onClick={() => setRefreshNonce((value) => value + 1)}
+                title={
+                  date
+                    ? "Clear the selected date before refreshing live data."
+                    : "Refresh live account data and save today's snapshot."
+                }
+              >
+                <RotateCcw size={16} aria-hidden="true" />
+                Refresh
               </button>
             </div>
           </div>
@@ -159,7 +177,9 @@ export function PortfolioDashboard() {
           <p className="mt-4 text-sm leading-6 text-[#69706c]">
             {data?.mode === "snapshot"
               ? `Showing nearest prior snapshot: ${data.effectiveDateKey ?? "none"}.`
-              : "Live view refreshes current data and stores today's daily snapshot."}
+              : data?.mode === "cached"
+                ? "Showing today's saved snapshot. Use Refresh for live account data."
+                : "Live data refreshed and today's daily snapshot was saved."}
           </p>
         </div>
       </section>

@@ -2,10 +2,15 @@ import type { Db } from "mongodb";
 
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getDateKey, getYearFromDateKey } from "@/lib/date";
-import { fetchAaveAccount } from "@/lib/aave";
+import { extractAaveReserveHints, fetchAaveAccount } from "@/lib/aave";
+import {
+  getAaveReserveHints,
+  saveAaveReserveHints,
+} from "@/lib/aave-reserve-cache";
 import { fetchHyperliquidAccount } from "@/lib/hyperliquid";
 import { listAccounts } from "@/lib/accounts";
 import {
+  findSnapshotByDate,
   findEarliestSnapshotInYear,
   findSnapshotOnOrBefore,
   upsertDailySnapshot,
@@ -19,7 +24,7 @@ import type {
   SourceSummary,
 } from "@/lib/types";
 
-const LIVE_CACHE_TTL_MS = 60_000;
+const LIVE_CACHE_TTL_MS = 15 * 60_000;
 
 type LivePortfolioCacheEntry = {
   key: string;
@@ -32,6 +37,7 @@ let livePortfolioCache: LivePortfolioCacheEntry | null = null;
 export async function getPortfolio(
   db: Db,
   selectedDateKey?: string,
+  options: { refresh?: boolean } = {},
 ): Promise<PortfolioResponse> {
   const todayKey = getDateKey(new Date(), PORTFOLIO_TIMEZONE);
   const dateKey = selectedDateKey || todayKey;
@@ -56,7 +62,26 @@ export async function getPortfolio(
     };
   }
 
-  const liveSnapshot = await getCachedOrRefreshPortfolio(accounts, todayKey);
+  if (!options.refresh) {
+    const todaySnapshot = await findSnapshotByDate(db, todayKey);
+    if (todaySnapshot) {
+      const snapshotWithPnl = withYearlyPnl(
+        todaySnapshot,
+        await findEarliestSnapshotInYear(db, todayKey),
+      );
+
+      return {
+        mode: "cached",
+        selectedDateKey: todayKey,
+        effectiveDateKey: todayKey,
+        timezone: PORTFOLIO_TIMEZONE,
+        snapshot: snapshotWithPnl,
+        accountsCount: accounts.length,
+      };
+    }
+  }
+
+  const liveSnapshot = await getCachedOrRefreshPortfolio(db, accounts, todayKey);
   const savedSnapshot = accounts.length
     ? await upsertDailySnapshot(db, liveSnapshot)
     : liveSnapshot;
@@ -76,6 +101,7 @@ export async function getPortfolio(
 }
 
 async function getCachedOrRefreshPortfolio(
+  db: Db,
   accounts: PortfolioAccount[],
   dateKey: string,
 ) {
@@ -89,7 +115,7 @@ async function getCachedOrRefreshPortfolio(
     return livePortfolioCache.snapshot;
   }
 
-  const snapshot = await refreshPortfolio(accounts, dateKey);
+  const snapshot = await refreshPortfolio(db, accounts, dateKey);
   livePortfolioCache = {
     key: cacheKey,
     capturedAtMs: now,
@@ -100,6 +126,7 @@ async function getCachedOrRefreshPortfolio(
 }
 
 async function refreshPortfolio(
+  db: Db,
   accounts: PortfolioAccount[],
   dateKey: string,
 ): Promise<PortfolioSnapshot> {
@@ -109,10 +136,7 @@ async function refreshPortfolio(
 
   for (const account of accounts) {
     try {
-      const result =
-        account.source === "aave"
-          ? await fetchAaveAccount(account)
-          : await fetchHyperliquidAccount(account);
+      const result = await fetchAccount(db, account);
 
       sourceSummaries.push(result.summary);
       positions.push(...result.positions);
@@ -135,6 +159,30 @@ async function refreshPortfolio(
     positions,
     sourceErrors,
   };
+}
+
+async function fetchAccount(db: Db, account: PortfolioAccount) {
+  if (account.source !== "aave") {
+    return fetchHyperliquidAccount(account);
+  }
+
+  const reserveHints = await getAaveReserveHints(
+    db,
+    account.id,
+    account.address,
+  );
+  const result = await fetchAaveAccount(account, undefined, reserveHints);
+
+  if (!reserveHints?.length) {
+    await saveAaveReserveHints(
+      db,
+      account.id,
+      account.address,
+      extractAaveReserveHints(result.positions),
+    );
+  }
+
+  return result;
 }
 
 export function yearOfPortfolio(response: PortfolioResponse) {

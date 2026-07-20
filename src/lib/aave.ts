@@ -11,6 +11,7 @@ import { mainnet } from "viem/chains";
 import { requireEthereumRpcUrl } from "@/lib/config";
 import { roundCurrency } from "@/lib/portfolio-calculations";
 import type {
+  AaveReserveHint,
   PortfolioAccount,
   PortfolioPosition,
   SourceSummary,
@@ -94,9 +95,17 @@ export function createEthereumClient(): PublicClient {
 export async function fetchAaveAccount(
   account: PortfolioAccount,
   client = createEthereumClient(),
+  reserveHints?: AaveReserveHint[] | null,
 ): Promise<AaveAccountResult> {
   const user = account.address as Address;
-  const assets = getAaveAssets();
+  const allAssets = getAaveAssets();
+  const assets = reserveHints?.length
+    ? reserveHints.map((hint) => ({
+        symbol: hint.symbol,
+        address: hint.address as Address,
+        decimals: hint.decimals,
+      }))
+    : allAssets;
   const [accountData, baseCurrencyUnit, reserveData] = await Promise.all([
     client.readContract({
       address: AaveV3Ethereum.POOL as Address,
@@ -167,6 +176,9 @@ export async function fetchAaveAccount(
         valueUsd: roundCurrency(supplied * priceUsd),
         debtUsd: 0,
         details: {
+          symbol: asset.symbol,
+          address: asset.address,
+          decimals: asset.decimals,
           chain: "Ethereum",
           collateral: data[8],
         },
@@ -186,6 +198,9 @@ export async function fetchAaveAccount(
         valueUsd: 0,
         debtUsd: roundCurrency(debt * priceUsd),
         details: {
+          symbol: asset.symbol,
+          address: asset.address,
+          decimals: asset.decimals,
           chain: "Ethereum",
           variableDebt,
           stableDebt,
@@ -216,7 +231,27 @@ export async function fetchAaveAccount(
   };
 }
 
-function getAaveAssets(): AaveAsset[] {
+export function extractAaveReserveHints(positions: PortfolioPosition[]) {
+  return positions
+    .filter((position) => position.source === "aave")
+    .map((position) => position.details)
+    .filter((details): details is NonNullable<typeof details> => Boolean(details))
+    .map((details) => ({
+      symbol: String(details.symbol),
+      address: String(details.address),
+      decimals: Number(details.decimals),
+    }))
+    .filter((hint) => hint.address.startsWith("0x") && hint.decimals >= 0)
+    .reduce<AaveReserveHint[]>((hints, hint) => {
+      if (!hints.some((existing) => existing.address === hint.address)) {
+        hints.push(hint);
+      }
+
+      return hints;
+    }, []);
+}
+
+export function getAaveAssets(): AaveAsset[] {
   return Object.entries(AaveV3Ethereum.ASSETS).map(([symbol, asset]) => ({
     symbol,
     address: asset.UNDERLYING as Address,

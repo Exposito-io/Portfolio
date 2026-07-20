@@ -14,6 +14,12 @@ export type PortfolioAccount = {
   updatedAt: string;
 };
 
+export type AaveReserveHint = {
+  symbol: string;
+  address: string;
+  decimals: number;
+};
+
 export type PositionKind = "asset" | "debt";
 
 export type PortfolioPosition = {
@@ -67,7 +73,7 @@ export type SourceError = {
 };
 
 export type PortfolioResponse = {
-  mode: "live" | "snapshot";
+  mode: "live" | "snapshot" | "cached";
   selectedDateKey: string;
   effectiveDateKey: string | null;
   timezone: string;
