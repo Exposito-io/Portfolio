@@ -20,6 +20,7 @@ import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import type {
   HyperliquidCandle,
   HyperliquidFilledOrder,
+  JournalEntry,
   JournalTrade,
 } from "@/lib/types";
 
@@ -28,6 +29,28 @@ type CandleInterval = "15m" | "1h" | "4h" | "1d" | "1w";
 type RangeOption = {
   label: string;
   days: number;
+};
+
+type ChartOrderMarker = {
+  kind: "order";
+  id: string;
+  side: HyperliquidFilledOrder["side"];
+  notionalUsd: number;
+  orderCount: number;
+};
+
+type ChartEntryMarker = {
+  kind: "entry";
+  id: string;
+  date: string;
+  descriptionMarkdown: string;
+};
+
+type ChartMarkerDetail = ChartOrderMarker | ChartEntryMarker;
+
+type HoveredMarker = ChartMarkerDetail & {
+  x: number;
+  y: number;
 };
 
 const rangeOptionsByInterval: Record<CandleInterval, RangeOption[]> = {
@@ -72,10 +95,12 @@ export function JournalChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const markerDetailsRef = useRef<Map<string, ChartMarkerDetail>>(new Map());
   const [candles, setCandles] = useState<HyperliquidCandle[]>([]);
   const [interval, setInterval] = useState<CandleInterval>("1d");
   const [days, setDays] = useState(90);
   const [error, setError] = useState("");
+  const [hoveredMarker, setHoveredMarker] = useState<HoveredMarker | null>(null);
   const [loading, setLoading] = useState(true);
 
   const rangeOptions = rangeOptionsByInterval[interval];
@@ -90,10 +115,19 @@ export function JournalChart({
       })),
     [candles],
   );
-  const markers = useMemo(
-    () => buildOrderMarkers(ordersState.data?.orders ?? [], candles),
-    [candles, ordersState.data?.orders],
+  const markerData = useMemo(
+    () =>
+      buildChartMarkers({
+        orders: ordersState.data?.orders ?? [],
+        entries: trade.entries,
+        candles,
+      }),
+    [candles, ordersState.data?.orders, trade.entries],
   );
+
+  useEffect(() => {
+    markerDetailsRef.current = markerData.details;
+  }, [markerData.details]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -183,6 +217,28 @@ export function JournalChart({
     });
     const markerPlugin = createSeriesMarkers(series, []);
 
+    chart.subscribeCrosshairMove((param) => {
+      const objectId = param.hoveredInfo?.objectId ?? param.hoveredObjectId;
+      const point = param.point;
+
+      if (!objectId || !point) {
+        setHoveredMarker(null);
+        return;
+      }
+
+      const detail = markerDetailsRef.current.get(String(objectId));
+      if (!detail) {
+        setHoveredMarker(null);
+        return;
+      }
+
+      setHoveredMarker({
+        ...detail,
+        x: point.x,
+        y: point.y,
+      });
+    });
+
     chartRef.current = chart;
     seriesRef.current = series;
     markersRef.current = markerPlugin;
@@ -199,9 +255,9 @@ export function JournalChart({
     if (!seriesRef.current) return;
 
     seriesRef.current.setData(candleData);
-    markersRef.current?.setMarkers(markers);
+    markersRef.current?.setMarkers(markerData.markers);
     chartRef.current?.timeScale().fitContent();
-  }, [candleData, markers]);
+  }, [candleData, markerData.markers]);
 
   function zoom(multiplier: number) {
     const timeScale = chartRef.current?.timeScale();
@@ -233,7 +289,9 @@ export function JournalChart({
           <h2>{trade.asset.label}</h2>
           <p>
             {trade.asset.chartCoin}
-            {markers.length ? ` · ${markers.length} order markers` : ""}
+            {markerData.markers.length
+              ? ` · ${markerData.markers.length} chart markers`
+              : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -298,6 +356,34 @@ export function JournalChart({
 
       <div className="chart-frame chart-frame-tradingview">
         <div ref={chartContainerRef} className="h-full w-full" />
+        {hoveredMarker ? (
+          <div
+            className="chart-marker-tooltip"
+            style={{
+              left: hoveredMarker.x + 12,
+              top: hoveredMarker.y,
+            }}
+          >
+            {hoveredMarker.kind === "order" ? (
+              <>
+                <strong>{hoveredMarker.side}</strong>
+                <span>{formatCompactUsd(hoveredMarker.notionalUsd)}</span>
+                <small>
+                  {hoveredMarker.orderCount}{" "}
+                  {hoveredMarker.orderCount === 1 ? "order" : "orders"}
+                </small>
+              </>
+            ) : (
+              <>
+                <strong>Journal entry</strong>
+                <span>{hoveredMarker.date}</span>
+                <small className="chart-marker-tooltip-note">
+                  {toPlainText(hoveredMarker.descriptionMarkdown)}
+                </small>
+              </>
+            )}
+          </div>
+        ) : null}
         {loading ? (
           <div className="chart-overlay text-[#1f7a68]">
             <RefreshCw className="animate-spin" size={22} aria-hidden="true" />
@@ -314,11 +400,21 @@ export function JournalChart({
   );
 }
 
-function buildOrderMarkers(
-  orders: HyperliquidFilledOrder[],
-  candles: HyperliquidCandle[],
-): SeriesMarker<Time>[] {
-  if (!candles.length || !orders.length) return [];
+function buildChartMarkers({
+  orders,
+  entries,
+  candles,
+}: {
+  orders: HyperliquidFilledOrder[];
+  entries: JournalEntry[];
+  candles: HyperliquidCandle[];
+}): {
+  markers: SeriesMarker<Time>[];
+  details: Map<string, ChartMarkerDetail>;
+} {
+  if (!candles.length || (!orders.length && !entries.length)) {
+    return { markers: [], details: new Map() };
+  }
 
   const groups = new Map<
     string,
@@ -347,23 +443,56 @@ function buildOrderMarkers(
     groups.set(key, group);
   }
 
-  return [...groups.values()]
+  const details = new Map<string, ChartMarkerDetail>();
+  const markers = [...groups.values()]
     .map<SeriesMarker<Time>>((group) => {
       const isBuy = group.side === "Buy";
-      const prefix = isBuy ? "B" : "S";
-      const countSuffix = group.orderCount > 1 ? ` (${group.orderCount})` : "";
+      const id = `${group.time}:${group.side}`;
+      details.set(id, {
+        kind: "order",
+        id,
+        side: group.side,
+        notionalUsd: group.notionalUsd,
+        orderCount: group.orderCount,
+      });
 
       return {
-        id: `${group.time}:${group.side}`,
+        id,
         time: group.time,
         position: isBuy ? "belowBar" : "aboveBar",
         color: isBuy ? "#1f7a68" : "#9b3d30",
-        shape: isBuy ? "arrowUp" : "arrowDown",
-        text: `${prefix} ${formatCompactUsd(group.notionalUsd)}${countSuffix}`,
-        size: 1.15,
+        shape: "circle",
+        size: 0.85,
       };
     })
     .sort((a, b) => Number(a.time) - Number(b.time));
+
+  for (const entry of entries) {
+    const candle = findContainingCandle(
+      Date.parse(`${entry.date}T00:00:00.000Z`),
+      candles,
+    );
+    if (!candle) continue;
+
+    const id = `entry:${entry.id}`;
+    details.set(id, {
+      kind: "entry",
+      id,
+      date: entry.date,
+      descriptionMarkdown: entry.descriptionMarkdown,
+    });
+    markers.push({
+      id,
+      time: Math.floor(candle.time / 1000) as UTCTimestamp,
+      position: "aboveBar",
+      color: "#c27b2c",
+      shape: "square",
+      size: 0.9,
+    });
+  }
+
+  markers.sort((a, b) => Number(a.time) - Number(b.time));
+  return { markers, details };
 }
 
 function findContainingCandle(
@@ -386,4 +515,18 @@ function formatCompactUsd(value: number) {
     notation: value >= 100_000 ? "compact" : "standard",
     style: "currency",
   }).format(value);
+}
+
+function toPlainText(markdown: string) {
+  const text = markdown
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[#>*-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "No description.";
+  return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
