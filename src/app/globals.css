@@ -242,6 +242,101 @@ textarea {
   font-weight: 700;
 }
 
+.trade-row,
+.entry-row {
+  align-items: flex-start;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+}
+
+.trade-title {
+  color: #1f2523;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.trade-title:hover {
+  color: #1f7a68;
+}
+
+.entry-row {
+  background: #fff;
+}
+
+.markdown-toolbar {
+  align-items: center;
+  background: #f1eee7;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  width: fit-content;
+}
+
+.markdown-toolbar button {
+  align-items: center;
+  border-radius: 6px;
+  color: #26312d;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.markdown-toolbar button:hover {
+  background: #fff;
+}
+
+.markdown-view {
+  color: #39423e;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.markdown-view > * + * {
+  margin-top: 0.65rem;
+}
+
+.markdown-view strong {
+  color: #1f2523;
+  font-weight: 800;
+}
+
+.markdown-view em {
+  font-style: italic;
+}
+
+.markdown-view ul,
+.markdown-view ol {
+  padding-left: 1.25rem;
+}
+
+.markdown-view ul {
+  list-style: disc;
+}
+
+.markdown-view ol {
+  list-style: decimal;
+}
+
+.markdown-view a {
+  color: #1f7a68;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
+}
+
+.chart-frame {
+  height: 22rem;
+  min-height: 22rem;
+}
+
 .tag {
   align-items: center;
   background: #f1eee7;

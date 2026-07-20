@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Settings } from "lucide-react";
+import { BarChart3, NotebookText, Settings } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -20,6 +20,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="flex items-center gap-2">
             <Link className="nav-link" href="/">
               Portfolio
+            </Link>
+            <Link className="nav-link" href="/journal">
+              <NotebookText size={16} aria-hidden="true" />
+              Journal
             </Link>
             <Link className="nav-link" href="/settings">
               <Settings size={16} aria-hidden="true" />

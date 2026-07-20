@@ -80,3 +80,43 @@ export type PortfolioResponse = {
   snapshot: PortfolioSnapshot | null;
   accountsCount: number;
 };
+
+export type JournalAssetKind = "perp" | "spot" | "trade-xyz";
+
+export type JournalTradeAsset = {
+  kind: JournalAssetKind;
+  label: string;
+  coin: string;
+  chartCoin: string;
+  dex?: string;
+};
+
+export type JournalEntry = {
+  id: string;
+  date: string;
+  descriptionMarkdown: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type JournalTrade = {
+  id: string;
+  title: string;
+  descriptionMarkdown: string;
+  startDate: string;
+  endDate: string | null;
+  asset: JournalTradeAsset;
+  entries: JournalEntry[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type HyperliquidCandle = {
+  time: number;
+  timeKey: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};

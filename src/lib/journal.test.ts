@@ -1,0 +1,197 @@
+import { ObjectId, type Db } from "mongodb";
+import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+
+import {
+  createEntry,
+  createTrade,
+  deleteEntry,
+  deleteTrade,
+  getTrade,
+  listTrades,
+  updateEntry,
+  updateTrade,
+} from "@/lib/journal";
+
+const asset = {
+  kind: "perp" as const,
+  label: "ETH perp",
+  coin: "ETH",
+  chartCoin: "ETH",
+};
+
+describe("journal trades", () => {
+  it("creates, serializes, updates, and deletes trades and entries", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      title: " ETH setup ",
+      descriptionMarkdown: "**Long** pullback",
+      startDate: "2026-07-01",
+      endDate: "",
+      asset,
+    });
+
+    expect(trade).toMatchObject({
+      title: "ETH setup",
+      endDate: null,
+      entries: [],
+    });
+
+    const updated = await updateTrade(db, trade.id, {
+      endDate: "2026-07-03",
+    });
+
+    expect(updated?.endDate).toBe("2026-07-03");
+
+    const withEntry = await createEntry(db, trade.id, {
+      date: "2026-07-02",
+      descriptionMarkdown: "Added after confirmation",
+    });
+    const entry = withEntry?.entries[0];
+
+    expect(entry).toMatchObject({
+      date: "2026-07-02",
+      descriptionMarkdown: "Added after confirmation",
+    });
+
+    const afterEntryUpdate = await updateEntry(db, trade.id, entry?.id ?? "", {
+      descriptionMarkdown: "_Trailing stop_",
+    });
+
+    expect(afterEntryUpdate?.entries[0].descriptionMarkdown).toBe("_Trailing stop_");
+
+    const afterEntryDelete = await deleteEntry(db, trade.id, entry?.id ?? "");
+    expect(afterEntryDelete?.entries).toHaveLength(0);
+
+    expect(await listTrades(db)).toHaveLength(1);
+    expect(await getTrade(db, "not-an-object-id")).toBeNull();
+    expect(await deleteTrade(db, trade.id)).toBe(true);
+    expect(await listTrades(db)).toHaveLength(0);
+  });
+
+  it("validates required fields and date ordering", async () => {
+    const db = fakeDb();
+
+    await expect(
+      createTrade(db, {
+        title: "",
+        descriptionMarkdown: "",
+        startDate: "2026-07-01",
+        asset,
+      }),
+    ).rejects.toBeInstanceOf(ZodError);
+
+    const trade = await createTrade(db, {
+      title: "BTC idea",
+      descriptionMarkdown: "",
+      startDate: "2026-07-10",
+      asset,
+    });
+
+    await expect(
+      updateTrade(db, trade.id, { endDate: "2026-07-09" }),
+    ).rejects.toBeInstanceOf(ZodError);
+  });
+});
+
+function fakeDb() {
+  const collection = new FakeCollection();
+  return {
+    collection: () => collection,
+  } as unknown as Db;
+}
+
+class FakeCollection {
+  docs: Document[] = [];
+
+  find() {
+    return {
+      sort: () => ({
+        toArray: async () => [...this.docs],
+      }),
+    };
+  }
+
+  async findOne(query: Query) {
+    return this.docs.find((doc) => idsEqual(doc._id, query._id)) ?? null;
+  }
+
+  async insertOne(doc: Document) {
+    this.docs.push(doc);
+    return { insertedId: doc._id };
+  }
+
+  async findOneAndUpdate(query: Query, update: Update) {
+    const doc = this.docs.find((candidate) => matches(candidate, query));
+    if (!doc) return null;
+
+    applyUpdate(doc, update);
+    return doc;
+  }
+
+  async deleteOne(query: Query) {
+    const initialLength = this.docs.length;
+    this.docs = this.docs.filter((doc) => !idsEqual(doc._id, query._id));
+    return { deletedCount: initialLength - this.docs.length };
+  }
+}
+
+type Document = {
+  _id: ObjectId;
+  entries?: Array<{
+    _id: ObjectId;
+    date: string;
+    descriptionMarkdown: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  [key: string]: unknown;
+};
+
+type Query = {
+  _id?: ObjectId;
+  "entries._id"?: ObjectId;
+};
+
+type Update = {
+  $set?: Record<string, unknown>;
+  $push?: { entries: Document["entries"] extends Array<infer T> ? T : never };
+  $pull?: { entries: { _id: ObjectId } };
+};
+
+function matches(doc: Document, query: Query) {
+  if (query._id && !idsEqual(doc._id, query._id)) return false;
+  if (query["entries._id"]) {
+    return Boolean(
+      doc.entries?.some((entry) => idsEqual(entry._id, query["entries._id"])),
+    );
+  }
+  return true;
+}
+
+function applyUpdate(doc: Document, update: Update) {
+  for (const [key, value] of Object.entries(update.$set ?? {})) {
+    if (key.startsWith("entries.$.")) {
+      const entry = doc.entries?.[0];
+      if (entry) {
+        entry[key.replace("entries.$.", "") as keyof typeof entry] = value as never;
+      }
+    } else {
+      doc[key] = value;
+    }
+  }
+
+  if (update.$push?.entries) {
+    doc.entries = [...(doc.entries ?? []), update.$push.entries];
+  }
+
+  if (update.$pull?.entries) {
+    doc.entries = (doc.entries ?? []).filter(
+      (entry) => !idsEqual(entry._id, update.$pull?.entries._id),
+    );
+  }
+}
+
+function idsEqual(left: ObjectId | undefined, right: ObjectId | undefined) {
+  return Boolean(left && right && left.toString() === right.toString());
+}
