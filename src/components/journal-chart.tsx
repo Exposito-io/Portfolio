@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, Scan, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+} from "lucide-react";
 import {
   CandlestickSeries,
   ColorType,
@@ -91,6 +95,7 @@ export function JournalChart({
   trade: JournalTrade;
   ordersState: FilledOrdersState;
 }) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -101,9 +106,9 @@ export function JournalChart({
   const [days, setDays] = useState(90);
   const [error, setError] = useState("");
   const [hoveredMarker, setHoveredMarker] = useState<HoveredMarker | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const rangeOptions = rangeOptionsByInterval[interval];
   const candleData = useMemo(
     () =>
       candles.map<CandlestickData<UTCTimestamp>>((candle) => ({
@@ -128,6 +133,17 @@ export function JournalChart({
   useEffect(() => {
     markerDetailsRef.current = markerData.details;
   }, [markerData.details]);
+
+  useEffect(() => {
+    function syncFullscreenState() {
+      setIsFullscreen(document.fullscreenElement === panelRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -259,19 +275,6 @@ export function JournalChart({
     chartRef.current?.timeScale().fitContent();
   }, [candleData, markerData.markers]);
 
-  function zoom(multiplier: number) {
-    const timeScale = chartRef.current?.timeScale();
-    const range = timeScale?.getVisibleLogicalRange();
-    if (!timeScale || !range) return;
-
-    const center = (range.from + range.to) / 2;
-    const halfWidth = ((range.to - range.from) * multiplier) / 2;
-    timeScale.setVisibleLogicalRange({
-      from: center - halfWidth,
-      to: center + halfWidth,
-    });
-  }
-
   function changeInterval(nextInterval: CandleInterval) {
     setInterval(nextInterval);
     const allowedDays = rangeOptionsByInterval[nextInterval].map(
@@ -282,8 +285,27 @@ export function JournalChart({
     }
   }
 
+  async function toggleFullscreen() {
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    try {
+      if (document.fullscreenElement === panel) {
+        await document.exitFullscreen();
+      } else {
+        await panel.requestFullscreen();
+      }
+    } catch (fullscreenError) {
+      setError(
+        fullscreenError instanceof Error
+          ? fullscreenError.message
+          : "Unable to toggle fullscreen.",
+      );
+    }
+  }
+
   return (
-    <div className="panel">
+    <div ref={panelRef} className="panel chart-panel">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="panel-heading">
           <h2>{trade.asset.label}</h2>
@@ -308,43 +330,19 @@ export function JournalChart({
             <option value="1d">1d</option>
             <option value="1w">1w</option>
           </select>
-          <select
-            className="input h-10 w-28"
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
-          >
-            {rangeOptions.map((option) => (
-              <option key={option.days} value={option.days}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+
           <button
             className="icon-button"
             type="button"
-            title="Zoom in"
-            aria-label="Zoom in"
-            onClick={() => zoom(0.7)}
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            onClick={toggleFullscreen}
           >
-            <ZoomIn size={16} aria-hidden="true" />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            title="Zoom out"
-            aria-label="Zoom out"
-            onClick={() => zoom(1.4)}
-          >
-            <ZoomOut size={16} aria-hidden="true" />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            title="Fit chart"
-            aria-label="Fit chart"
-            onClick={() => chartRef.current?.timeScale().fitContent()}
-          >
-            <Scan size={16} aria-hidden="true" />
+            {isFullscreen ? (
+              <Minimize2 size={16} aria-hidden="true" />
+            ) : (
+              <Maximize2 size={16} aria-hidden="true" />
+            )}
           </button>
         </div>
       </div>

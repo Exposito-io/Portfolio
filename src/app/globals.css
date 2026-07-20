@@ -337,6 +337,23 @@ textarea {
   min-height: 22rem;
 }
 
+.chart-panel:fullscreen {
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 1rem;
+  width: 100vw;
+}
+
+.chart-panel:fullscreen .chart-frame {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
 .chart-frame-tradingview {
   background: #fff;
   border-radius: 8px;
