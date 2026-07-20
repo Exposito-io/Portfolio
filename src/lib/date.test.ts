@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { getDateKey, isValidDateKey } from "@/lib/date";
+import {
+  getDateKey,
+  getZonedDateEndMs,
+  getZonedDateStartMs,
+  isValidDateKey,
+} from "@/lib/date";
 
 describe("date helpers", () => {
   it("formats date keys in the requested timezone", () => {
@@ -12,5 +17,14 @@ describe("date helpers", () => {
   it("validates date-key shape", () => {
     expect(isValidDateKey("2026-07-19")).toBe(true);
     expect(isValidDateKey("07/19/2026")).toBe(false);
+  });
+
+  it("converts date keys to local day boundaries", () => {
+    expect(
+      new Date(getZonedDateStartMs("2026-07-20", "America/Toronto")).toISOString(),
+    ).toBe("2026-07-20T04:00:00.000Z");
+    expect(
+      new Date(getZonedDateEndMs("2026-01-20", "America/Toronto")).toISOString(),
+    ).toBe("2026-01-21T04:59:59.999Z");
   });
 });

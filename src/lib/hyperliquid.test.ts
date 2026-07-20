@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchHyperliquidAccount,
   fetchHyperliquidCandles,
+  fetchHyperliquidFilledOrdersByTime,
   fetchHyperliquidMarkets,
+  fetchHyperliquidUserFillsByTime,
+  getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
 import type { PortfolioAccount } from "@/lib/types";
 
@@ -237,6 +240,142 @@ describe("Hyperliquid normalization", () => {
         close: 108,
         volume: 1234,
       },
+    ]);
+  });
+
+  it("normalizes user fills by time for selected asset aliases", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          coin: "xyz:XYZ100",
+          px: "123.45",
+          sz: "2",
+          side: "B",
+          time: 1_800_000_000_000,
+          dir: "Open Long",
+          closedPnl: "0",
+          hash: "0xabc",
+          oid: 42,
+          crossed: true,
+          fee: "0.12",
+          feeToken: "USDC",
+          tid: 99,
+        },
+        {
+          coin: "BTC",
+          px: "64000",
+          sz: "0.1",
+          side: "A",
+          time: 1_800_000_001_000,
+          tid: 100,
+        },
+      ],
+    });
+
+    const fills = await fetchHyperliquidUserFillsByTime(
+      {
+        account,
+        startTime: 1_799_999_000_000,
+        endTime: 1_800_001_000_000,
+        coinAliases: ["xyz:XYZ100", "XYZ100"],
+      },
+      fetcher,
+    );
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({
+          type: "userFillsByTime",
+          user: account.address,
+          startTime: 1_799_999_000_000,
+          endTime: 1_800_001_000_000,
+          aggregateByTime: true,
+        }),
+      }),
+    );
+    expect(fills).toEqual([
+      expect.objectContaining({
+        id: "hl1:99",
+        coin: "xyz:XYZ100",
+        side: "Buy",
+        price: 123.45,
+        size: 2,
+        notionalUsd: 246.9,
+        fee: 0.12,
+        feeToken: "USDC",
+        closedPnl: 0,
+      }),
+    ]);
+  });
+
+  it("builds Trade XYZ coin aliases with and without the dex prefix", () => {
+    expect(
+      getHyperliquidCoinAliases({
+        kind: "trade-xyz",
+        label: "XYZ100 Trade XYZ perp",
+        coin: "XYZ100",
+        chartCoin: "xyz:XYZ100",
+        dex: "xyz",
+      }),
+    ).toEqual(["XYZ100", "xyz:XYZ100"]);
+  });
+
+  it("aggregates fills into filled orders by order id", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          coin: "BTC",
+          px: "100",
+          sz: "1",
+          side: "B",
+          time: 1_800_000_000_000,
+          dir: "Open Long",
+          oid: 42,
+          fee: "0.1",
+          feeToken: "USDC",
+          tid: 1,
+        },
+        {
+          coin: "BTC",
+          px: "110",
+          sz: "2",
+          side: "B",
+          time: 1_800_000_001_000,
+          dir: "Open Long",
+          oid: 42,
+          fee: "0.2",
+          feeToken: "USDC",
+          tid: 2,
+        },
+      ],
+    });
+
+    const orders = await fetchHyperliquidFilledOrdersByTime(
+      {
+        account,
+        startTime: 1_799_999_000_000,
+        endTime: 1_800_001_000_000,
+        coinAliases: ["BTC"],
+      },
+      fetcher,
+    );
+
+    expect(orders).toEqual([
+      expect.objectContaining({
+        id: "hl1:42:BTC:Buy",
+        side: "Buy",
+        direction: "Open Long",
+        averagePrice: 106.67,
+        totalSize: 3,
+        notionalUsd: 320,
+        fee: 0.3,
+        feeToken: "USDC",
+        orderId: 42,
+        fillCount: 2,
+      }),
     ]);
   });
 });

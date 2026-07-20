@@ -120,3 +120,42 @@ export type HyperliquidCandle = {
   close: number;
   volume: number;
 };
+
+export type HyperliquidFill = {
+  id: string;
+  accountId: string;
+  accountLabel: string;
+  coin: string;
+  side: "Buy" | "Sell" | "Unknown";
+  direction: string;
+  price: number;
+  size: number;
+  notionalUsd: number;
+  fee: number | null;
+  feeToken: string | null;
+  closedPnl: number | null;
+  time: number;
+  timeKey: string;
+  hash: string | null;
+  orderId: number | null;
+  crossed: boolean | null;
+};
+
+export type HyperliquidFilledOrder = {
+  id: string;
+  accountId: string;
+  accountLabel: string;
+  coin: string;
+  side: "Buy" | "Sell" | "Unknown";
+  direction: string;
+  averagePrice: number;
+  totalSize: number;
+  notionalUsd: number;
+  fee: number | null;
+  feeToken: string | null;
+  closedPnl: number | null;
+  firstTime: number;
+  lastTime: number;
+  orderId: number | null;
+  fillCount: number;
+};

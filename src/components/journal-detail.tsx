@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { JournalChart } from "@/components/journal-chart";
+import { JournalFilledOrders } from "@/components/journal-filled-orders";
 import {
   JournalTradeForm,
   type TradeFormPayload,
@@ -227,6 +228,8 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
         <JournalChart asset={trade.asset} />
       </section>
+
+      <JournalFilledOrders trade={trade} />
 
       <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
         <div className="panel h-fit">

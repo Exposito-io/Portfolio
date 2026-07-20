@@ -1,6 +1,8 @@
 import { roundCurrency } from "@/lib/portfolio-calculations";
 import type {
   HyperliquidCandle,
+  HyperliquidFill,
+  HyperliquidFilledOrder,
   JournalTradeAsset,
   PortfolioAccount,
   PortfolioPosition,
@@ -69,6 +71,22 @@ type HyperliquidCandleResponse = {
   c?: string;
   v?: string;
 }[];
+
+type HyperliquidUserFillResponse = Array<{
+  coin?: string;
+  px?: string;
+  sz?: string;
+  side?: "A" | "B" | string;
+  time?: number;
+  dir?: string;
+  closedPnl?: string;
+  hash?: string;
+  oid?: number;
+  crossed?: boolean;
+  fee?: string;
+  feeToken?: string;
+  tid?: number;
+}>;
 
 export type HyperliquidAccountResult = {
   summary: SourceSummary;
@@ -285,6 +303,90 @@ export async function fetchHyperliquidCandles(
     .filter((candle) => candle.time > 0 && Number.isFinite(candle.close));
 }
 
+export async function fetchHyperliquidUserFillsByTime(
+  {
+    account,
+    startTime,
+    endTime,
+    coinAliases,
+  }: {
+    account: PortfolioAccount;
+    startTime: number;
+    endTime: number;
+    coinAliases: string[];
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<HyperliquidFill[]> {
+  const aliases = new Set(coinAliases);
+  const fills: HyperliquidFill[] = [];
+  let nextStartTime = startTime;
+
+  for (let page = 0; page < 5 && nextStartTime <= endTime; page += 1) {
+    const response = await postInfo<HyperliquidUserFillResponse>(
+      {
+        type: "userFillsByTime",
+        user: account.address,
+        startTime: nextStartTime,
+        endTime,
+        aggregateByTime: true,
+      },
+      fetcher,
+      `Hyperliquid fills for ${account.label}`,
+    );
+    const pageFills = response
+      .filter((fill) => fill.coin && aliases.has(fill.coin))
+      .map((fill) => normalizeFill(fill, account));
+
+    fills.push(...pageFills);
+
+    if (response.length < 2000) break;
+    const lastTime = Math.max(...response.map((fill) => Number(fill.time ?? 0)));
+    if (!Number.isFinite(lastTime) || lastTime < nextStartTime) break;
+    nextStartTime = lastTime + 1;
+  }
+
+  return fills.sort((a, b) => b.time - a.time);
+}
+
+export async function fetchHyperliquidFilledOrdersByTime(
+  {
+    account,
+    startTime,
+    endTime,
+    coinAliases,
+  }: {
+    account: PortfolioAccount;
+    startTime: number;
+    endTime: number;
+    coinAliases: string[];
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<HyperliquidFilledOrder[]> {
+  const fills = await fetchHyperliquidUserFillsByTime(
+    {
+      account,
+      startTime,
+      endTime,
+      coinAliases,
+    },
+    fetcher,
+  );
+
+  return aggregateFillsToOrders(fills);
+}
+
+export function getHyperliquidCoinAliases(asset: JournalTradeAsset) {
+  const aliases = new Set([asset.coin, asset.chartCoin]);
+
+  if (asset.kind === "trade-xyz") {
+    const withoutPrefix = asset.chartCoin.replace(/^xyz:/, "");
+    aliases.add(withoutPrefix);
+    aliases.add(`xyz:${withoutPrefix}`);
+  }
+
+  return [...aliases].filter(Boolean);
+}
+
 async function fetchSpotClearinghouseState(
   account: PortfolioAccount,
   fetcher: typeof fetch,
@@ -367,6 +469,128 @@ function parseUsd(value: string | undefined) {
 function parseNullableNumber(value: string | undefined) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeFill(
+  fill: HyperliquidUserFillResponse[number],
+  account: PortfolioAccount,
+): HyperliquidFill {
+  const price = Number(fill.px ?? 0);
+  const size = Number(fill.sz ?? 0);
+  const time = Number(fill.time ?? 0);
+  const orderId = fill.oid ?? null;
+  const tradeId = fill.tid ?? `${time}:${orderId ?? "unknown"}`;
+
+  return {
+    id: `${account.id}:${tradeId}`,
+    accountId: account.id,
+    accountLabel: account.label,
+    coin: fill.coin ?? "",
+    side: toFillSide(fill.side),
+    direction: fill.dir ?? "",
+    price,
+    size,
+    notionalUsd: roundCurrency(price * size),
+    fee: parseNullableNumber(fill.fee),
+    feeToken: fill.feeToken ?? null,
+    closedPnl: parseNullableNumber(fill.closedPnl),
+    time,
+    timeKey: new Date(time).toISOString(),
+    hash: fill.hash ?? null,
+    orderId,
+    crossed: fill.crossed ?? null,
+  };
+}
+
+function aggregateFillsToOrders(
+  fills: HyperliquidFill[],
+): HyperliquidFilledOrder[] {
+  const groups = new Map<
+    string,
+    {
+      accountId: string;
+      accountLabel: string;
+      coin: string;
+      side: HyperliquidFill["side"];
+      directions: Set<string>;
+      notionalUsd: number;
+      totalSize: number;
+      fee: number | null;
+      feeTokens: Set<string>;
+      closedPnl: number | null;
+      firstTime: number;
+      lastTime: number;
+      orderId: number | null;
+      fillCount: number;
+    }
+  >();
+
+  for (const fill of fills) {
+    const key = `${fill.accountId}:${fill.orderId ?? fill.id}:${fill.coin}:${fill.side}`;
+    const group = groups.get(key) ?? {
+      accountId: fill.accountId,
+      accountLabel: fill.accountLabel,
+      coin: fill.coin,
+      side: fill.side,
+      directions: new Set<string>(),
+      notionalUsd: 0,
+      totalSize: 0,
+      fee: null,
+      feeTokens: new Set<string>(),
+      closedPnl: null,
+      firstTime: fill.time,
+      lastTime: fill.time,
+      orderId: fill.orderId,
+      fillCount: 0,
+    };
+
+    if (fill.direction) group.directions.add(fill.direction);
+    group.notionalUsd += fill.notionalUsd;
+    group.totalSize += fill.size;
+    group.fee = fill.fee === null ? group.fee : (group.fee ?? 0) + fill.fee;
+    if (fill.feeToken) group.feeTokens.add(fill.feeToken);
+    group.closedPnl =
+      fill.closedPnl === null
+        ? group.closedPnl
+        : (group.closedPnl ?? 0) + fill.closedPnl;
+    group.firstTime = Math.min(group.firstTime, fill.time);
+    group.lastTime = Math.max(group.lastTime, fill.time);
+    group.fillCount += 1;
+
+    groups.set(key, group);
+  }
+
+  return [...groups.entries()]
+    .map(([id, group]) => ({
+      id,
+      accountId: group.accountId,
+      accountLabel: group.accountLabel,
+      coin: group.coin,
+      side: group.side,
+      direction: [...group.directions].join(", "),
+      averagePrice:
+        group.totalSize === 0
+          ? 0
+          : roundCurrency(group.notionalUsd / group.totalSize),
+      totalSize: group.totalSize,
+      notionalUsd: roundCurrency(group.notionalUsd),
+      fee: group.fee === null ? null : roundCurrency(group.fee),
+      feeToken:
+        group.feeTokens.size === 1 ? [...group.feeTokens][0] : "Multiple",
+      closedPnl:
+        group.closedPnl === null ? null : roundCurrency(group.closedPnl),
+      firstTime: group.firstTime,
+      lastTime: group.lastTime,
+      orderId: group.orderId,
+      fillCount: group.fillCount,
+    }))
+    .sort((a, b) => b.lastTime - a.lastTime);
+}
+
+function toFillSide(side: string | undefined): HyperliquidFill["side"] {
+  if (side === "B") return "Buy";
+  if (side === "A") return "Sell";
+  return "Unknown";
 }
 
 function toSpotAsset(
