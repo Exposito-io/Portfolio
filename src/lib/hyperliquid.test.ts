@@ -22,6 +22,20 @@ describe("Hyperliquid normalization", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
+          balances: [
+            {
+              coin: "USDC",
+              token: 0,
+              total: "12345.67",
+              hold: "4000",
+              entryNtl: "0.0",
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
           marginSummary: {
             accountValue: "3000.42",
             totalNtlPos: "2500",
@@ -70,21 +84,30 @@ describe("Hyperliquid normalization", () => {
       "https://api.hyperliquid.xyz/info",
       expect.objectContaining({
         body: JSON.stringify({
+          type: "spotClearinghouseState",
+          user: account.address,
+        }),
+      }),
+    );
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({
           type: "clearinghouseState",
           user: account.address,
           dex: "xyz",
         }),
       }),
     );
-    expect(result.summary.netWorthUsd).toBe(4000.42);
+    expect(result.summary.netWorthUsd).toBe(12345.67);
     expect(result.summary.totalInvestmentsUsd).toBe(8000.42);
-    expect(result.positions).toHaveLength(4);
-    expect(result.positions[1]).toMatchObject({
+    expect(result.positions).toHaveLength(2);
+    expect(result.positions[0]).toMatchObject({
       symbol: "SOL",
       valueUsd: 2500,
       quantity: 12,
     });
-    expect(result.positions[3]).toMatchObject({
+    expect(result.positions[1]).toMatchObject({
       symbol: "xyz:XYZ100",
       name: "xyz:XYZ100 Trade XYZ perpetual position",
       valueUsd: 5000,
