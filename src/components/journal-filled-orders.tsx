@@ -1,59 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
-import type {
-  HyperliquidFilledOrder,
-  JournalTrade,
-  SourceError,
-} from "@/lib/types";
+import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
+import type { JournalTrade } from "@/lib/types";
 
-type OrdersResponse = {
-  orders: HyperliquidFilledOrder[];
-  sourceErrors: SourceError[];
-  accountsCount: number;
-};
-
-export function JournalFilledOrders({ trade }: { trade: JournalTrade }) {
-  const [data, setData] = useState<OrdersResponse | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadOrders() {
-      setLoading(true);
-      setError("");
-      try {
-        const response = await fetch(
-          `/api/journal/trades/${trade.id}/filled-orders`,
-          {
-            signal: controller.signal,
-          },
-        );
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Unable to load orders.");
-        setData(payload);
-      } catch (loadError) {
-        if (!controller.signal.aborted) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "Unable to load orders.",
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadOrders();
-    return () => controller.abort();
-  }, [trade.id]);
+export function JournalFilledOrders({
+  trade,
+  ordersState,
+}: {
+  trade: JournalTrade;
+  ordersState: FilledOrdersState;
+}) {
+  const { data, error, loading } = ordersState;
 
   return (
     <section className="panel overflow-hidden">

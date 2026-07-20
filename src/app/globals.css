@@ -337,6 +337,22 @@ textarea {
   min-height: 22rem;
 }
 
+.chart-frame-tradingview {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.chart-overlay {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.72);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+}
+
 .tag {
   align-items: center;
   background: #f1eee7;

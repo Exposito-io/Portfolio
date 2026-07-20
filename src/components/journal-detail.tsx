@@ -11,6 +11,7 @@ import {
   type TradeFormPayload,
 } from "@/components/journal-trade-form";
 import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
+import { useJournalFilledOrders } from "@/components/use-journal-filled-orders";
 import type { JournalEntry, JournalTrade, JournalTradeAsset } from "@/lib/types";
 
 type EntryFormState = {
@@ -32,6 +33,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const filledOrdersState = useJournalFilledOrders(trade?.id ?? null);
 
   const loadTrade = useCallback(async () => {
     setLoading(true);
@@ -226,10 +228,10 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           )}
         </div>
 
-        <JournalChart asset={trade.asset} />
+        <JournalChart trade={trade} ordersState={filledOrdersState} />
       </section>
 
-      <JournalFilledOrders trade={trade} />
+      <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
 
       <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
         <div className="panel h-fit">
