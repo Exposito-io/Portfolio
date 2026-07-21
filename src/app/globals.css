@@ -332,6 +332,14 @@ textarea {
   text-underline-offset: 0.16rem;
 }
 
+.markdown-view img {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
 .chart-frame {
   height: 22rem;
   min-height: 22rem;

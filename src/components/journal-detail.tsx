@@ -260,6 +260,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               id="entry-description"
               label="Entry"
               required
+              enableImageUpload
               value={entryForm.descriptionMarkdown}
               onChange={(descriptionMarkdown) =>
                 setEntryForm({ ...entryForm, descriptionMarkdown })
