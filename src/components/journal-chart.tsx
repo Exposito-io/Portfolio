@@ -5,6 +5,7 @@ import {
   Maximize2,
   Minimize2,
   RefreshCw,
+  X,
 } from "lucide-react";
 import {
   CandlestickSeries,
@@ -15,11 +16,13 @@ import {
   type IChartApi,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
+  type MouseEventParams,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 
+import { MarkdownView } from "@/components/markdown-editor";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import type {
   HyperliquidCandle,
@@ -106,6 +109,7 @@ export function JournalChart({
   const [days, setDays] = useState(90);
   const [error, setError] = useState("");
   const [hoveredMarker, setHoveredMarker] = useState<HoveredMarker | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -129,10 +133,31 @@ export function JournalChart({
       }),
     [candles, ordersState.data?.orders, trade.entries],
   );
+  const selectedEntry = useMemo(() => {
+    if (!selectedEntryId) return null;
+
+    const detail = markerData.details.get(selectedEntryId);
+    return detail?.kind === "entry" ? detail : null;
+  }, [markerData.details, selectedEntryId]);
 
   useEffect(() => {
     markerDetailsRef.current = markerData.details;
   }, [markerData.details]);
+
+  useEffect(() => {
+    if (!selectedEntry) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedEntryId(null);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [selectedEntry]);
 
   useEffect(() => {
     function syncFullscreenState() {
@@ -233,17 +258,11 @@ export function JournalChart({
     });
     const markerPlugin = createSeriesMarkers(series, []);
 
-    chart.subscribeCrosshairMove((param) => {
-      const objectId = param.hoveredInfo?.objectId ?? param.hoveredObjectId;
+    const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       const point = param.point;
+      const detail = getHoveredMarkerDetail(param, markerDetailsRef.current);
 
-      if (!objectId || !point) {
-        setHoveredMarker(null);
-        return;
-      }
-
-      const detail = markerDetailsRef.current.get(String(objectId));
-      if (!detail) {
+      if (!detail || !point) {
         setHoveredMarker(null);
         return;
       }
@@ -253,13 +272,28 @@ export function JournalChart({
         x: point.x,
         y: point.y,
       });
-    });
+    };
+
+    const handleChartClick = (param: MouseEventParams<Time>) => {
+      const detail = getHoveredMarkerDetail(param, markerDetailsRef.current);
+      if (detail?.kind !== "entry") {
+        return;
+      }
+
+      setHoveredMarker(null);
+      setSelectedEntryId(detail.id);
+    };
+
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+    chart.subscribeClick(handleChartClick);
 
     chartRef.current = chart;
     seriesRef.current = series;
     markersRef.current = markerPlugin;
 
     return () => {
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      chart.unsubscribeClick(handleChartClick);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -372,13 +406,7 @@ export function JournalChart({
                 </small>
               </>
             ) : (
-              <>
-                <strong>Journal entry</strong>
-                <span>{hoveredMarker.date}</span>
-                <small className="chart-marker-tooltip-note">
-                  {toPlainText(hoveredMarker.descriptionMarkdown)}
-                </small>
-              </>
+              <EntryMarkerTooltip marker={hoveredMarker} />
             )}
           </div>
         ) : null}
@@ -394,8 +422,72 @@ export function JournalChart({
           null
         )}
       </div>
+
+      {selectedEntry ? (
+        <div
+          className="journal-entry-modal-backdrop"
+          onClick={() => setSelectedEntryId(null)}
+        >
+          <div
+            aria-labelledby="journal-entry-modal-title"
+            aria-modal="true"
+            className="journal-entry-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="journal-entry-modal-header">
+              <div>
+                <p>Journal entry</p>
+                <h3 id="journal-entry-modal-title">{selectedEntry.date}</h3>
+              </div>
+              <button
+                aria-label="Close entry"
+                className="icon-button"
+                onClick={() => setSelectedEntryId(null)}
+                type="button"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="journal-entry-modal-body">
+              <MarkdownView value={selectedEntry.descriptionMarkdown} />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function EntryMarkerTooltip({ marker }: { marker: ChartEntryMarker }) {
+  const image = getFirstMarkdownImage(marker.descriptionMarkdown);
+
+  return (
+    <>
+      <strong>Journal entry</strong>
+      <span>{marker.date}</span>
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Tooltip images come from Markdown/GridFS without stable dimensions for next/image.
+        <img
+          alt={image.alt}
+          className="chart-marker-tooltip-image"
+          src={image.src}
+        />
+      ) : null}
+      <small className="chart-marker-tooltip-note">
+        {toPlainText(marker.descriptionMarkdown)}
+      </small>
+    </>
+  );
+}
+
+function getHoveredMarkerDetail(
+  param: MouseEventParams<Time>,
+  details: Map<string, ChartMarkerDetail>,
+) {
+  const objectId = param.hoveredInfo?.objectId ?? param.hoveredObjectId;
+  if (!objectId) return null;
+  return details.get(String(objectId)) ?? null;
 }
 
 function buildChartMarkers({
@@ -515,8 +607,32 @@ function formatCompactUsd(value: number) {
   }).format(value);
 }
 
+function getFirstMarkdownImage(markdown: string) {
+  const imageMatch = markdown.match(
+    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'))?\)/,
+  );
+  if (!imageMatch) return null;
+
+  const src = imageMatch[2].replace(/^<|>$/g, "");
+  if (!isSupportedImageSrc(src)) return null;
+
+  return {
+    alt: imageMatch[1] || "Journal entry image",
+    src,
+  };
+}
+
+function isSupportedImageSrc(src: string) {
+  return (
+    src.startsWith("/") ||
+    src.startsWith("data:image/") ||
+    /^https?:\/\//i.test(src)
+  );
+}
+
 function toPlainText(markdown: string) {
   const text = markdown
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/_([^_]+)_/g, "$1")
