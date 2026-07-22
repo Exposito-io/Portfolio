@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import {
   JournalTradeForm,
@@ -15,6 +15,7 @@ export function JournalPanel() {
   const [trades, setTrades] = useState<JournalTrade[]>([]);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
   const [editingTrade, setEditingTrade] = useState<JournalTrade | null>(null);
+  const [tradeFormOpen, setTradeFormOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,6 +64,22 @@ export function JournalPanel() {
     void loadMarkets();
   }, []);
 
+  useEffect(() => {
+    if (!tradeFormOpen) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !saving) {
+        setEditingTrade(null);
+        setTradeFormOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [saving, tradeFormOpen]);
+
   async function saveTrade(payload: TradeFormPayload) {
     setSaving(true);
     setError("");
@@ -78,6 +95,7 @@ export function JournalPanel() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save trade.");
       setEditingTrade(null);
+      setTradeFormOpen(false);
       await loadTrades(false);
     } catch (saveError) {
       setError(
@@ -98,7 +116,10 @@ export function JournalPanel() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to delete trade.");
-      if (editingTrade?.id === trade.id) setEditingTrade(null);
+      if (editingTrade?.id === trade.id) {
+        setEditingTrade(null);
+        setTradeFormOpen(false);
+      }
       await loadTrades(false);
     } catch (deleteError) {
       setError(
@@ -109,40 +130,51 @@ export function JournalPanel() {
     }
   }
 
+  function openNewTradeForm() {
+    setError("");
+    setEditingTrade(null);
+    setTradeFormOpen(true);
+  }
+
+  function openEditTradeForm(trade: JournalTrade) {
+    setError("");
+    setEditingTrade(trade);
+    setTradeFormOpen(true);
+  }
+
+  function closeTradeForm() {
+    if (saving) return;
+    setEditingTrade(null);
+    setTradeFormOpen(false);
+  }
+
   return (
-    <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[440px_1fr] lg:px-8">
-      <section className="panel h-fit">
-        <div className="panel-heading">
-          <h1>Journal</h1>
-          <p>{editingTrade ? "Edit trade idea" : "New trade idea"}</p>
-        </div>
-
-        {error ? <div className="alert alert-error">{error}</div> : null}
-
-        <div className="mt-5">
-          <JournalTradeForm
-            key={editingTrade?.id ?? "new"}
-            trade={editingTrade}
-            markets={markets}
-            saving={saving}
-            submitLabel={editingTrade ? "Save trade" : "Add trade"}
-            onCancel={editingTrade ? () => setEditingTrade(null) : undefined}
-            onSubmit={saveTrade}
-          />
-        </div>
-      </section>
-
+    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       <section className="panel">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="panel-heading">
-            <h2>Trades</h2>
+            <h1>Journal</h1>
             <p>{trades.length ? `${trades.length} saved ideas` : "Saved ideas"}</p>
           </div>
-          <span className="tag tag-green">
-            <BookOpen size={13} aria-hidden="true" />
-            {trades.filter((trade) => !trade.endDate).length} open
-          </span>
+          <div className="flex flex-wrap gap-2">
+            <span className="tag tag-green">
+              <BookOpen size={13} aria-hidden="true" />
+              {trades.filter((trade) => !trade.endDate).length} open
+            </span>
+            <button
+              className="button-primary"
+              onClick={openNewTradeForm}
+              type="button"
+            >
+              <Plus size={16} aria-hidden="true" />
+              New Trade
+            </button>
+          </div>
         </div>
+
+        {error && !tradeFormOpen ? (
+          <div className="alert alert-error">{error}</div>
+        ) : null}
 
         {loading ? (
           <p className="py-8 text-sm text-[#69706c]">Loading trades...</p>
@@ -175,19 +207,14 @@ export function JournalPanel() {
                   {formatDateRange(trade)}
                 </p>
                 <div className="mt-3 line-clamp-3 text-sm leading-6 text-[#4f5753]">
-                  <MarkdownView
-                    value={
-                      trade.entries[0]?.descriptionMarkdown ||
-                      trade.descriptionMarkdown
-                    }
-                  />
+                  <MarkdownView value={trade.descriptionMarkdown} />
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">
                 <button
                   className="icon-button"
                   aria-label={`Edit ${trade.title}`}
-                  onClick={() => setEditingTrade(trade)}
+                  onClick={() => openEditTradeForm(trade)}
                 >
                   <Pencil size={16} aria-hidden="true" />
                 </button>
@@ -203,6 +230,49 @@ export function JournalPanel() {
           ))}
         </div>
       </section>
+
+      {tradeFormOpen ? (
+        <div className="journal-modal-backdrop" onClick={closeTradeForm}>
+          <div
+            aria-labelledby="journal-trade-modal-title"
+            aria-modal="true"
+            className="journal-modal journal-trade-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="journal-modal-header">
+              <div>
+                <p>{editingTrade ? "Edit trade idea" : "New trade idea"}</p>
+                <h2 id="journal-trade-modal-title">
+                  {editingTrade ? editingTrade.title : "New Trade"}
+                </h2>
+              </div>
+              <button
+                aria-label="Close trade form"
+                className="icon-button"
+                disabled={saving}
+                onClick={closeTradeForm}
+                type="button"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="journal-modal-body">
+              {error ? <div className="alert alert-error">{error}</div> : null}
+              <JournalTradeForm
+                key={editingTrade?.id ?? "new"}
+                trade={editingTrade}
+                markets={markets}
+                saving={saving}
+                submitLabel={editingTrade ? "Save trade" : "Add trade"}
+                onCancel={closeTradeForm}
+                onSubmit={saveTrade}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -425,6 +425,7 @@ textarea {
   line-height: 1.45;
 }
 
+.journal-modal-backdrop,
 .journal-entry-modal-backdrop {
   align-items: center;
   background: rgba(31, 37, 35, 0.48);
@@ -436,6 +437,7 @@ textarea {
   z-index: 20;
 }
 
+.journal-modal,
 .journal-entry-modal {
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.12);
@@ -448,6 +450,11 @@ textarea {
   width: min(42rem, 100%);
 }
 
+.journal-trade-modal {
+  width: min(48rem, 100%);
+}
+
+.journal-modal-header,
 .journal-entry-modal-header {
   align-items: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
@@ -457,6 +464,7 @@ textarea {
   padding: 1rem;
 }
 
+.journal-modal-header p,
 .journal-entry-modal-header p {
   color: #69706c;
   font-size: 0.76rem;
@@ -464,12 +472,14 @@ textarea {
   text-transform: uppercase;
 }
 
+.journal-modal-header h2,
 .journal-entry-modal-header h3 {
   font-size: 1rem;
   font-weight: 800;
   margin-top: 0.15rem;
 }
 
+.journal-modal-body,
 .journal-entry-modal-body {
   overflow: auto;
   padding: 1rem;
