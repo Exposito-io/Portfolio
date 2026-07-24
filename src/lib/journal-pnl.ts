@@ -7,6 +7,7 @@ import type {
 export function calculateJournalTradePnlSummary(
   orders: HyperliquidFilledOrder[],
   unrealizedPnlUsd: number | null = null,
+  positionValueUsd: number | null = null,
 ): JournalTradePnlSummary {
   const closedPnlOrders = orders.filter((order) => order.closedPnl !== null);
   const realizedPnlUsd = closedPnlOrders.length
@@ -31,6 +32,7 @@ export function calculateJournalTradePnlSummary(
     pnlPercent,
     realizedPnlUsd,
     unrealizedPnlUsd,
+    positionValueUsd,
     orderCount: orders.length,
     fillCount: orders.reduce((sum, order) => sum + order.fillCount, 0),
     notionalUsd,

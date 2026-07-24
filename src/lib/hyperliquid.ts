@@ -375,7 +375,12 @@ export async function fetchHyperliquidFilledOrdersByTime(
   return aggregateFillsToOrders(fills);
 }
 
-export async function fetchHyperliquidOpenPositionPnl(
+type HyperliquidOpenPositionSummary = {
+  positionValueUsd: number;
+  unrealizedPnlUsd: number;
+};
+
+export async function fetchHyperliquidOpenPositionSummary(
   {
     account,
     asset,
@@ -386,7 +391,7 @@ export async function fetchHyperliquidOpenPositionPnl(
     coinAliases?: string[];
   },
   fetcher: typeof fetch = fetch,
-): Promise<number | null> {
+): Promise<HyperliquidOpenPositionSummary | null> {
   if (asset.kind === "spot") {
     return null;
   }
@@ -402,17 +407,36 @@ export async function fetchHyperliquidOpenPositionPnl(
     dex ? `Hyperliquid ${dex} position PnL` : "Hyperliquid position PnL",
   );
   const aliases = new Set(coinAliases);
-  const matchingPnl = (state.assetPositions ?? [])
+  const matchingPositions = (state.assetPositions ?? [])
     .map((item) => item.position)
-    .filter((position) => position?.coin && aliases.has(position.coin))
-    .map((position) => parseNullableNumber(position?.unrealizedPnl))
-    .filter((pnl): pnl is number => pnl !== null);
+    .filter((position) => position?.coin && aliases.has(position.coin));
 
-  if (!matchingPnl.length) {
+  if (!matchingPositions.length) {
     return null;
   }
 
-  return roundCurrency(matchingPnl.reduce((sum, pnl) => sum + pnl, 0));
+  return {
+    positionValueUsd: roundCurrency(
+      matchingPositions.reduce(
+        (sum, position) => sum + (parseNullableNumber(position?.positionValue) ?? 0),
+        0,
+      ),
+    ),
+    unrealizedPnlUsd: roundCurrency(
+      matchingPositions.reduce(
+        (sum, position) => sum + (parseNullableNumber(position?.unrealizedPnl) ?? 0),
+        0,
+      ),
+    ),
+  };
+}
+
+export async function fetchHyperliquidOpenPositionPnl(
+  params: Parameters<typeof fetchHyperliquidOpenPositionSummary>[0],
+  fetcher: typeof fetch = fetch,
+): Promise<number | null> {
+  const summary = await fetchHyperliquidOpenPositionSummary(params, fetcher);
+  return summary?.unrealizedPnlUsd ?? null;
 }
 
 export function getHyperliquidCoinAliases(asset: JournalTradeAsset) {

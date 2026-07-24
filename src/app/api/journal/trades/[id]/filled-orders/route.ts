@@ -5,7 +5,7 @@ import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getZonedDateEndMs, getZonedDateStartMs } from "@/lib/date";
 import {
   fetchHyperliquidFilledOrdersByTime,
-  fetchHyperliquidOpenPositionPnl,
+  fetchHyperliquidOpenPositionSummary,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
 import { getTrade } from "@/lib/journal";
@@ -40,6 +40,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const orders: HyperliquidFilledOrder[] = [];
     const sourceErrors: SourceError[] = [];
     let unrealizedPnlUsd: number | null = null;
+    let positionValueUsd: number | null = null;
 
     for (const account of accounts) {
       try {
@@ -63,14 +64,16 @@ export async function GET(_request: Request, context: RouteContext) {
 
       if (!trade.endDate) {
         try {
-          const accountUnrealizedPnlUsd = await fetchHyperliquidOpenPositionPnl({
+          const openPosition = await fetchHyperliquidOpenPositionSummary({
             account,
             asset: trade.asset,
             coinAliases,
           });
-          if (accountUnrealizedPnlUsd !== null) {
+          if (openPosition) {
             unrealizedPnlUsd =
-              (unrealizedPnlUsd ?? 0) + accountUnrealizedPnlUsd;
+              (unrealizedPnlUsd ?? 0) + openPosition.unrealizedPnlUsd;
+            positionValueUsd =
+              (positionValueUsd ?? 0) + openPosition.positionValueUsd;
           }
         } catch (error) {
           sourceErrors.push({
@@ -88,11 +91,16 @@ export async function GET(_request: Request, context: RouteContext) {
 
     return NextResponse.json({
       orders: orders.sort((a, b) => b.lastTime - a.lastTime),
-      summary: calculateJournalTradePnlSummary(orders, unrealizedPnlUsd),
+      summary: calculateJournalTradePnlSummary(
+        orders,
+        unrealizedPnlUsd,
+        positionValueUsd,
+      ),
       sourceErrors,
       accountsCount: accounts.length,
       startTime,
       endTime,
+      timezone: PORTFOLIO_TIMEZONE,
     });
   } catch (error) {
     return NextResponse.json(

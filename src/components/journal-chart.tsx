@@ -22,6 +22,10 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 
+import {
+  EntryOrderTotalsView,
+  groupOrdersByDate,
+} from "@/components/journal-entry-order-totals";
 import { MarkdownView } from "@/components/markdown-editor";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import type {
@@ -139,6 +143,14 @@ export function JournalChart({
     const detail = markerData.details.get(selectedEntryId);
     return detail?.kind === "entry" ? detail : null;
   }, [markerData.details, selectedEntryId]);
+  const entryOrderTotals = useMemo(
+    () =>
+      groupOrdersByDate(
+        ordersState.data?.orders ?? [],
+        ordersState.data?.timezone ?? "America/Toronto",
+      ),
+    [ordersState.data?.orders, ordersState.data?.timezone],
+  );
 
   useEffect(() => {
     markerDetailsRef.current = markerData.details;
@@ -440,14 +452,20 @@ export function JournalChart({
                 <p>Journal entry</p>
                 <h3 id="journal-entry-modal-title">{selectedEntry.date}</h3>
               </div>
-              <button
-                aria-label="Close entry"
-                className="icon-button"
-                onClick={() => setSelectedEntryId(null)}
-                type="button"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
+              <div className="journal-entry-modal-actions">
+                <EntryOrderTotalsView
+                  loading={ordersState.loading}
+                  totals={entryOrderTotals.get(selectedEntry.date)}
+                />
+                <button
+                  aria-label="Close entry"
+                  className="icon-button"
+                  onClick={() => setSelectedEntryId(null)}
+                  type="button"
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
             </div>
             <div className="journal-entry-modal-body">
               <MarkdownView value={selectedEntry.descriptionMarkdown} />

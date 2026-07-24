@@ -265,6 +265,83 @@ textarea {
 
 .entry-row {
   background: #fff;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.entry-row-header {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+.entry-row-date {
+  color: #4f5753;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.entry-order-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.entry-order-total {
+  background: #f7f5ef;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.08rem;
+  min-width: 7.95rem;
+  padding: 0.42rem 0.55rem;
+}
+
+.entry-order-total span {
+  color: #69706c;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.entry-order-total strong {
+  color: #1f2523;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.entry-order-totals-loading {
+  color: #737a76;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.entry-order-total-buy {
+  border-left: 4px solid #1f7a68;
+}
+
+.entry-order-total-buy strong {
+  color: #1f7a68;
+}
+
+.entry-order-total-sell {
+  border-left: 4px solid #9b3d30;
+}
+
+.entry-order-total-sell strong {
+  color: #9b3d30;
+}
+
+.entry-order-totals-loading {
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .entry-row-header {
+    grid-template-columns: minmax(7rem, 1fr) auto auto;
+  }
 }
 
 .markdown-toolbar {
@@ -455,6 +532,10 @@ textarea {
   border-left-color: #9b3d30;
 }
 
+.journal-pnl-metric-neutral {
+  border-left-color: #52605a;
+}
+
 .journal-pnl-metric span {
   color: #69706c;
   display: block;
@@ -498,18 +579,9 @@ textarea {
   white-space: nowrap;
 }
 
-.journal-pnl-metric-percent small {
-  color: #69706c;
-  display: block;
-  font-size: 0.64rem;
-  font-weight: 700;
-  margin-top: 0.22rem;
-  white-space: nowrap;
-}
-
 @media (min-width: 640px) {
   .journal-detail-topbar {
-    grid-template-columns: auto minmax(18rem, 24rem) auto;
+    grid-template-columns: auto minmax(14rem, 20rem) minmax(14rem, 20rem) auto;
     justify-content: space-between;
   }
 }
@@ -570,6 +642,18 @@ textarea {
   font-size: 1rem;
   font-weight: 800;
   margin-top: 0.15rem;
+}
+
+.journal-entry-modal-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.journal-entry-modal-actions .entry-order-totals {
+  justify-content: flex-end;
 }
 
 .journal-modal-body,

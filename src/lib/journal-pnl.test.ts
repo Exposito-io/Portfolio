@@ -40,6 +40,7 @@ describe("journal PnL", () => {
       pnlPercent: 3.41,
       realizedPnlUsd: 10.25,
       unrealizedPnlUsd: null,
+      positionValueUsd: null,
       orderCount: 2,
       fillCount: 5,
       notionalUsd: 300.5,
@@ -56,6 +57,7 @@ describe("journal PnL", () => {
       pnlPercent: null,
       realizedPnlUsd: null,
       unrealizedPnlUsd: null,
+      positionValueUsd: null,
       orderCount: 1,
       fillCount: 1,
       notionalUsd: 100,
@@ -67,12 +69,14 @@ describe("journal PnL", () => {
       calculateJournalTradePnlSummary(
         [{ ...baseOrder, id: "order-1", closedPnl: 12.34 }],
         100.1,
+        5000.5,
       ),
     ).toMatchObject({
       pnlUsd: 112.44,
       pnlPercent: 112.44,
       realizedPnlUsd: 12.34,
       unrealizedPnlUsd: 100.1,
+      positionValueUsd: 5000.5,
     });
   });
 });

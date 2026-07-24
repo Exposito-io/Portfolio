@@ -13,6 +13,7 @@ type FilledOrdersResponse = {
   summary: JournalTradePnlSummary;
   sourceErrors: SourceError[];
   accountsCount: number;
+  timezone: string;
 };
 
 export type FilledOrdersState = {

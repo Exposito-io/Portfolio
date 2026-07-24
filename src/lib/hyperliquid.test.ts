@@ -6,6 +6,7 @@ import {
   fetchHyperliquidFilledOrdersByTime,
   fetchHyperliquidMarkets,
   fetchHyperliquidOpenPositionPnl,
+  fetchHyperliquidOpenPositionSummary,
   fetchHyperliquidUserFillsByTime,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
@@ -331,6 +332,7 @@ describe("Hyperliquid normalization", () => {
           {
             position: {
               coin: "xyz:DRAM",
+              positionValue: "517419.8696",
               unrealizedPnl: "17443.2072",
             },
           },
@@ -344,7 +346,7 @@ describe("Hyperliquid normalization", () => {
       }),
     });
 
-    const pnl = await fetchHyperliquidOpenPositionPnl(
+    const summary = await fetchHyperliquidOpenPositionSummary(
       {
         account,
         asset: {
@@ -368,7 +370,42 @@ describe("Hyperliquid normalization", () => {
         }),
       }),
     );
-    expect(pnl).toBe(17443.21);
+    expect(summary).toEqual({
+      positionValueUsd: 517419.87,
+      unrealizedPnlUsd: 17443.21,
+    });
+  });
+
+  it("keeps the open position PnL helper as a shortcut", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        assetPositions: [
+          {
+            position: {
+              coin: "BTC",
+              positionValue: "1000",
+              unrealizedPnl: "-25",
+            },
+          },
+        ],
+      }),
+    });
+
+    const pnl = await fetchHyperliquidOpenPositionPnl(
+      {
+        account,
+        asset: {
+          kind: "perp",
+          label: "BTC perp",
+          coin: "BTC",
+          chartCoin: "BTC",
+        },
+      },
+      fetcher,
+    );
+
+    expect(pnl).toBe(-25);
   });
 
   it("aggregates fills into filled orders by order id", async () => {

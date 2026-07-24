@@ -1,19 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { JournalChart } from "@/components/journal-chart";
+import {
+  EntryOrderTotalsView,
+  groupOrdersByDate,
+} from "@/components/journal-entry-order-totals";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
-import { JournalPnlMetric } from "@/components/journal-pnl-badge";
+import {
+  JournalPnlMetric,
+  JournalPositionValueMetric,
+} from "@/components/journal-pnl-badge";
 import {
   JournalTradeForm,
   type TradeFormPayload,
 } from "@/components/journal-trade-form";
 import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
 import { useJournalFilledOrders } from "@/components/use-journal-filled-orders";
-import type { JournalEntry, JournalTrade, JournalTradeAsset } from "@/lib/types";
+import type {
+  JournalEntry,
+  JournalTrade,
+  JournalTradeAsset,
+} from "@/lib/types";
 
 type EntryFormState = {
   date: string;
@@ -36,6 +47,14 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const filledOrdersState = useJournalFilledOrders(trade?.id ?? null);
+  const entryOrderTotals = useMemo(
+    () =>
+      groupOrdersByDate(
+        filledOrdersState.data?.orders ?? [],
+        filledOrdersState.data?.timezone ?? "America/Toronto",
+      ),
+    [filledOrdersState.data?.orders, filledOrdersState.data?.timezone],
+  );
 
   const loadTrade = useCallback(async () => {
     setLoading(true);
@@ -223,6 +242,11 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           <ArrowLeft size={16} aria-hidden="true" />
           Journal
         </Link>
+        <JournalPositionValueMetric
+          error={filledOrdersState.error}
+          loading={filledOrdersState.loading}
+          summary={filledOrdersState.data?.summary}
+        />
         <JournalPnlMetric
           error={filledOrdersState.error}
           loading={filledOrdersState.loading}
@@ -285,8 +309,6 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
       <JournalChart trade={trade} ordersState={filledOrdersState} />
 
-      <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
-
       <section className="grid gap-6">
         <div className="panel">
           <div className="panel-heading">
@@ -298,27 +320,31 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           <div className="mt-4 grid gap-3">
             {trade.entries.map((entry) => (
               <article className="entry-row" key={entry.id}>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-[#4f5753]">{entry.date}</p>
-                  <div className="mt-2">
-                    <MarkdownView value={entry.descriptionMarkdown} />
+                <div className="entry-row-header">
+                  <p className="entry-row-date">{entry.date}</p>
+                  <EntryOrderTotalsView
+                    loading={filledOrdersState.loading}
+                    totals={entryOrderTotals.get(entry.date)}
+                  />
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      className="icon-button"
+                      aria-label={`Edit entry ${entry.date}`}
+                      onClick={() => beginEditEntry(entry)}
+                    >
+                      <Pencil size={16} aria-hidden="true" />
+                    </button>
+                    <button
+                      className="icon-button danger"
+                      aria-label={`Delete entry ${entry.date}`}
+                      onClick={() => removeEntry(entry)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    className="icon-button"
-                    aria-label={`Edit entry ${entry.date}`}
-                    onClick={() => beginEditEntry(entry)}
-                  >
-                    <Pencil size={16} aria-hidden="true" />
-                  </button>
-                  <button
-                    className="icon-button danger"
-                    aria-label={`Delete entry ${entry.date}`}
-                    onClick={() => removeEntry(entry)}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                  </button>
+                <div className="min-w-0">
+                  <MarkdownView value={entry.descriptionMarkdown} />
                 </div>
               </article>
             ))}
@@ -334,6 +360,8 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           </div>
         </div>
       </section>
+
+      <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
 
       {entryFormOpen ? (
         <div className="journal-modal-backdrop" onClick={closeEntryForm}>

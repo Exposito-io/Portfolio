@@ -97,7 +97,55 @@ export function JournalPnlMetric({
             ? formatSignedPercent(summary.pnlPercent)
             : "N/A"}
         </b>
-        <small>of matched notional</small>
+      </div>
+    </section>
+  );
+}
+
+export function JournalPositionValueMetric({
+  error,
+  loading,
+  summary,
+}: {
+  error?: string;
+  loading?: boolean;
+  summary?: JournalTradePnlSummary | null;
+}) {
+  if (loading) {
+    return (
+      <section className="journal-pnl-metric">
+        <span>Position value</span>
+        <strong>Loading</strong>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="journal-pnl-metric">
+        <span>Position value</span>
+        <strong>Unavailable</strong>
+      </section>
+    );
+  }
+
+  if (!summary || !isFiniteNumber(summary.positionValueUsd)) {
+    return (
+      <section className="journal-pnl-metric">
+        <span>Position value</span>
+        <strong>N/A</strong>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="journal-pnl-metric journal-pnl-metric-neutral"
+      title="Current Hyperliquid position value"
+    >
+      <div>
+        <span>Position value</span>
+        <strong>{formatCurrency(summary.positionValueUsd)}</strong>
       </div>
     </section>
   );
