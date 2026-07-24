@@ -454,6 +454,10 @@ textarea {
   width: min(48rem, 100%);
 }
 
+.journal-entry-form-modal {
+  width: min(50rem, 100%);
+}
+
 .journal-modal-header,
 .journal-entry-modal-header {
   align-items: center;

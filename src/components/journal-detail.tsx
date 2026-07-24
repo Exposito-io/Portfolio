@@ -31,6 +31,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [entryForm, setEntryForm] = useState<EntryFormState>(emptyEntryForm);
   const [editingTrade, setEditingTrade] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
+  const [entryFormOpen, setEntryFormOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,6 +81,23 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     void loadMarkets();
   }, []);
 
+  useEffect(() => {
+    if (!entryFormOpen) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !saving) {
+        setEditingEntry(null);
+        setEntryForm(emptyEntryForm);
+        setEntryFormOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [entryFormOpen, saving]);
+
   async function saveTrade(payload: TradeFormPayload) {
     if (!trade) return;
     setSaving(true);
@@ -123,6 +141,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
       setTrade(result.trade);
       setEditingEntry(null);
       setEntryForm(emptyEntryForm);
+      setEntryFormOpen(false);
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "Unable to save entry.",
@@ -153,12 +172,28 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     }
   }
 
+  function beginNewEntry() {
+    setError("");
+    setEditingEntry(null);
+    setEntryForm(emptyEntryForm);
+    setEntryFormOpen(true);
+  }
+
   function beginEditEntry(entry: JournalEntry) {
+    setError("");
     setEditingEntry(entry);
     setEntryForm({
       date: entry.date,
       descriptionMarkdown: entry.descriptionMarkdown,
     });
+    setEntryFormOpen(true);
+  }
+
+  function closeEntryForm() {
+    if (saving) return;
+    setEditingEntry(null);
+    setEntryForm(emptyEntryForm);
+    setEntryFormOpen(false);
   }
 
   if (loading) {
@@ -183,12 +218,24 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <Link className="button-secondary w-fit" href="/journal">
-        <ArrowLeft size={16} aria-hidden="true" />
-        Journal
-      </Link>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Link className="button-secondary w-fit" href="/journal">
+          <ArrowLeft size={16} aria-hidden="true" />
+          Journal
+        </Link>
+        <button
+          className="button-primary w-fit"
+          onClick={beginNewEntry}
+          type="button"
+        >
+          <Plus size={16} aria-hidden="true" />
+          New journal entry
+        </button>
+      </div>
 
-      {error ? <div className="alert alert-error">{error}</div> : null}
+      {error && !entryFormOpen ? (
+        <div className="alert alert-error">{error}</div>
+      ) : null}
 
       <section className="grid gap-6">
         <div className="panel">
@@ -240,68 +287,13 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
       <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
 
-      <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
-        <div className="panel h-fit">
-          <div className="panel-heading">
-            <h2>{editingEntry ? "Edit entry" : "New entry"}</h2>
-            <p>{trade.title}</p>
-          </div>
-          <form className="mt-5 grid gap-4" onSubmit={saveEntry}>
-            <div className="grid gap-2">
-              <label className="field-label" htmlFor="entry-date">
-                Date
-              </label>
-              <input
-                id="entry-date"
-                className="input"
-                required
-                type="date"
-                value={entryForm.date}
-                onChange={(event) =>
-                  setEntryForm({ ...entryForm, date: event.target.value })
-                }
-              />
-            </div>
-            <MarkdownEditor
-              id="entry-description"
-              label="Entry"
-              required
-              enableImageUpload
-              value={entryForm.descriptionMarkdown}
-              onChange={(descriptionMarkdown) =>
-                setEntryForm({ ...entryForm, descriptionMarkdown })
-              }
-            />
-            <div className="flex flex-wrap gap-2">
-              <button className="button-primary" disabled={saving} type="submit">
-                {editingEntry ? (
-                  <Save size={16} aria-hidden="true" />
-                ) : (
-                  <Plus size={16} aria-hidden="true" />
-                )}
-                {editingEntry ? "Save entry" : "Add entry"}
-              </button>
-              {editingEntry ? (
-                <button
-                  className="button-secondary"
-                  type="button"
-                  onClick={() => {
-                    setEditingEntry(null);
-                    setEntryForm(emptyEntryForm);
-                  }}
-                >
-                  <X size={16} aria-hidden="true" />
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </div>
-
+      <section className="grid gap-6">
         <div className="panel">
           <div className="panel-heading">
             <h2>Entries</h2>
-            <p>{trade.entries.length ? `${trade.entries.length} notes` : "Notes"}</p>
+            <p>
+              {trade.entries.length ? `${trade.entries.length} notes` : "Notes"}
+            </p>
           </div>
           <div className="mt-4 grid gap-3">
             {trade.entries.map((entry) => (
@@ -342,6 +334,89 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           </div>
         </div>
       </section>
+
+      {entryFormOpen ? (
+        <div className="journal-modal-backdrop" onClick={closeEntryForm}>
+          <div
+            aria-labelledby="journal-entry-form-modal-title"
+            aria-modal="true"
+            className="journal-modal journal-entry-form-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="journal-modal-header">
+              <div>
+                <p>{editingEntry ? "Edit journal entry" : "New journal entry"}</p>
+                <h2 id="journal-entry-form-modal-title">
+                  {editingEntry ? editingEntry.date : trade.title}
+                </h2>
+              </div>
+              <button
+                aria-label="Close entry form"
+                className="icon-button"
+                disabled={saving}
+                onClick={closeEntryForm}
+                type="button"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="journal-modal-body">
+              {error ? <div className="alert alert-error">{error}</div> : null}
+              <form className="grid gap-4" onSubmit={saveEntry}>
+                <div className="grid gap-2">
+                  <label className="field-label" htmlFor="entry-date">
+                    Date
+                  </label>
+                  <input
+                    id="entry-date"
+                    className="input"
+                    required
+                    type="date"
+                    value={entryForm.date}
+                    onChange={(event) =>
+                      setEntryForm({ ...entryForm, date: event.target.value })
+                    }
+                  />
+                </div>
+                <MarkdownEditor
+                  id="entry-description"
+                  label="Entry"
+                  required
+                  enableImageUpload
+                  value={entryForm.descriptionMarkdown}
+                  onChange={(descriptionMarkdown) =>
+                    setEntryForm({ ...entryForm, descriptionMarkdown })
+                  }
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="button-primary"
+                    disabled={saving}
+                    type="submit"
+                  >
+                    {editingEntry ? (
+                      <Save size={16} aria-hidden="true" />
+                    ) : (
+                      <Plus size={16} aria-hidden="true" />
+                    )}
+                    {editingEntry ? "Save entry" : "Add entry"}
+                  </button>
+                  <button
+                    className="button-secondary"
+                    disabled={saving}
+                    type="button"
+                    onClick={closeEntryForm}
+                  >
+                    <X size={16} aria-hidden="true" />
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
