@@ -113,6 +113,7 @@ export type JournalTrade = {
 
 export type JournalTradePnlSummary = {
   pnlUsd: number | null;
+  pnlPercent: number | null;
   realizedPnlUsd: number | null;
   unrealizedPnlUsd: number | null;
   orderCount: number;

@@ -6,7 +6,7 @@ import { ArrowLeft, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { JournalChart } from "@/components/journal-chart";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
-import { JournalPnlBadge } from "@/components/journal-pnl-badge";
+import { JournalPnlMetric } from "@/components/journal-pnl-badge";
 import {
   JournalTradeForm,
   type TradeFormPayload,
@@ -218,11 +218,16 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="journal-detail-topbar">
         <Link className="button-secondary w-fit" href="/journal">
           <ArrowLeft size={16} aria-hidden="true" />
           Journal
         </Link>
+        <JournalPnlMetric
+          error={filledOrdersState.error}
+          loading={filledOrdersState.loading}
+          summary={filledOrdersState.data?.summary}
+        />
         <button
           className="button-primary w-fit"
           onClick={beginNewEntry}
@@ -268,11 +273,6 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                   {trade.endDate ? "Closed" : "Open"}
                 </span>
                 <span className="tag">{trade.asset.label}</span>
-                <JournalPnlBadge
-                  error={filledOrdersState.error}
-                  loading={filledOrdersState.loading}
-                  summary={filledOrdersState.data?.summary}
-                />
               </div>
               <div className="mt-5">
                 <MarkdownView value={trade.descriptionMarkdown} />

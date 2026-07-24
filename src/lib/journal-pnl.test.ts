@@ -37,6 +37,7 @@ describe("journal PnL", () => {
       ]),
     ).toEqual({
       pnlUsd: 10.25,
+      pnlPercent: 3.41,
       realizedPnlUsd: 10.25,
       unrealizedPnlUsd: null,
       orderCount: 2,
@@ -52,6 +53,7 @@ describe("journal PnL", () => {
       ]),
     ).toMatchObject({
       pnlUsd: null,
+      pnlPercent: null,
       realizedPnlUsd: null,
       unrealizedPnlUsd: null,
       orderCount: 1,
@@ -68,6 +70,7 @@ describe("journal PnL", () => {
       ),
     ).toMatchObject({
       pnlUsd: 112.44,
+      pnlPercent: 112.44,
       realizedPnlUsd: 12.34,
       unrealizedPnlUsd: 100.1,
     });

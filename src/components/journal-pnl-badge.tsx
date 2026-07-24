@@ -42,6 +42,67 @@ export function JournalPnlBadge({
   );
 }
 
+export function JournalPnlMetric({
+  error,
+  loading,
+  summary,
+}: {
+  error?: string;
+  loading?: boolean;
+  summary?: JournalTradePnlSummary | null;
+}) {
+  if (loading) {
+    return (
+      <section className="journal-pnl-metric">
+        <span>PnL</span>
+        <strong>Loading</strong>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="journal-pnl-metric">
+        <span>PnL</span>
+        <strong>Unavailable</strong>
+      </section>
+    );
+  }
+
+  if (!summary || !isFiniteNumber(summary.pnlUsd)) {
+    return (
+      <section className="journal-pnl-metric">
+        <span>PnL</span>
+        <strong>N/A</strong>
+      </section>
+    );
+  }
+
+  const tone =
+    summary.pnlUsd > 0
+      ? "journal-pnl-metric-positive"
+      : summary.pnlUsd < 0
+        ? "journal-pnl-metric-negative"
+        : "";
+
+  return (
+    <section className={`journal-pnl-metric ${tone}`} title={formatPnlTitle(summary)}>
+      <div>
+        <span>PnL</span>
+        <strong>{formatSignedCurrency(summary.pnlUsd)}</strong>
+      </div>
+      <div className="journal-pnl-metric-percent">
+        <b>
+          {isFiniteNumber(summary.pnlPercent)
+            ? formatSignedPercent(summary.pnlPercent)
+            : "N/A"}
+        </b>
+        <small>of matched notional</small>
+      </div>
+    </section>
+  );
+}
+
 function formatPnlTitle(summary: JournalTradePnlSummary) {
   const parts = [
     `${summary.orderCount} filled orders`,
@@ -58,6 +119,22 @@ function formatPnlTitle(summary: JournalTradePnlSummary) {
   }
 
   return parts.join(", ");
+}
+
+function formatSignedPercent(value: number) {
+  if (!Number.isFinite(value)) return "N/A";
+
+  const formatted = `${Math.abs(value).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })}%`;
+  if (value > 0) return `+${formatted}`;
+  if (value < 0) return `-${formatted}`;
+  return formatted;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function formatSignedCurrency(value: number) {

@@ -425,6 +425,95 @@ textarea {
   line-height: 1.45;
 }
 
+.journal-detail-topbar {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+.journal-pnl-metric {
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #9aa29d;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.06);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr auto;
+  justify-self: stretch;
+  min-width: 0;
+  padding: 0.75rem 0.9rem;
+}
+
+.journal-pnl-metric-positive {
+  border-left-color: #1f7a68;
+}
+
+.journal-pnl-metric-negative {
+  border-left-color: #9b3d30;
+}
+
+.journal-pnl-metric span {
+  color: #69706c;
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.journal-pnl-metric strong {
+  color: #1f2523;
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-top: 0.18rem;
+  white-space: nowrap;
+}
+
+.journal-pnl-metric-positive strong,
+.journal-pnl-metric-positive .journal-pnl-metric-percent b {
+  color: #1f7a68;
+}
+
+.journal-pnl-metric-negative strong,
+.journal-pnl-metric-negative .journal-pnl-metric-percent b {
+  color: #9b3d30;
+}
+
+.journal-pnl-metric-percent {
+  background: #f7f5ef;
+  border-radius: 8px;
+  padding: 0.52rem 0.65rem;
+}
+
+.journal-pnl-metric-percent b {
+  color: #1f2523;
+  display: block;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.journal-pnl-metric-percent small {
+  color: #69706c;
+  display: block;
+  font-size: 0.64rem;
+  font-weight: 700;
+  margin-top: 0.22rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .journal-detail-topbar {
+    grid-template-columns: auto minmax(18rem, 24rem) auto;
+    justify-content: space-between;
+  }
+}
+
 .journal-modal-backdrop,
 .journal-entry-modal-backdrop {
   align-items: center;
