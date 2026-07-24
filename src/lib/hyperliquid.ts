@@ -375,6 +375,46 @@ export async function fetchHyperliquidFilledOrdersByTime(
   return aggregateFillsToOrders(fills);
 }
 
+export async function fetchHyperliquidOpenPositionPnl(
+  {
+    account,
+    asset,
+    coinAliases = getHyperliquidCoinAliases(asset),
+  }: {
+    account: PortfolioAccount;
+    asset: JournalTradeAsset;
+    coinAliases?: string[];
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<number | null> {
+  if (asset.kind === "spot") {
+    return null;
+  }
+
+  const dex = asset.kind === "trade-xyz" ? "xyz" : "";
+  const state = await postInfo<HyperliquidClearinghouseState>(
+    {
+      type: "clearinghouseState",
+      user: account.address,
+      ...(dex ? { dex } : {}),
+    },
+    fetcher,
+    dex ? `Hyperliquid ${dex} position PnL` : "Hyperliquid position PnL",
+  );
+  const aliases = new Set(coinAliases);
+  const matchingPnl = (state.assetPositions ?? [])
+    .map((item) => item.position)
+    .filter((position) => position?.coin && aliases.has(position.coin))
+    .map((position) => parseNullableNumber(position?.unrealizedPnl))
+    .filter((pnl): pnl is number => pnl !== null);
+
+  if (!matchingPnl.length) {
+    return null;
+  }
+
+  return roundCurrency(matchingPnl.reduce((sum, pnl) => sum + pnl, 0));
+}
+
 export function getHyperliquidCoinAliases(asset: JournalTradeAsset) {
   const aliases = new Set([asset.coin, asset.chartCoin]);
 

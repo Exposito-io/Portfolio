@@ -111,6 +111,15 @@ export type JournalTrade = {
   updatedAt: string;
 };
 
+export type JournalTradePnlSummary = {
+  pnlUsd: number | null;
+  realizedPnlUsd: number | null;
+  unrealizedPnlUsd: number | null;
+  orderCount: number;
+  fillCount: number;
+  notionalUsd: number;
+};
+
 export type HyperliquidCandle = {
   time: number;
   timeKey: string;

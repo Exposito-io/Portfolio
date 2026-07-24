@@ -5,9 +5,11 @@ import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getZonedDateEndMs, getZonedDateStartMs } from "@/lib/date";
 import {
   fetchHyperliquidFilledOrdersByTime,
+  fetchHyperliquidOpenPositionPnl,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
 import { getTrade } from "@/lib/journal";
+import { calculateJournalTradePnlSummary } from "@/lib/journal-pnl";
 import { getDb } from "@/lib/mongodb";
 import type { HyperliquidFilledOrder, SourceError } from "@/lib/types";
 
@@ -37,6 +39,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const coinAliases = getHyperliquidCoinAliases(trade.asset);
     const orders: HyperliquidFilledOrder[] = [];
     const sourceErrors: SourceError[] = [];
+    let unrealizedPnlUsd: number | null = null;
 
     for (const account of accounts) {
       try {
@@ -57,10 +60,35 @@ export async function GET(_request: Request, context: RouteContext) {
             error instanceof Error ? error.message : "Unable to load orders.",
         });
       }
+
+      if (!trade.endDate) {
+        try {
+          const accountUnrealizedPnlUsd = await fetchHyperliquidOpenPositionPnl({
+            account,
+            asset: trade.asset,
+            coinAliases,
+          });
+          if (accountUnrealizedPnlUsd !== null) {
+            unrealizedPnlUsd =
+              (unrealizedPnlUsd ?? 0) + accountUnrealizedPnlUsd;
+          }
+        } catch (error) {
+          sourceErrors.push({
+            source: account.source,
+            accountId: account.id,
+            accountLabel: account.label,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Unable to load open position PnL.",
+          });
+        }
+      }
     }
 
     return NextResponse.json({
       orders: orders.sort((a, b) => b.lastTime - a.lastTime),
+      summary: calculateJournalTradePnlSummary(orders, unrealizedPnlUsd),
       sourceErrors,
       accountsCount: accounts.length,
       startTime,

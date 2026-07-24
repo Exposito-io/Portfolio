@@ -2,6 +2,7 @@
 
 import { RefreshCw } from "lucide-react";
 
+import { JournalPnlBadge } from "@/components/journal-pnl-badge";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import type { JournalTrade } from "@/lib/types";
 
@@ -26,7 +27,9 @@ export function JournalFilledOrders({
         </div>
         {loading ? (
           <RefreshCw className="animate-spin text-[#1f7a68]" size={20} />
-        ) : null}
+        ) : (
+          <JournalPnlBadge error={error} summary={data?.summary} />
+        )}
       </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}

@@ -5,6 +5,7 @@ import {
   fetchHyperliquidCandles,
   fetchHyperliquidFilledOrdersByTime,
   fetchHyperliquidMarkets,
+  fetchHyperliquidOpenPositionPnl,
   fetchHyperliquidUserFillsByTime,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
@@ -320,6 +321,54 @@ describe("Hyperliquid normalization", () => {
         dex: "xyz",
       }),
     ).toEqual(["XYZ100", "xyz:XYZ100"]);
+  });
+
+  it("loads Trade XYZ unrealized PnL from the xyz clearinghouse state", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        assetPositions: [
+          {
+            position: {
+              coin: "xyz:DRAM",
+              unrealizedPnl: "17443.2072",
+            },
+          },
+          {
+            position: {
+              coin: "xyz:OTHER",
+              unrealizedPnl: "-100",
+            },
+          },
+        ],
+      }),
+    });
+
+    const pnl = await fetchHyperliquidOpenPositionPnl(
+      {
+        account,
+        asset: {
+          kind: "trade-xyz",
+          label: "xyz:DRAM Trade XYZ perp",
+          coin: "xyz:DRAM",
+          chartCoin: "xyz:DRAM",
+          dex: "xyz",
+        },
+      },
+      fetcher,
+    );
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({
+          type: "clearinghouseState",
+          user: account.address,
+          dex: "xyz",
+        }),
+      }),
+    );
+    expect(pnl).toBe(17443.21);
   });
 
   it("aggregates fills into filled orders by order id", async () => {

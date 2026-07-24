@@ -6,6 +6,7 @@ import { ArrowLeft, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { JournalChart } from "@/components/journal-chart";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
+import { JournalPnlBadge } from "@/components/journal-pnl-badge";
 import {
   JournalTradeForm,
   type TradeFormPayload,
@@ -220,6 +221,11 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                   {trade.endDate ? "Closed" : "Open"}
                 </span>
                 <span className="tag">{trade.asset.label}</span>
+                <JournalPnlBadge
+                  error={filledOrdersState.error}
+                  loading={filledOrdersState.loading}
+                  summary={filledOrdersState.data?.summary}
+                />
               </div>
               <div className="mt-5">
                 <MarkdownView value={trade.descriptionMarkdown} />

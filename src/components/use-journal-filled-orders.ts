@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from "react";
 
-import type { HyperliquidFilledOrder, SourceError } from "@/lib/types";
+import type {
+  HyperliquidFilledOrder,
+  JournalTradePnlSummary,
+  SourceError,
+} from "@/lib/types";
 
 type FilledOrdersResponse = {
   orders: HyperliquidFilledOrder[];
+  summary: JournalTradePnlSummary;
   sourceErrors: SourceError[];
   accountsCount: number;
 };

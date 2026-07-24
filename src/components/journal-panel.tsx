@@ -8,14 +8,28 @@ import {
   JournalTradeForm,
   type TradeFormPayload,
 } from "@/components/journal-trade-form";
+import { JournalPnlBadge } from "@/components/journal-pnl-badge";
 import { MarkdownView } from "@/components/markdown-editor";
-import type { JournalTrade, JournalTradeAsset } from "@/lib/types";
+import type {
+  JournalTrade,
+  JournalTradeAsset,
+  JournalTradePnlSummary,
+} from "@/lib/types";
+
+type TradePnlState = {
+  summary: JournalTradePnlSummary | null;
+  error: string;
+  loading: boolean;
+};
 
 export function JournalPanel() {
   const [trades, setTrades] = useState<JournalTrade[]>([]);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
   const [editingTrade, setEditingTrade] = useState<JournalTrade | null>(null);
   const [tradeFormOpen, setTradeFormOpen] = useState(false);
+  const [tradePnlById, setTradePnlById] = useState<Record<string, TradePnlState>>(
+    {},
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,6 +79,39 @@ export function JournalPanel() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+
+    const timeout = window.setTimeout(() => {
+      if (!trades.length) {
+        setTradePnlById({});
+        return;
+      }
+
+      setTradePnlById((current) =>
+        Object.fromEntries(
+          trades.map((trade) => [
+            trade.id,
+            current[trade.id] ?? {
+              summary: null,
+              error: "",
+              loading: true,
+            },
+          ]),
+        ),
+      );
+
+      for (const trade of trades) {
+        void loadTradePnl(trade.id, controller.signal);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [trades]);
+
+  useEffect(() => {
     if (!tradeFormOpen) return;
 
     function closeOnEscape(event: KeyboardEvent) {
@@ -103,6 +150,48 @@ export function JournalPanel() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function loadTradePnl(tradeId: string, signal: AbortSignal) {
+    setTradePnlById((current) => ({
+      ...current,
+      [tradeId]: {
+        summary: current[tradeId]?.summary ?? null,
+        error: "",
+        loading: true,
+      },
+    }));
+
+    try {
+      const response = await fetch(
+        `/api/journal/trades/${tradeId}/filled-orders`,
+        { signal },
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to load PnL.");
+      }
+
+      setTradePnlById((current) => ({
+        ...current,
+        [tradeId]: {
+          summary: payload.summary ?? null,
+          error: "",
+          loading: false,
+        },
+      }));
+    } catch (pnlError) {
+      if (signal.aborted) return;
+
+      setTradePnlById((current) => ({
+        ...current,
+        [tradeId]: {
+          summary: null,
+          error: pnlError instanceof Error ? pnlError.message : "Unable to load PnL.",
+          loading: false,
+        },
+      }));
     }
   }
 
@@ -202,6 +291,11 @@ export function JournalPanel() {
                     {trade.endDate ? "Closed" : "Open"}
                   </span>
                   <span className="tag">{trade.asset.label}</span>
+                  <JournalPnlBadge
+                    error={tradePnlById[trade.id]?.error}
+                    loading={tradePnlById[trade.id]?.loading}
+                    summary={tradePnlById[trade.id]?.summary}
+                  />
                 </div>
                 <p className="mt-2 text-sm font-medium text-[#69706c]">
                   {formatDateRange(trade)}
