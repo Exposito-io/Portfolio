@@ -81,7 +81,12 @@ export async function getPortfolio(
     }
   }
 
-  const liveSnapshot = await getCachedOrRefreshPortfolio(db, accounts, todayKey);
+  const liveSnapshot = await getCachedOrRefreshPortfolio(
+    db,
+    accounts,
+    todayKey,
+    Boolean(options.refresh),
+  );
   const savedSnapshot = accounts.length
     ? await upsertDailySnapshot(db, liveSnapshot)
     : liveSnapshot;
@@ -104,11 +109,13 @@ async function getCachedOrRefreshPortfolio(
   db: Db,
   accounts: PortfolioAccount[],
   dateKey: string,
+  forceRefresh = false,
 ) {
   const cacheKey = getLiveCacheKey(accounts, dateKey);
   const now = Date.now();
 
   if (
+    !forceRefresh &&
     livePortfolioCache?.key === cacheKey &&
     now - livePortfolioCache.capturedAtMs < LIVE_CACHE_TTL_MS
   ) {
@@ -141,6 +148,7 @@ async function refreshPortfolio(
       sourceSummaries.push(result.summary);
       positions.push(...result.positions);
     } catch (error) {
+      logSourceRefreshError(account, error);
       sourceErrors.push({
         source: account.source,
         accountId: account.id,
@@ -212,6 +220,9 @@ function toSourceErrorMessage(error: unknown) {
 
   const status = error.message.match(/Status:\s*(\d+)/)?.[1];
   const details = error.message.match(/Details:\s*([^\n]+)/)?.[1];
+  const firstLine =
+    error.message.split("\n")[0]?.replace(/:\s*$/, "") ||
+    "Unable to refresh this account.";
 
   if (status === "429") {
     return "RPC provider rate limit reached while reading this account. Try again in a minute or use a higher-limit Ethereum RPC URL.";
@@ -221,5 +232,43 @@ function toSourceErrorMessage(error: unknown) {
     return `RPC request failed with status ${status}${details ? `: ${details}` : ""}.`;
   }
 
-  return error.message.split("\n")[0] || "Unable to refresh this account.";
+  return details ? `${firstLine}: ${details}` : firstLine;
+}
+
+function logSourceRefreshError(account: PortfolioAccount, error: unknown) {
+  console.warn(
+    [
+      "[portfolio] Source refresh failed",
+      `source=${account.source}`,
+      `accountId=${account.id}`,
+      `accountLabel=${JSON.stringify(account.label)}`,
+      "--- full error start ---",
+      formatErrorForLog(error),
+      "--- full error end ---",
+    ].join("\n"),
+  );
+}
+
+function formatErrorForLog(error: unknown) {
+  if (!(error instanceof Error)) {
+    return redactRpcUrls(String(error));
+  }
+
+  return redactRpcUrls(formatErrorWithCauses(error));
+}
+
+function formatErrorWithCauses(error: Error, depth = 0): string {
+  const prefix = depth ? `Caused by (${depth}): ` : "";
+  const current = error.stack || `${error.name}: ${error.message}`;
+  const cause = error.cause;
+
+  if (!(cause instanceof Error)) {
+    return `${prefix}${current}`;
+  }
+
+  return `${prefix}${current}\n\n${formatErrorWithCauses(cause, depth + 1)}`;
+}
+
+function redactRpcUrls(message: string) {
+  return message.replace(/^URL:\s*.+$/gm, "URL: [redacted]");
 }

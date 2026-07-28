@@ -76,6 +76,28 @@ export function PortfolioDashboard() {
     (sum, position) => sum + position.debtUsd,
     0,
   );
+  const debtAccountRows =
+    snapshot?.sourceSummaries.map((summary) => ({
+      key: `${summary.source}:${summary.label}`,
+      source: summary.source,
+      accountLabel: summary.label,
+      investmentsUsd: summary.totalInvestmentsUsd,
+      debtUsd: summary.totalDebtUsd,
+      debtPercent: getDebtPercent(
+        summary.totalDebtUsd,
+        summary.totalInvestmentsUsd,
+      ),
+    })) ?? [];
+  const totalDebtPercent = getDebtPercent(
+    totalDebtValueUsd,
+    totalAssetValueUsd,
+  );
+  const sourceErrorContext =
+    data?.mode === "live"
+      ? null
+      : snapshot
+        ? ` Snapshot captured ${formatDateTime(snapshot.capturedAt)}. Use Refresh to retry live account data.`
+        : null;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -132,7 +154,7 @@ export function PortfolioDashboard() {
                 <Alert
                   key={`${sourceError.accountId}:${sourceError.message}`}
                   tone="warning"
-                  message={`${sourceError.accountLabel}: ${sourceError.message}`}
+                  message={`${sourceError.accountLabel}: ${sourceError.message}${sourceErrorContext ?? ""}`}
                 />
               ))}
             </div>
@@ -199,6 +221,9 @@ export function PortfolioDashboard() {
           icon={<AlertTriangle size={18} />}
           label="Debt"
           value={formatCurrency(snapshot?.totals.totalDebtUsd)}
+          detail={
+            snapshot ? `${formatPercent(totalDebtPercent)} of investments` : ""
+          }
         />
         <Metric
           icon={<TrendingUp size={18} />}
@@ -277,9 +302,45 @@ export function PortfolioDashboard() {
       <section className="panel overflow-hidden">
         <div className="panel-heading">
           <h2>Debts</h2>
-          <p>Borrowed balances and liability exposure</p>
+          <p>Borrowed balances and liability exposure by account and asset</p>
         </div>
-        <div className="overflow-x-auto">
+        {debtAccountRows.length ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Source</th>
+                  <th>Investments</th>
+                  <th>Debt</th>
+                  <th>Debt %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {debtAccountRows.map((row) => (
+                  <tr key={row.key}>
+                    <td>{row.accountLabel}</td>
+                    <td className="capitalize">{row.source}</td>
+                    <td>{formatCurrency(row.investmentsUsd)}</td>
+                    <td>{formatCurrency(row.debtUsd)}</td>
+                    <td>{formatPercent(row.debtPercent)}</td>
+                  </tr>
+                ))}
+                <tr className="total-row">
+                  <td colSpan={2}>Total</td>
+                  <td>{formatCurrency(totalAssetValueUsd)}</td>
+                  <td>{formatCurrency(totalDebtValueUsd)}</td>
+                  <td>{formatPercent(totalDebtPercent)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        <div
+          className={
+            debtAccountRows.length ? "mt-6 overflow-x-auto" : "overflow-x-auto"
+          }
+        >
           <table className="data-table">
             <thead>
               <tr>
@@ -328,11 +389,13 @@ function Metric({
   icon,
   label,
   value,
+  detail,
   signed = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  detail?: string;
   signed?: boolean;
 }) {
   const negative = signed && value.startsWith("-");
@@ -341,6 +404,7 @@ function Metric({
       <div className="metric-icon">{icon}</div>
       <span>{label}</span>
       <strong className={negative ? "text-[#9b3d30]" : ""}>{value}</strong>
+      {detail ? <p>{detail}</p> : null}
     </div>
   );
 }
@@ -362,4 +426,33 @@ function formatCurrency(value: number | null | undefined) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getDebtPercent(debtUsd: number, investmentsUsd: number) {
+  if (!Number.isFinite(debtUsd) || !Number.isFinite(investmentsUsd)) {
+    return null;
+  }
+
+  if (investmentsUsd <= 0) {
+    return null;
+  }
+
+  return (debtUsd / investmentsUsd) * 100;
+}
+
+function formatPercent(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "N/A";
+  return `${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 2,
+  }).format(value)}%`;
 }
