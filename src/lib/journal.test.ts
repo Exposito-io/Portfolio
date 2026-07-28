@@ -45,23 +45,33 @@ describe("journal trades", () => {
 
     const withEntry = await createEntry(db, trade.id, {
       date: "2026-07-02",
+      tags: ["Post-mortem", "Lessons", "post-MORTEM"],
       descriptionMarkdown: "Added after confirmation",
     });
     const entry = withEntry?.entries[0];
 
     expect(entry).toMatchObject({
       date: "2026-07-02",
+      tags: ["Post-mortem", "Lessons"],
       descriptionMarkdown: "Added after confirmation",
     });
 
     const afterEntryUpdate = await updateEntry(db, trade.id, entry?.id ?? "", {
+      tags: ["General"],
       descriptionMarkdown: "_Trailing stop_",
     });
 
     expect(afterEntryUpdate?.entries[0].descriptionMarkdown).toBe("_Trailing stop_");
+    expect(afterEntryUpdate?.entries[0].tags).toEqual(["General"]);
 
     const afterEntryDelete = await deleteEntry(db, trade.id, entry?.id ?? "");
     expect(afterEntryDelete?.entries).toHaveLength(0);
+
+    const untaggedEntry = await createEntry(db, trade.id, {
+      date: "2026-07-03",
+      descriptionMarkdown: "Routine update",
+    });
+    expect(untaggedEntry?.entries[0].tags).toEqual([]);
 
     expect(await listTrades(db)).toHaveLength(1);
     expect(await getTrade(db, "not-an-object-id")).toBeNull();
@@ -141,6 +151,7 @@ type Document = {
   entries?: Array<{
     _id: ObjectId;
     date: string;
+    tags?: string[];
     descriptionMarkdown: string;
     createdAt: Date;
     updatedAt: Date;

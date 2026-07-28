@@ -94,6 +94,7 @@ export type JournalTradeAsset = {
 export type JournalEntry = {
   id: string;
   date: string;
+  tags: string[];
   descriptionMarkdown: string;
   createdAt: string;
   updatedAt: string;

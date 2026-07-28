@@ -5,6 +5,11 @@ import { isValidDateKey } from "@/lib/date";
 import type { JournalEntry, JournalTrade, JournalTradeAsset } from "@/lib/types";
 
 const markdownSchema = z.string().trim().max(12_000).default("");
+const entryTagsSchema = z
+  .array(z.string().trim().min(1).max(32))
+  .max(8)
+  .default([])
+  .transform(normalizeTags);
 
 const assetSchema = z.object({
   kind: z.enum(["perp", "spot", "trade-xyz"]),
@@ -42,6 +47,7 @@ const entryInputSchema = z.object({
   date: z.string().trim().refine(isValidDateKey, {
     message: "Entry date must use YYYY-MM-DD format.",
   }),
+  tags: entryTagsSchema,
   descriptionMarkdown: markdownSchema.refine((value) => value.length > 0, {
     message: "Entry description is required.",
   }),
@@ -89,6 +95,7 @@ function serializeEntry(entry: JournalEntryDocument): JournalEntry {
   return {
     id: entry._id.toString(),
     date: entry.date,
+    tags: normalizeTags(entry.tags ?? []),
     descriptionMarkdown: entry.descriptionMarkdown,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
@@ -192,6 +199,7 @@ export async function createEntry(db: Db, tradeId: string, payload: unknown) {
   const entry: JournalEntryDocument = {
     _id: new ObjectId(),
     date: input.date,
+    tags: input.tags,
     descriptionMarkdown: input.descriptionMarkdown,
     createdAt: now,
     updatedAt: now,
@@ -226,6 +234,7 @@ export async function updateEntry(
   };
 
   if (input.date !== undefined) set["entries.$.date"] = input.date;
+  if (input.tags !== undefined) set["entries.$.tags"] = input.tags;
   if (input.descriptionMarkdown !== undefined) {
     set["entries.$.descriptionMarkdown"] = input.descriptionMarkdown;
   }
@@ -264,6 +273,19 @@ function normalizeAsset(asset: JournalTradeAsset): JournalTradeAsset {
     chartCoin: asset.chartCoin.trim(),
     ...(asset.dex ? { dex: asset.dex.trim() } : {}),
   };
+}
+
+function normalizeTags(tags: string[]) {
+  const seen = new Set<string>();
+
+  const normalized = tags.filter((tag) => {
+    const key = tag.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return normalized;
 }
 
 function toObjectId(id: string) {

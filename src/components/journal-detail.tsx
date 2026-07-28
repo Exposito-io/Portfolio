@@ -10,6 +10,7 @@ import {
   groupOrdersByDate,
 } from "@/components/journal-entry-order-totals";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
+import { JournalTagInput } from "@/components/journal-tag-input";
 import {
   JournalPnlMetric,
   JournalPositionValueMetric,
@@ -28,11 +29,13 @@ import type {
 
 type EntryFormState = {
   date: string;
+  tags: string[];
   descriptionMarkdown: string;
 };
 
 const emptyEntryForm: EntryFormState = {
   date: new Date().toISOString().slice(0, 10),
+  tags: [],
   descriptionMarkdown: "",
 };
 
@@ -54,6 +57,17 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         filledOrdersState.data?.timezone ?? "America/Toronto",
       ),
     [filledOrdersState.data?.orders, filledOrdersState.data?.timezone],
+  );
+  const existingTags = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          (trade?.entries ?? [])
+            .flatMap((entry) => entry.tags)
+            .map((tag) => [tag.toLocaleLowerCase(), tag]),
+        ).values(),
+      ).sort((left, right) => left.localeCompare(right)),
+    [trade?.entries],
   );
 
   const loadTrade = useCallback(async () => {
@@ -203,6 +217,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     setEditingEntry(entry);
     setEntryForm({
       date: entry.date,
+      tags: entry.tags,
       descriptionMarkdown: entry.descriptionMarkdown,
     });
     setEntryFormOpen(true);
@@ -321,7 +336,14 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
             {trade.entries.map((entry) => (
               <article className="entry-row" key={entry.id}>
                 <div className="entry-row-header">
-                  <p className="entry-row-date">{entry.date}</p>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="entry-row-date">{entry.date}</p>
+                    {entry.tags.map((tag) => (
+                      <span className="tag" key={tag}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                   <EntryOrderTotalsView
                     loading={filledOrdersState.loading}
                     totals={entryOrderTotals.get(entry.date)}
@@ -406,6 +428,19 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                       setEntryForm({ ...entryForm, date: event.target.value })
                     }
                   />
+                </div>
+                <div className="grid gap-2">
+                  <label className="field-label" htmlFor="entry-tags">
+                    Tags
+                  </label>
+                  <JournalTagInput
+                    suggestions={existingTags}
+                    value={entryForm.tags}
+                    onChange={(tags) => setEntryForm({ ...entryForm, tags })}
+                  />
+                  <p className="text-xs text-[#69706c]">
+                    Press Enter or comma to add a tag. You can add up to 8.
+                  </p>
                 </div>
                 <MarkdownEditor
                   id="entry-description"
