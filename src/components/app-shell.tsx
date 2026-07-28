@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BarChart3, NotebookText, Settings } from "lucide-react";
+import Image from "next/image";
+import { NotebookText, Settings } from "lucide-react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -7,9 +8,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-black/10 bg-white/85 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[#123d34] text-white">
-              <BarChart3 size={20} aria-hidden="true" />
-            </span>
+            <Image src="/logo.svg" alt="" width={36} height={36} priority />
             <span>
               <span className="block text-base font-semibold">Portfolio</span>
               <span className="block text-xs text-[#6b716e]">
