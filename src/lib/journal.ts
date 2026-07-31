@@ -217,6 +217,47 @@ export async function createEntry(db: Db, tradeId: string, payload: unknown) {
   return result ? serializeTrade(result) : null;
 }
 
+export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
+  const _id = toObjectId(tradeId);
+  if (!_id) return null;
+
+  const existing = await collection(db).findOne({ _id });
+  if (!existing) return null;
+
+  const input = entryInputSchema.parse(payload);
+  if (input.date < existing.startDate) {
+    throw new z.ZodError([
+      {
+        code: "custom",
+        path: ["date"],
+        message: "Close date must be on or after the start date.",
+        input: input.date,
+      },
+    ]);
+  }
+
+  const now = new Date();
+  const entry: JournalEntryDocument = {
+    _id: new ObjectId(),
+    date: input.date,
+    tags: input.tags,
+    descriptionMarkdown: input.descriptionMarkdown,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const result = await collection(db).findOneAndUpdate(
+    { _id },
+    {
+      $push: { entries: entry },
+      $set: { endDate: input.date, updatedAt: now },
+    },
+    { returnDocument: "after" },
+  );
+
+  return result ? serializeTrade(result) : null;
+}
+
 export async function updateEntry(
   db: Db,
   tradeId: string,

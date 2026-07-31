@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import {
   createEntry,
   createTrade,
+  closeTrade,
   deleteEntry,
   deleteTrade,
   getTrade,
@@ -100,6 +101,37 @@ describe("journal trades", () => {
 
     await expect(
       updateTrade(db, trade.id, { endDate: "2026-07-09" }),
+    ).rejects.toBeInstanceOf(ZodError);
+  });
+
+  it("closes a trade and creates its post-mortem entry atomically", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      title: "SOL breakout",
+      descriptionMarkdown: "",
+      startDate: "2026-07-10",
+      asset,
+    });
+
+    const closed = await closeTrade(db, trade.id, {
+      date: "2026-07-12",
+      tags: ["post-mortem"],
+      descriptionMarkdown: "What worked and what did not.",
+    });
+
+    expect(closed?.endDate).toBe("2026-07-12");
+    expect(closed?.entries[0]).toMatchObject({
+      date: "2026-07-12",
+      tags: ["post-mortem"],
+      descriptionMarkdown: "What worked and what did not.",
+    });
+
+    await expect(
+      closeTrade(db, trade.id, {
+        date: "2026-07-09",
+        tags: ["post-mortem"],
+        descriptionMarkdown: "Too early.",
+      }),
     ).rejects.toBeInstanceOf(ZodError);
   });
 });

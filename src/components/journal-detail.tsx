@@ -1,8 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowLeft,
+  Check,
+  EllipsisVertical,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { JournalChart } from "@/components/journal-chart";
 import {
@@ -46,9 +62,12 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [editingTrade, setEditingTrade] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [entryFormOpen, setEntryFormOpen] = useState(false);
+  const [closingTrade, setClosingTrade] = useState(false);
+  const [entryActionsOpen, setEntryActionsOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const entryActionsRef = useRef<HTMLDivElement>(null);
   const filledOrdersState = useJournalFilledOrders(trade?.id ?? null);
   const entryOrderTotals = useMemo(
     () =>
@@ -120,6 +139,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape" && !saving) {
         setEditingEntry(null);
+        setClosingTrade(false);
         setEntryForm(emptyEntryForm);
         setEntryFormOpen(false);
       }
@@ -130,6 +150,28 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [entryFormOpen, saving]);
+
+  useEffect(() => {
+    if (!entryActionsOpen) return;
+
+    function closeEntryActions(event: MouseEvent | KeyboardEvent) {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      if (
+        event instanceof MouseEvent &&
+        entryActionsRef.current?.contains(event.target as Node)
+      ) {
+        return;
+      }
+      setEntryActionsOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeEntryActions);
+    window.addEventListener("keydown", closeEntryActions);
+    return () => {
+      document.removeEventListener("mousedown", closeEntryActions);
+      window.removeEventListener("keydown", closeEntryActions);
+    };
+  }, [entryActionsOpen]);
 
   async function saveTrade(payload: TradeFormPayload) {
     if (!trade) return;
@@ -161,11 +203,13 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     setSaving(true);
     setError("");
     try {
-      const endpoint = editingEntry
-        ? `/api/journal/trades/${trade.id}/entries/${editingEntry.id}`
-        : `/api/journal/trades/${trade.id}/entries`;
+      const endpoint = closingTrade
+        ? `/api/journal/trades/${trade.id}/close`
+        : editingEntry
+          ? `/api/journal/trades/${trade.id}/entries/${editingEntry.id}`
+          : `/api/journal/trades/${trade.id}/entries`;
       const response = await fetch(endpoint, {
-        method: editingEntry ? "PATCH" : "POST",
+        method: editingEntry && !closingTrade ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entryForm),
       });
@@ -173,6 +217,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
       if (!response.ok) throw new Error(result.error || "Unable to save entry.");
       setTrade(result.trade);
       setEditingEntry(null);
+      setClosingTrade(false);
       setEntryForm(emptyEntryForm);
       setEntryFormOpen(false);
     } catch (saveError) {
@@ -208,6 +253,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   function beginNewEntry() {
     setError("");
     setEditingEntry(null);
+    setClosingTrade(false);
     setEntryForm(emptyEntryForm);
     setEntryFormOpen(true);
   }
@@ -215,6 +261,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   function beginEditEntry(entry: JournalEntry) {
     setError("");
     setEditingEntry(entry);
+    setClosingTrade(false);
     setEntryForm({
       date: entry.date,
       tags: entry.tags,
@@ -223,9 +270,22 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     setEntryFormOpen(true);
   }
 
+  function beginCloseTrade() {
+    setError("");
+    setEntryActionsOpen(false);
+    setEditingEntry(null);
+    setClosingTrade(true);
+    setEntryForm({
+      ...emptyEntryForm,
+      tags: ["post-mortem"],
+    });
+    setEntryFormOpen(true);
+  }
+
   function closeEntryForm() {
     if (saving) return;
     setEditingEntry(null);
+    setClosingTrade(false);
     setEntryForm(emptyEntryForm);
     setEntryFormOpen(false);
   }
@@ -267,14 +327,38 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           loading={filledOrdersState.loading}
           summary={filledOrdersState.data?.summary}
         />
-        <button
-          className="button-primary w-fit"
-          onClick={beginNewEntry}
-          type="button"
-        >
-          <Plus size={16} aria-hidden="true" />
-          New journal entry
-        </button>
+        <div className="journal-entry-actions" ref={entryActionsRef}>
+          <button
+            className="button-primary"
+            onClick={beginNewEntry}
+            type="button"
+          >
+            <Plus size={16} aria-hidden="true" />
+            New journal entry
+          </button>
+          {!trade.endDate ? (
+            <>
+              <button
+                aria-expanded={entryActionsOpen}
+                aria-haspopup="menu"
+                aria-label="More journal actions"
+                className="journal-entry-actions-toggle"
+                onClick={() => setEntryActionsOpen((open) => !open)}
+                type="button"
+              >
+                <EllipsisVertical size={18} aria-hidden="true" />
+              </button>
+              {entryActionsOpen ? (
+                <div className="journal-entry-actions-menu" role="menu">
+                  <button onClick={beginCloseTrade} role="menuitem" type="button">
+                    <Check size={16} aria-hidden="true" />
+                    Close trade
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
       </div>
 
       {error && !entryFormOpen ? (
@@ -396,9 +480,19 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           >
             <div className="journal-modal-header">
               <div>
-                <p>{editingEntry ? "Edit journal entry" : "New journal entry"}</p>
+                <p>
+                  {closingTrade
+                    ? "Close trade"
+                    : editingEntry
+                      ? "Edit journal entry"
+                      : "New journal entry"}
+                </p>
                 <h2 id="journal-entry-form-modal-title">
-                  {editingEntry ? editingEntry.date : trade.title}
+                  {closingTrade
+                    ? trade.title
+                    : editingEntry
+                      ? editingEntry.date
+                      : trade.title}
                 </h2>
               </div>
               <button
@@ -416,7 +510,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               <form className="grid gap-4" onSubmit={saveEntry}>
                 <div className="grid gap-2">
                   <label className="field-label" htmlFor="entry-date">
-                    Date
+                    {closingTrade ? "Close date" : "Date"}
                   </label>
                   <input
                     id="entry-date"
@@ -460,10 +554,16 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                   >
                     {editingEntry ? (
                       <Save size={16} aria-hidden="true" />
+                    ) : closingTrade ? (
+                      <Check size={16} aria-hidden="true" />
                     ) : (
                       <Plus size={16} aria-hidden="true" />
                     )}
-                    {editingEntry ? "Save entry" : "Add entry"}
+                    {closingTrade
+                      ? "Close trade"
+                      : editingEntry
+                        ? "Save entry"
+                        : "Add entry"}
                   </button>
                   <button
                     className="button-secondary"
