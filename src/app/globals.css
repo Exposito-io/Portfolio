@@ -259,6 +259,56 @@ textarea {
   padding: 1rem;
 }
 
+.journal-trade-section {
+  border-top: 1px solid rgba(0, 0, 0, 0.09);
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+.journal-trade-section-heading,
+.journal-closed-trades-toggle {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.journal-trade-section-heading {
+  margin-bottom: 0.75rem;
+}
+
+.journal-trade-section-heading h2 {
+  color: #1f2523;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.journal-trade-section-heading > span {
+  color: #69706c;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.journal-closed-trades-toggle {
+  border-radius: 8px;
+  color: #4f5753;
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 0.55rem 0.65rem;
+  width: 100%;
+}
+
+.journal-closed-trades-toggle:hover,
+.journal-closed-trades-toggle:focus-visible {
+  background: #f1eee7;
+  outline: none;
+}
+
+.journal-closed-trades-toggle > span:first-child {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
 .trade-title {
   color: #1f2523;
   font-size: 1rem;

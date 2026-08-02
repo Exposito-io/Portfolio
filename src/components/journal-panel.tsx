@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import {
   JournalTradeForm,
@@ -27,6 +35,7 @@ export function JournalPanel() {
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
   const [editingTrade, setEditingTrade] = useState<JournalTrade | null>(null);
   const [tradeFormOpen, setTradeFormOpen] = useState(false);
+  const [closedTradesOpen, setClosedTradesOpen] = useState(false);
   const [tradePnlById, setTradePnlById] = useState<Record<string, TradePnlState>>(
     {},
   );
@@ -237,6 +246,54 @@ export function JournalPanel() {
     setTradeFormOpen(false);
   }
 
+  const openTrades = trades.filter((trade) => !trade.endDate);
+  const closedTrades = trades.filter((trade) => trade.endDate);
+
+  function renderTrade(trade: JournalTrade) {
+    return (
+      <article className="trade-row" key={trade.id}>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link className="trade-title" href={`/journal/${trade.id}`}>
+              {trade.title}
+            </Link>
+            <span className={trade.endDate ? "tag" : "tag tag-green"}>
+              {trade.endDate ? "Closed" : "Open"}
+            </span>
+            <span className="tag">{trade.asset.label}</span>
+            <JournalPnlBadge
+              error={tradePnlById[trade.id]?.error}
+              loading={tradePnlById[trade.id]?.loading}
+              summary={tradePnlById[trade.id]?.summary}
+            />
+          </div>
+          <p className="mt-2 text-sm font-medium text-[#69706c]">
+            {formatDateRange(trade)}
+          </p>
+          <div className="mt-3 line-clamp-3 text-sm leading-6 text-[#4f5753]">
+            <MarkdownView value={trade.descriptionMarkdown} />
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button
+            className="icon-button"
+            aria-label={`Edit ${trade.title}`}
+            onClick={() => openEditTradeForm(trade)}
+          >
+            <Pencil size={16} aria-hidden="true" />
+          </button>
+          <button
+            className="icon-button danger"
+            aria-label={`Delete ${trade.title}`}
+            onClick={() => removeTrade(trade)}
+          >
+            <Trash2 size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       <section className="panel">
@@ -279,50 +336,48 @@ export function JournalPanel() {
           </div>
         ) : null}
 
-        <div className="mt-4 grid gap-3">
-          {trades.map((trade) => (
-            <article className="trade-row" key={trade.id}>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link className="trade-title" href={`/journal/${trade.id}`}>
-                    {trade.title}
-                  </Link>
-                  <span className={trade.endDate ? "tag" : "tag tag-green"}>
-                    {trade.endDate ? "Closed" : "Open"}
+        {!loading && trades.length ? (
+          <>
+            <div className="journal-trade-section">
+              <div className="journal-trade-section-heading">
+                <h2>Open trades</h2>
+                <span>{openTrades.length}</span>
+              </div>
+              <div className="grid gap-3">
+                {openTrades.map(renderTrade)}
+                {!openTrades.length ? (
+                  <p className="py-3 text-sm text-[#69706c]">No open trades.</p>
+                ) : null}
+              </div>
+            </div>
+
+            {closedTrades.length ? (
+              <div className="journal-trade-section journal-closed-trades">
+                <button
+                  aria-expanded={closedTradesOpen}
+                  className="journal-closed-trades-toggle"
+                  onClick={() => setClosedTradesOpen((open) => !open)}
+                  type="button"
+                >
+                  <span>
+                    {closedTradesOpen ? (
+                      <ChevronDown size={18} aria-hidden="true" />
+                    ) : (
+                      <ChevronRight size={18} aria-hidden="true" />
+                    )}
+                    Closed trades
                   </span>
-                  <span className="tag">{trade.asset.label}</span>
-                  <JournalPnlBadge
-                    error={tradePnlById[trade.id]?.error}
-                    loading={tradePnlById[trade.id]?.loading}
-                    summary={tradePnlById[trade.id]?.summary}
-                  />
-                </div>
-                <p className="mt-2 text-sm font-medium text-[#69706c]">
-                  {formatDateRange(trade)}
-                </p>
-                <div className="mt-3 line-clamp-3 text-sm leading-6 text-[#4f5753]">
-                  <MarkdownView value={trade.descriptionMarkdown} />
-                </div>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  className="icon-button"
-                  aria-label={`Edit ${trade.title}`}
-                  onClick={() => openEditTradeForm(trade)}
-                >
-                  <Pencil size={16} aria-hidden="true" />
+                  <span className="tag">{closedTrades.length}</span>
                 </button>
-                <button
-                  className="icon-button danger"
-                  aria-label={`Delete ${trade.title}`}
-                  onClick={() => removeTrade(trade)}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
+                {closedTradesOpen ? (
+                  <div className="mt-3 grid gap-3">
+                    {closedTrades.map(renderTrade)}
+                  </div>
+                ) : null}
               </div>
-            </article>
-          ))}
-        </div>
+            ) : null}
+          </>
+        ) : null}
       </section>
 
       {tradeFormOpen ? (

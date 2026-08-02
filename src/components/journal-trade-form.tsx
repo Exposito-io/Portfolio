@@ -22,13 +22,20 @@ type TradeFormState = {
   assetKey: string;
 };
 
-const emptyForm: TradeFormState = {
-  title: "",
-  descriptionMarkdown: "",
-  startDate: new Date().toISOString().slice(0, 10),
-  endDate: "",
-  assetKey: "",
-};
+function createEmptyForm(): TradeFormState {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return {
+    title: "",
+    descriptionMarkdown: "",
+    startDate: `${year}-${month}-${day}`,
+    endDate: "",
+    assetKey: "",
+  };
+}
 
 export function JournalTradeForm({
   trade,
@@ -49,7 +56,7 @@ export function JournalTradeForm({
     () => markets.map((market) => [getAssetKey(market), market] as const),
     [markets],
   );
-  const [form, setForm] = useState<TradeFormState>(emptyForm);
+  const [form, setForm] = useState<TradeFormState>(() => createEmptyForm());
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -64,7 +71,7 @@ export function JournalTradeForm({
         return;
       }
 
-      setForm(emptyForm);
+      setForm(createEmptyForm());
     }, 0);
 
     return () => window.clearTimeout(timeout);
@@ -72,9 +79,13 @@ export function JournalTradeForm({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      if (!form.assetKey && marketOptions[0]) {
-        setForm((current) => ({ ...current, assetKey: marketOptions[0][0] }));
-      }
+      if (!marketOptions[0]) return;
+
+      setForm((current) =>
+        current.assetKey
+          ? current
+          : { ...current, assetKey: marketOptions[0][0] },
+      );
     }, 0);
 
     return () => window.clearTimeout(timeout);
@@ -95,7 +106,7 @@ export function JournalTradeForm({
 
     if (!trade) {
       setForm({
-        ...emptyForm,
+        ...createEmptyForm(),
         assetKey: marketOptions[0]?.[0] || "",
       });
     }
