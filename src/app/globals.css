@@ -543,12 +543,13 @@ textarea {
   border-radius: 8px;
   color: #4f5753;
   display: flex;
-  flex: 1;
+  flex: none;
   gap: 0.6rem;
   min-width: 0;
   padding: 0.65rem;
   text-align: left;
 }
+.chart-choice-row .chart-choice { flex: 1; }
 .chart-choice:hover { background: #f1eee7; }
 .chart-choice.active { background: #e6efe9; border-color: rgba(31, 122, 104, 0.22); color: #123d34; }
 .chart-choice span { display: grid; min-width: 0; }
