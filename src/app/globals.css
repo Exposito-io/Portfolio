@@ -474,8 +474,15 @@ textarea {
 }
 
 .chart-frame {
-  height: 22rem;
-  min-height: 22rem;
+  height: clamp(26rem, 76dvh, 70rem);
+  min-height: 26rem;
+}
+
+@media (min-width: 768px) {
+  .chart-frame {
+    height: clamp(34rem, 80dvh, 72rem);
+    min-height: 34rem;
+  }
 }
 
 .chart-panel:fullscreen {
