@@ -95,6 +95,7 @@ export async function GET(_request: Request, context: RouteContext) {
         orders,
         unrealizedPnlUsd,
         positionValueUsd,
+        trade.endDate !== null,
       ),
       sourceErrors,
       accountsCount: accounts.length,

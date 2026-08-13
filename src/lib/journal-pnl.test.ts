@@ -64,19 +64,38 @@ describe("journal PnL", () => {
     });
   });
 
-  it("adds unrealized PnL for open trades", () => {
+  it("uses only unrealized PnL for unfinished trades", () => {
     expect(
       calculateJournalTradePnlSummary(
         [{ ...baseOrder, id: "order-1", closedPnl: 12.34 }],
         100.1,
         5000.5,
+        false,
       ),
     ).toMatchObject({
-      pnlUsd: 112.44,
-      pnlPercent: 112.44,
+      pnlUsd: 100.1,
+      pnlPercent: 100.1,
       realizedPnlUsd: 12.34,
       unrealizedPnlUsd: 100.1,
       positionValueUsd: 5000.5,
+    });
+  });
+
+  it("uses all order PnL for finished trades", () => {
+    expect(
+      calculateJournalTradePnlSummary(
+        [
+          { ...baseOrder, id: "order-1", closedPnl: 12.34 },
+          { ...baseOrder, id: "order-2", closedPnl: -2.1 },
+        ],
+        100.1,
+        5000.5,
+        true,
+      ),
+    ).toMatchObject({
+      pnlUsd: 10.24,
+      pnlPercent: 5.12,
+      realizedPnlUsd: 10.24,
     });
   });
 });
