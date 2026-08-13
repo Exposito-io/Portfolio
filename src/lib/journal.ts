@@ -27,6 +27,7 @@ const assetSchema = z.object({
 const tradingViewChartSchema = z.object({
   id: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(80).optional(),
+  source: z.enum(["tradingview", "hyperliquid"]).optional(),
   symbol: z.string().trim().min(1).max(240),
 });
 
@@ -361,7 +362,7 @@ function normalizeTags(tags: string[]) {
 function normalizeTradingViewCharts(charts: JournalTradingViewChart[]) {
   const seen = new Set<string>();
   return charts.filter((chart) => {
-    const key = chart.symbol.toLocaleUpperCase();
+    const key = `${chart.source ?? "tradingview"}:${chart.symbol.toLocaleUpperCase()}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

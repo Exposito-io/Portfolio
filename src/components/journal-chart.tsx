@@ -100,10 +100,12 @@ const rangeOptionsByInterval: Record<CandleInterval, RangeOption[]> = {
 
 export function JournalChart({
   trade,
+  markets,
   ordersState,
   onTradeChange,
 }: {
   trade: JournalTrade;
+  markets: JournalTrade["asset"][];
   ordersState: FilledOrdersState;
   onTradeChange: (trade: JournalTrade) => void;
 }) {
@@ -124,11 +126,21 @@ export function JournalChart({
   const [activeChartId, setActiveChartId] = useState("journal");
   const [addChartOpen, setAddChartOpen] = useState(false);
   const [chartName, setChartName] = useState("");
+  const [chartSource, setChartSource] = useState<"tradingview" | "hyperliquid">(
+    "tradingview",
+  );
   const [chartSymbol, setChartSymbol] = useState("");
   const [chartsSaving, setChartsSaving] = useState(false);
   const activeTradingViewChart = trade.tradingViewCharts.find(
     (chart) => chart.id === activeChartId,
   );
+  const activeChartSource = activeTradingViewChart?.source ?? "tradingview";
+  const isTradingViewChart =
+    Boolean(activeTradingViewChart) && activeChartSource === "tradingview";
+  const activeHyperliquidCoin =
+    activeTradingViewChart && activeChartSource === "hyperliquid"
+      ? activeTradingViewChart.symbol
+      : trade.asset.chartCoin;
 
   const candleData = useMemo(
     () =>
@@ -203,7 +215,7 @@ export function JournalChart({
       setError("");
       try {
         const params = new URLSearchParams({
-          coin: trade.asset.chartCoin,
+        coin: activeHyperliquidCoin,
           interval,
           days: String(days),
         });
@@ -228,7 +240,7 @@ export function JournalChart({
 
     void loadCandles();
     return () => controller.abort();
-  }, [days, interval, trade.asset.chartCoin]);
+  }, [activeHyperliquidCoin, days, interval]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -330,9 +342,11 @@ export function JournalChart({
     if (!seriesRef.current) return;
 
     seriesRef.current.setData(candleData);
-    markersRef.current?.setMarkers(markerData.markers);
+    markersRef.current?.setMarkers(
+      activeTradingViewChart ? [] : markerData.markers,
+    );
     chartRef.current?.timeScale().fitContent();
-  }, [candleData, markerData.markers]);
+  }, [activeTradingViewChart, candleData, markerData.markers]);
 
   function changeInterval(nextInterval: CandleInterval) {
     setInterval(nextInterval);
@@ -399,6 +413,7 @@ export function JournalChart({
     const chart = {
       id: crypto.randomUUID(),
       ...(name ? { name } : {}),
+      source: chartSource,
       symbol,
     };
     const updatedTrade = await saveTradingViewCharts([
@@ -409,6 +424,7 @@ export function JournalChart({
 
     setActiveChartId(chart.id);
     setChartName("");
+    setChartSource("tradingview");
     setChartSymbol("");
     setAddChartOpen(false);
   }
@@ -430,7 +446,7 @@ export function JournalChart({
           </h2>
           <p>
             {activeTradingViewChart
-              ? `${activeTradingViewChart.symbol} · TradingView`
+              ? `${activeTradingViewChart.symbol} · ${activeChartSource === "hyperliquid" ? "Hyperliquid" : "TradingView"}`
               : trade.asset.chartCoin}
             {!activeTradingViewChart && markerData.markers.length
               ? ` · ${markerData.markers.length} chart markers`
@@ -438,7 +454,7 @@ export function JournalChart({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {!activeTradingViewChart ? <select
+          {!isTradingViewChart ? <select
             className="input h-10 w-24"
             value={interval}
             onChange={(event) =>
@@ -486,9 +502,9 @@ export function JournalChart({
       <div className="chart-frame chart-frame-tradingview">
         <div
           ref={chartContainerRef}
-          className={activeTradingViewChart ? "hidden h-full w-full" : "h-full w-full"}
+          className={isTradingViewChart ? "hidden h-full w-full" : "h-full w-full"}
         />
-        {activeTradingViewChart ? (
+        {isTradingViewChart && activeTradingViewChart ? (
           <TradingViewEmbed symbol={activeTradingViewChart.symbol} />
         ) : null}
         {!activeTradingViewChart && hoveredMarker ? (
@@ -513,7 +529,7 @@ export function JournalChart({
             )}
           </div>
         ) : null}
-        {!activeTradingViewChart && loading ? (
+        {!isTradingViewChart && loading ? (
           <div className="chart-overlay text-[#1f7a68]">
             <RefreshCw className="animate-spin" size={22} aria-hidden="true" />
           </div>
@@ -545,7 +561,13 @@ export function JournalChart({
                 <ChartCandlestick size={16} aria-hidden="true" />
                 <span>
                   <strong>{chart.name ?? chart.symbol}</strong>
-                  <small>{chart.name ? chart.symbol : "TradingView"}</small>
+                  <small>
+                    {chart.name
+                      ? chart.symbol
+                      : chart.source === "hyperliquid"
+                        ? "Hyperliquid"
+                        : "TradingView"}
+                  </small>
                 </span>
               </button>
               <button
@@ -577,6 +599,35 @@ export function JournalChart({
               <button aria-label="Close add chart" className="icon-button" onClick={() => setAddChartOpen(false)} type="button"><X size={16} /></button>
             </div>
             <div className="journal-entry-modal-body grid gap-4">
+              <fieldset className="grid gap-2">
+                <legend className="field-label">Chart source</legend>
+                <div className="chart-source-options">
+                  <label>
+                    <input
+                      checked={chartSource === "tradingview"}
+                      name="chart-source"
+                      onChange={() => {
+                        setChartSource("tradingview");
+                        setChartSymbol("");
+                      }}
+                      type="radio"
+                    />
+                    TradingView
+                  </label>
+                  <label>
+                    <input
+                      checked={chartSource === "hyperliquid"}
+                      name="chart-source"
+                      onChange={() => {
+                        setChartSource("hyperliquid");
+                        setChartSymbol(markets[0]?.chartCoin ?? "");
+                      }}
+                      type="radio"
+                    />
+                    Hyperliquid
+                  </label>
+                </div>
+              </fieldset>
               <div className="grid gap-2">
                 <label className="field-label" htmlFor="tradingview-chart-name">Chart name</label>
                 <input
@@ -589,18 +640,37 @@ export function JournalChart({
                   value={chartName}
                 />
               </div>
-              <div className="grid gap-2">
-                <label className="field-label" htmlFor="tradingview-symbol">Symbol or formula</label>
-                <input
-                  className="input"
-                  id="tradingview-symbol"
-                  onChange={(event) => setChartSymbol(event.target.value)}
-                  placeholder="NASDAQ:AAPL or BINANCE:BTCUSDT/ETHUSDT"
-                  required
-                  value={chartSymbol}
-                />
-                <p className="text-xs text-[#69706c]">Use the same symbol or formula you would enter in TradingView.</p>
-              </div>
+              {chartSource === "tradingview" ? (
+                <div className="grid gap-2">
+                  <label className="field-label" htmlFor="tradingview-symbol">Symbol or formula</label>
+                  <input
+                    className="input"
+                    id="tradingview-symbol"
+                    onChange={(event) => setChartSymbol(event.target.value)}
+                    placeholder="NASDAQ:AAPL or BINANCE:BTCUSDT/ETHUSDT"
+                    required
+                    value={chartSymbol}
+                  />
+                  <p className="text-xs text-[#69706c]">Use the same symbol or formula you would enter in TradingView.</p>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <label className="field-label" htmlFor="hyperliquid-ticker">Hyperliquid ticker</label>
+                  <select
+                    className="input"
+                    id="hyperliquid-ticker"
+                    onChange={(event) => setChartSymbol(event.target.value)}
+                    required
+                    value={chartSymbol}
+                  >
+                    {markets.map((market) => (
+                      <option key={`${market.kind}:${market.chartCoin}`} value={market.chartCoin}>
+                        {market.label} ({market.chartCoin})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button className="button-primary" disabled={chartsSaving} type="submit"><Plus size={16} />Add chart</button>
                 <button className="button-secondary" disabled={chartsSaving} onClick={() => setAddChartOpen(false)} type="button">Cancel</button>

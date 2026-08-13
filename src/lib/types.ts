@@ -103,6 +103,7 @@ export type JournalEntry = {
 export type JournalTradingViewChart = {
   id: string;
   name?: string;
+  source?: "tradingview" | "hyperliquid";
   symbol: string;
 };
 

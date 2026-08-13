@@ -558,6 +558,30 @@ textarea {
 .chart-remove:hover { background: #f7e5df; }
 .add-chart-modal { max-width: 32rem; }
 
+.chart-source-options {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chart-source-options label {
+  align-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 700;
+  gap: 0.55rem;
+  padding: 0.7rem;
+}
+
+.chart-source-options label:has(input:checked) {
+  background: #e6efe9;
+  border-color: rgba(31, 122, 104, 0.4);
+  color: #123d34;
+}
+
 @media (min-width: 900px) {
   .chart-workspace { grid-template-columns: minmax(0, 1fr) 14rem; }
 }

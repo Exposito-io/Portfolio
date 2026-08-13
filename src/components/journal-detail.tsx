@@ -465,6 +465,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
       <JournalChart
         trade={trade}
+        markets={markets}
         ordersState={filledOrdersState}
         onTradeChange={setTrade}
       />
