@@ -123,6 +123,7 @@ export function JournalChart({
   const [loading, setLoading] = useState(true);
   const [activeChartId, setActiveChartId] = useState("journal");
   const [addChartOpen, setAddChartOpen] = useState(false);
+  const [chartName, setChartName] = useState("");
   const [chartSymbol, setChartSymbol] = useState("");
   const [chartsSaving, setChartsSaving] = useState(false);
   const activeTradingViewChart = trade.tradingViewCharts.find(
@@ -394,7 +395,12 @@ export function JournalChart({
     const symbol = chartSymbol.trim();
     if (!symbol) return;
 
-    const chart = { id: crypto.randomUUID(), symbol };
+    const name = chartName.trim();
+    const chart = {
+      id: crypto.randomUUID(),
+      ...(name ? { name } : {}),
+      symbol,
+    };
     const updatedTrade = await saveTradingViewCharts([
       ...trade.tradingViewCharts,
       chart,
@@ -402,6 +408,7 @@ export function JournalChart({
     if (!updatedTrade) return;
 
     setActiveChartId(chart.id);
+    setChartName("");
     setChartSymbol("");
     setAddChartOpen(false);
   }
@@ -416,9 +423,15 @@ export function JournalChart({
     <div ref={panelRef} className="panel chart-panel">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="panel-heading">
-          <h2>{activeTradingViewChart?.symbol ?? trade.asset.label}</h2>
+          <h2>
+            {activeTradingViewChart?.name ??
+              activeTradingViewChart?.symbol ??
+              trade.asset.label}
+          </h2>
           <p>
-            {activeTradingViewChart ? "TradingView" : trade.asset.chartCoin}
+            {activeTradingViewChart
+              ? `${activeTradingViewChart.symbol} · TradingView`
+              : trade.asset.chartCoin}
             {!activeTradingViewChart && markerData.markers.length
               ? ` · ${markerData.markers.length} chart markers`
               : ""}
@@ -530,7 +543,10 @@ export function JournalChart({
                 type="button"
               >
                 <ChartCandlestick size={16} aria-hidden="true" />
-                <span><strong>{chart.symbol}</strong><small>TradingView</small></span>
+                <span>
+                  <strong>{chart.name ?? chart.symbol}</strong>
+                  <small>{chart.name ? chart.symbol : "TradingView"}</small>
+                </span>
               </button>
               <button
                 aria-label={`Remove ${chart.symbol} chart`}
@@ -562,9 +578,20 @@ export function JournalChart({
             </div>
             <div className="journal-entry-modal-body grid gap-4">
               <div className="grid gap-2">
-                <label className="field-label" htmlFor="tradingview-symbol">Symbol or formula</label>
+                <label className="field-label" htmlFor="tradingview-chart-name">Chart name</label>
                 <input
                   autoFocus
+                  className="input"
+                  id="tradingview-chart-name"
+                  maxLength={80}
+                  onChange={(event) => setChartName(event.target.value)}
+                  placeholder="e.g. BTC / ETH ratio"
+                  value={chartName}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="field-label" htmlFor="tradingview-symbol">Symbol or formula</label>
+                <input
                   className="input"
                   id="tradingview-symbol"
                   onChange={(event) => setChartSymbol(event.target.value)}

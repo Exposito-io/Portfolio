@@ -46,10 +46,12 @@ describe("journal trades", () => {
     expect(updated?.descriptionMarkdown).toBe("**Long** pullback");
 
     const withChart = await updateTrade(db, trade.id, {
-      tradingViewCharts: [{ id: "chart-1", symbol: "NASDAQ:AAPL" }],
+      tradingViewCharts: [
+        { id: "chart-1", name: "Apple", symbol: "NASDAQ:AAPL" },
+      ],
     });
     expect(withChart?.tradingViewCharts).toEqual([
-      { id: "chart-1", symbol: "NASDAQ:AAPL" },
+      { id: "chart-1", name: "Apple", symbol: "NASDAQ:AAPL" },
     ]);
     expect(withChart?.descriptionMarkdown).toBe("**Long** pullback");
 

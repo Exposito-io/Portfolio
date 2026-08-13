@@ -26,6 +26,7 @@ const assetSchema = z.object({
 
 const tradingViewChartSchema = z.object({
   id: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(80).optional(),
   symbol: z.string().trim().min(1).max(240),
 });
 

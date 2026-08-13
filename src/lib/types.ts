@@ -102,6 +102,7 @@ export type JournalEntry = {
 
 export type JournalTradingViewChart = {
   id: string;
+  name?: string;
   symbol: string;
 };
 
