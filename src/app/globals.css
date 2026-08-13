@@ -677,6 +677,21 @@ textarea {
   padding: 0.52rem 0.65rem;
 }
 
+.journal-market-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.journal-market-change-positive b {
+  color: #1f7a68;
+}
+
+.journal-market-change-negative b {
+  color: #9b3d30;
+}
+
 .journal-pnl-metric-percent b {
   color: #1f2523;
   display: block;
@@ -688,12 +703,27 @@ textarea {
 
 @media (min-width: 640px) {
   .journal-detail-topbar {
-    grid-template-columns: auto minmax(14rem, 20rem) minmax(14rem, 20rem) auto;
+    grid-template-columns: auto repeat(2, minmax(12rem, 1fr));
     justify-content: space-between;
   }
 
   .journal-entry-actions {
     justify-self: end;
+  }
+}
+
+@media (min-width: 1100px) {
+  .journal-detail-topbar {
+    grid-template-columns: auto max-content repeat(2, minmax(10rem, 1fr)) auto;
+  }
+
+  .journal-market-metric {
+    justify-self: start;
+    width: max-content;
+  }
+
+  .journal-market-changes {
+    flex-wrap: nowrap;
   }
 }
 

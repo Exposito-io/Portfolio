@@ -28,6 +28,7 @@ import {
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
 import { JournalTagInput } from "@/components/journal-tag-input";
 import {
+  JournalMarketMetric,
   JournalPnlMetric,
   JournalPositionValueMetric,
 } from "@/components/journal-pnl-badge";
@@ -37,7 +38,12 @@ import {
 } from "@/components/journal-trade-form";
 import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
 import { useJournalFilledOrders } from "@/components/use-journal-filled-orders";
+import {
+  calculateJournalMarketSummary,
+  type JournalMarketSummary,
+} from "@/lib/journal-market";
 import type {
+  HyperliquidCandle,
   JournalEntry,
   JournalTrade,
   JournalTradeAsset,
@@ -58,6 +64,10 @@ const emptyEntryForm: EntryFormState = {
 export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [trade, setTrade] = useState<JournalTrade | null>(null);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
+  const [marketSummary, setMarketSummary] =
+    useState<JournalMarketSummary | null>(null);
+  const [marketError, setMarketError] = useState("");
+  const [marketLoading, setMarketLoading] = useState(true);
   const [entryForm, setEntryForm] = useState<EntryFormState>(emptyEntryForm);
   const [editingTrade, setEditingTrade] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
@@ -68,6 +78,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const entryActionsRef = useRef<HTMLDivElement>(null);
+  const chartCoin = trade?.asset.chartCoin;
   const filledOrdersState = useJournalFilledOrders(trade?.id ?? null);
   const entryOrderTotals = useMemo(
     () =>
@@ -132,6 +143,47 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
     void loadMarkets();
   }, []);
+
+  useEffect(() => {
+    if (!chartCoin) return;
+    const controller = new AbortController();
+    const requestedCoin = chartCoin;
+
+    async function loadMarketSummary() {
+      setMarketLoading(true);
+      setMarketError("");
+      try {
+        const params = new URLSearchParams({
+          coin: requestedCoin,
+          interval: "1h",
+          days: "31",
+        });
+        const response = await fetch(`/api/hyperliquid/candles?${params}`, {
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to load market price.");
+        }
+        setMarketSummary(
+          calculateJournalMarketSummary(payload.candles as HyperliquidCandle[]),
+        );
+      } catch (loadError) {
+        if (!controller.signal.aborted) {
+          setMarketError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load market price.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setMarketLoading(false);
+      }
+    }
+
+    void loadMarketSummary();
+    return () => controller.abort();
+  }, [chartCoin]);
 
   useEffect(() => {
     if (!entryFormOpen) return;
@@ -317,6 +369,11 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           <ArrowLeft size={16} aria-hidden="true" />
           Journal
         </Link>
+        <JournalMarketMetric
+          error={marketError}
+          loading={marketLoading}
+          summary={marketSummary}
+        />
         <JournalPositionValueMetric
           error={filledOrdersState.error}
           loading={filledOrdersState.loading}

@@ -1,4 +1,83 @@
 import type { JournalTradePnlSummary } from "@/lib/types";
+import type { JournalMarketSummary } from "@/lib/journal-market";
+
+export function JournalMarketMetric({
+  error,
+  loading,
+  summary,
+}: {
+  error?: string;
+  loading?: boolean;
+  summary?: JournalMarketSummary | null;
+}) {
+  if (loading) {
+    return <MetricShell label="Asset price" value="Loading" />;
+  }
+
+  if (error || !summary) {
+    return (
+      <MetricShell
+        label="Asset price"
+        title={error}
+        value={error ? "Unavailable" : "N/A"}
+      />
+    );
+  }
+
+  const tone =
+    summary.change24hPercent > 0
+      ? "journal-pnl-metric-positive"
+      : summary.change24hPercent < 0
+        ? "journal-pnl-metric-negative"
+        : "";
+
+  return (
+    <section className={`journal-pnl-metric journal-market-metric ${tone}`}>
+      <div>
+        <span>Asset price</span>
+        <strong>{formatAssetPrice(summary.priceUsd)}</strong>
+      </div>
+      <div className="journal-market-changes">
+        <MarketChange label="24h" value={summary.change24hPercent} />
+        <MarketChange label="7d" value={summary.change7dPercent} />
+        <MarketChange label="30d" value={summary.change30dPercent} />
+      </div>
+    </section>
+  );
+}
+
+function MarketChange({ label, value }: { label: string; value: number }) {
+  const tone =
+    value > 0
+      ? "journal-market-change-positive"
+      : value < 0
+        ? "journal-market-change-negative"
+        : "";
+
+  return (
+    <div className={`journal-pnl-metric-percent ${tone}`}>
+      <span>{label}</span>
+      <b>{formatSignedPercent(value, 1)}</b>
+    </div>
+  );
+}
+
+function MetricShell({
+  label,
+  title,
+  value,
+}: {
+  label: string;
+  title?: string;
+  value: string;
+}) {
+  return (
+    <section className="journal-pnl-metric" title={title}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </section>
+  );
+}
 
 export function JournalPnlBadge({
   error,
@@ -169,12 +248,12 @@ function formatPnlTitle(summary: JournalTradePnlSummary) {
   return parts.join(", ");
 }
 
-function formatSignedPercent(value: number) {
+function formatSignedPercent(value: number, fractionDigits = 2) {
   if (!Number.isFinite(value)) return "N/A";
 
   const formatted = `${Math.abs(value).toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
   })}%`;
   if (value > 0) return `+${formatted}`;
   if (value < 0) return `-${formatted}`;
@@ -196,6 +275,15 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     currency: "USD",
     maximumFractionDigits: Math.abs(value) >= 1000 ? 0 : 2,
+    style: "currency",
+  }).format(value);
+}
+
+function formatAssetPrice(value: number) {
+  const maximumFractionDigits = value >= 1000 ? 2 : value >= 1 ? 4 : 8;
+  return new Intl.NumberFormat("en-US", {
+    currency: "USD",
+    maximumFractionDigits,
     style: "currency",
   }).format(value);
 }
