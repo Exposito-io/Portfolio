@@ -292,7 +292,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
   if (loading) {
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 text-sm text-[#69706c] sm:px-6 lg:px-8">
+      <main className="w-full px-4 py-6 text-sm text-[#69706c] sm:px-6 lg:px-8">
         Loading trade...
       </main>
     );
@@ -300,7 +300,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
   if (!trade) {
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
         {error ? <div className="alert alert-error">{error}</div> : null}
         <Link className="button-secondary w-fit" href="/journal">
           <ArrowLeft size={16} aria-hidden="true" />
@@ -311,7 +311,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <div className="journal-detail-topbar">
         <Link className="button-secondary w-fit" href="/journal">
           <ArrowLeft size={16} aria-hidden="true" />
