@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ChartCandlestick,
   Maximize2,
   Minimize2,
+  Plus,
   RefreshCw,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -98,9 +101,11 @@ const rangeOptionsByInterval: Record<CandleInterval, RangeOption[]> = {
 export function JournalChart({
   trade,
   ordersState,
+  onTradeChange,
 }: {
   trade: JournalTrade;
   ordersState: FilledOrdersState;
+  onTradeChange: (trade: JournalTrade) => void;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -116,6 +121,13 @@ export function JournalChart({
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeChartId, setActiveChartId] = useState("journal");
+  const [addChartOpen, setAddChartOpen] = useState(false);
+  const [chartSymbol, setChartSymbol] = useState("");
+  const [chartsSaving, setChartsSaving] = useState(false);
+  const activeTradingViewChart = trade.tradingViewCharts.find(
+    (chart) => chart.id === activeChartId,
+  );
 
   const candleData = useMemo(
     () =>
@@ -350,20 +362,70 @@ export function JournalChart({
     }
   }
 
+  async function saveTradingViewCharts(
+    charts: JournalTrade["tradingViewCharts"],
+  ) {
+    setChartsSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/journal/trades/${trade.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tradingViewCharts: charts }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to save charts.");
+      }
+      onTradeChange(payload.trade);
+      return payload.trade as JournalTrade;
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Unable to save charts.",
+      );
+      return null;
+    } finally {
+      setChartsSaving(false);
+    }
+  }
+
+  async function addTradingViewChart(event: React.FormEvent) {
+    event.preventDefault();
+    const symbol = chartSymbol.trim();
+    if (!symbol) return;
+
+    const chart = { id: crypto.randomUUID(), symbol };
+    const updatedTrade = await saveTradingViewCharts([
+      ...trade.tradingViewCharts,
+      chart,
+    ]);
+    if (!updatedTrade) return;
+
+    setActiveChartId(chart.id);
+    setChartSymbol("");
+    setAddChartOpen(false);
+  }
+
+  async function removeTradingViewChart(id: string) {
+    const charts = trade.tradingViewCharts.filter((chart) => chart.id !== id);
+    const updatedTrade = await saveTradingViewCharts(charts);
+    if (updatedTrade && activeChartId === id) setActiveChartId("journal");
+  }
+
   return (
     <div ref={panelRef} className="panel chart-panel">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="panel-heading">
-          <h2>{trade.asset.label}</h2>
+          <h2>{activeTradingViewChart?.symbol ?? trade.asset.label}</h2>
           <p>
-            {trade.asset.chartCoin}
-            {markerData.markers.length
+            {activeTradingViewChart ? "TradingView" : trade.asset.chartCoin}
+            {!activeTradingViewChart && markerData.markers.length
               ? ` · ${markerData.markers.length} chart markers`
               : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <select
+          {!activeTradingViewChart ? <select
             className="input h-10 w-24"
             value={interval}
             onChange={(event) =>
@@ -375,7 +437,16 @@ export function JournalChart({
             <option value="4h">4h</option>
             <option value="1d">1d</option>
             <option value="1w">1w</option>
-          </select>
+          </select> : null}
+
+          <button
+            className="button-secondary"
+            type="button"
+            onClick={() => setAddChartOpen(true)}
+          >
+            <Plus size={16} aria-hidden="true" />
+            Add chart
+          </button>
 
           <button
             className="icon-button"
@@ -398,9 +469,16 @@ export function JournalChart({
         <div className="alert alert-warning">{ordersState.error}</div>
       ) : null}
 
+      <div className="chart-workspace">
       <div className="chart-frame chart-frame-tradingview">
-        <div ref={chartContainerRef} className="h-full w-full" />
-        {hoveredMarker ? (
+        <div
+          ref={chartContainerRef}
+          className={activeTradingViewChart ? "hidden h-full w-full" : "h-full w-full"}
+        />
+        {activeTradingViewChart ? (
+          <TradingViewEmbed symbol={activeTradingViewChart.symbol} />
+        ) : null}
+        {!activeTradingViewChart && hoveredMarker ? (
           <div
             className="chart-marker-tooltip"
             style={{
@@ -422,7 +500,7 @@ export function JournalChart({
             )}
           </div>
         ) : null}
-        {loading ? (
+        {!activeTradingViewChart && loading ? (
           <div className="chart-overlay text-[#1f7a68]">
             <RefreshCw className="animate-spin" size={22} aria-hidden="true" />
           </div>
@@ -434,6 +512,76 @@ export function JournalChart({
           null
         )}
       </div>
+        <aside className="chart-sidebar" aria-label="Available charts">
+          <p className="chart-sidebar-title">Charts</p>
+          <button
+            className={activeChartId === "journal" ? "chart-choice active" : "chart-choice"}
+            onClick={() => setActiveChartId("journal")}
+            type="button"
+          >
+            <ChartCandlestick size={16} aria-hidden="true" />
+            <span><strong>{trade.asset.label}</strong><small>Journal chart</small></span>
+          </button>
+          {trade.tradingViewCharts.map((chart) => (
+            <div className="chart-choice-row" key={chart.id}>
+              <button
+                className={activeChartId === chart.id ? "chart-choice active" : "chart-choice"}
+                onClick={() => setActiveChartId(chart.id)}
+                type="button"
+              >
+                <ChartCandlestick size={16} aria-hidden="true" />
+                <span><strong>{chart.symbol}</strong><small>TradingView</small></span>
+              </button>
+              <button
+                aria-label={`Remove ${chart.symbol} chart`}
+                className="chart-remove"
+                disabled={chartsSaving}
+                onClick={() => void removeTradingViewChart(chart.id)}
+                type="button"
+              >
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </aside>
+      </div>
+
+      {addChartOpen ? (
+        <div className="journal-entry-modal-backdrop" onClick={() => setAddChartOpen(false)}>
+          <form
+            aria-labelledby="add-chart-title"
+            aria-modal="true"
+            className="journal-entry-modal add-chart-modal"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={addTradingViewChart}
+            role="dialog"
+          >
+            <div className="journal-entry-modal-header">
+              <div><p>TradingView</p><h3 id="add-chart-title">Add chart</h3></div>
+              <button aria-label="Close add chart" className="icon-button" onClick={() => setAddChartOpen(false)} type="button"><X size={16} /></button>
+            </div>
+            <div className="journal-entry-modal-body grid gap-4">
+              <div className="grid gap-2">
+                <label className="field-label" htmlFor="tradingview-symbol">Symbol or formula</label>
+                <input
+                  autoFocus
+                  className="input"
+                  id="tradingview-symbol"
+                  onChange={(event) => setChartSymbol(event.target.value)}
+                  placeholder="NASDAQ:AAPL or BINANCE:BTCUSDT/ETHUSDT"
+                  required
+                  value={chartSymbol}
+                />
+                <p className="text-xs text-[#69706c]">Use the same symbol or formula you would enter in TradingView.</p>
+              </div>
+              <div className="flex gap-2">
+                <button className="button-primary" disabled={chartsSaving} type="submit"><Plus size={16} />Add chart</button>
+                <button className="button-secondary" disabled={chartsSaving} onClick={() => setAddChartOpen(false)} type="button">Cancel</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       {selectedEntry ? (
         <div
@@ -474,6 +622,30 @@ export function JournalChart({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function TradingViewEmbed({ symbol }: { symbol: string }) {
+  const src = `https://s.tradingview.com/widgetembed/?${new URLSearchParams({
+    symbol,
+    interval: "D",
+    theme: "light",
+    style: "1",
+    locale: "en",
+    hide_side_toolbar: "0",
+    allow_symbol_change: "0",
+    save_image: "0",
+    calendar: "0",
+  })}`;
+
+  return (
+    <iframe
+      allowFullScreen
+      className="tradingview-embed"
+      key={symbol}
+      src={src}
+      title={`TradingView chart for ${symbol}`}
+    />
   );
 }
 

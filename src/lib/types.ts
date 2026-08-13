@@ -100,6 +100,11 @@ export type JournalEntry = {
   updatedAt: string;
 };
 
+export type JournalTradingViewChart = {
+  id: string;
+  symbol: string;
+};
+
 export type JournalTrade = {
   id: string;
   title: string;
@@ -107,6 +112,7 @@ export type JournalTrade = {
   startDate: string;
   endDate: string | null;
   asset: JournalTradeAsset;
+  tradingViewCharts: JournalTradingViewChart[];
   entries: JournalEntry[];
   createdAt: string;
   updatedAt: string;

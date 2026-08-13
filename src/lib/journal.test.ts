@@ -43,6 +43,15 @@ describe("journal trades", () => {
     });
 
     expect(updated?.endDate).toBe("2026-07-03");
+    expect(updated?.descriptionMarkdown).toBe("**Long** pullback");
+
+    const withChart = await updateTrade(db, trade.id, {
+      tradingViewCharts: [{ id: "chart-1", symbol: "NASDAQ:AAPL" }],
+    });
+    expect(withChart?.tradingViewCharts).toEqual([
+      { id: "chart-1", symbol: "NASDAQ:AAPL" },
+    ]);
+    expect(withChart?.descriptionMarkdown).toBe("**Long** pullback");
 
     const withEntry = await createEntry(db, trade.id, {
       date: "2026-07-02",

@@ -2,7 +2,12 @@ import { ObjectId, type Collection, type Db, type Document } from "mongodb";
 import { z } from "zod";
 
 import { isValidDateKey } from "@/lib/date";
-import type { JournalEntry, JournalTrade, JournalTradeAsset } from "@/lib/types";
+import type {
+  JournalEntry,
+  JournalTrade,
+  JournalTradeAsset,
+  JournalTradingViewChart,
+} from "@/lib/types";
 
 const markdownSchema = z.string().trim().max(12_000).default("");
 const entryTagsSchema = z
@@ -17,6 +22,11 @@ const assetSchema = z.object({
   coin: z.string().trim().min(1).max(80),
   chartCoin: z.string().trim().min(1).max(100),
   dex: z.string().trim().max(40).optional(),
+});
+
+const tradingViewChartSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  symbol: z.string().trim().min(1).max(240),
 });
 
 const tradeBaseSchema = z.object({
@@ -34,6 +44,7 @@ const tradeBaseSchema = z.object({
     .optional()
     .transform((value) => value || null),
   asset: assetSchema,
+  tradingViewCharts: z.array(tradingViewChartSchema).max(12).optional(),
 });
 
 const tradeInputSchema = tradeBaseSchema.refine(
@@ -41,7 +52,19 @@ const tradeInputSchema = tradeBaseSchema.refine(
   "End date must be on or after the start date.",
 );
 
-const tradeUpdateSchema = tradeBaseSchema.partial();
+const tradeUpdateSchema = z.object({
+  title: z.string().trim().min(1).max(140).optional(),
+  descriptionMarkdown: z.string().trim().max(12_000).optional(),
+  startDate: z.string().trim().refine(isValidDateKey, {
+    message: "Start date must use YYYY-MM-DD format.",
+  }).optional(),
+  endDate: z.string().trim().refine(
+    (value) => value === "" || isValidDateKey(value),
+    { message: "End date must use YYYY-MM-DD format." },
+  ).optional().transform((value) => value || null),
+  asset: assetSchema.optional(),
+  tradingViewCharts: z.array(tradingViewChartSchema).max(12).optional(),
+});
 
 const entryInputSchema = z.object({
   date: z.string().trim().refine(isValidDateKey, {
@@ -83,6 +106,7 @@ export function serializeTrade(trade: JournalTradeDocument): JournalTrade {
     startDate: trade.startDate,
     endDate: trade.endDate ?? null,
     asset: trade.asset,
+    tradingViewCharts: normalizeTradingViewCharts(trade.tradingViewCharts ?? []),
     entries: [...(trade.entries ?? [])]
       .sort((a, b) => b.date.localeCompare(a.date))
       .map(serializeEntry),
@@ -129,6 +153,7 @@ export async function createTrade(db: Db, payload: unknown) {
     startDate: input.startDate,
     endDate: input.endDate ?? null,
     asset: normalizeAsset(input.asset),
+    tradingViewCharts: input.tradingViewCharts ?? [],
     entries: [],
     createdAt: now,
     updatedAt: now,
@@ -172,6 +197,9 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
   if (input.startDate !== undefined) update.startDate = input.startDate;
   if ("endDate" in input) update.endDate = input.endDate ?? null;
   if (input.asset !== undefined) update.asset = normalizeAsset(input.asset);
+  if (input.tradingViewCharts !== undefined) {
+    update.tradingViewCharts = normalizeTradingViewCharts(input.tradingViewCharts);
+  }
 
   const result = await collection(db).findOneAndUpdate(
     { _id },
@@ -327,6 +355,16 @@ function normalizeTags(tags: string[]) {
   });
 
   return normalized;
+}
+
+function normalizeTradingViewCharts(charts: JournalTradingViewChart[]) {
+  const seen = new Set<string>();
+  return charts.filter((chart) => {
+    const key = chart.symbol.toLocaleUpperCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function toObjectId(id: string) {

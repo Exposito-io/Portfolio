@@ -463,7 +463,11 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
       </section>
 
-      <JournalChart trade={trade} ordersState={filledOrdersState} />
+      <JournalChart
+        trade={trade}
+        ordersState={filledOrdersState}
+        onTradeChange={setTrade}
+      />
 
       <section className="grid gap-6">
         <div className="panel">
