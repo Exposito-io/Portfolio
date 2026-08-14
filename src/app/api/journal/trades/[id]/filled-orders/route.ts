@@ -40,7 +40,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const orders: HyperliquidFilledOrder[] = [];
     const sourceErrors: SourceError[] = [];
     let unrealizedPnlUsd: number | null = null;
-    let positionValueUsd: number | null = null;
+    let positionValueUsd = 0;
 
     for (const account of accounts) {
       try {
@@ -72,8 +72,7 @@ export async function GET(_request: Request, context: RouteContext) {
           if (openPosition) {
             unrealizedPnlUsd =
               (unrealizedPnlUsd ?? 0) + openPosition.unrealizedPnlUsd;
-            positionValueUsd =
-              (positionValueUsd ?? 0) + openPosition.positionValueUsd;
+            positionValueUsd += openPosition.positionValueUsd;
           }
         } catch (error) {
           sourceErrors.push({

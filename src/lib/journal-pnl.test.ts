@@ -40,7 +40,7 @@ describe("journal PnL", () => {
       pnlPercent: 3.41,
       realizedPnlUsd: 10.25,
       unrealizedPnlUsd: null,
-      positionValueUsd: null,
+      positionValueUsd: 0,
       orderCount: 2,
       fillCount: 5,
       notionalUsd: 300.5,
@@ -57,14 +57,14 @@ describe("journal PnL", () => {
       pnlPercent: null,
       realizedPnlUsd: null,
       unrealizedPnlUsd: null,
-      positionValueUsd: null,
+      positionValueUsd: 0,
       orderCount: 1,
       fillCount: 1,
       notionalUsd: 100,
     });
   });
 
-  it("uses only unrealized PnL for unfinished trades", () => {
+  it("adds unrealized PnL to trade PnL for unfinished trades", () => {
     expect(
       calculateJournalTradePnlSummary(
         [{ ...baseOrder, id: "order-1", closedPnl: 12.34 }],
@@ -73,11 +73,23 @@ describe("journal PnL", () => {
         false,
       ),
     ).toMatchObject({
-      pnlUsd: 100.1,
-      pnlPercent: 100.1,
+      pnlUsd: 112.44,
+      pnlPercent: 112.44,
       realizedPnlUsd: 12.34,
       unrealizedPnlUsd: 100.1,
       positionValueUsd: 5000.5,
+    });
+  });
+
+  it("uses unrealized PnL when there is no realized trade PnL", () => {
+    expect(
+      calculateJournalTradePnlSummary([baseOrder], -25.5, null, false),
+    ).toMatchObject({
+      pnlUsd: -25.5,
+      pnlPercent: -25.5,
+      realizedPnlUsd: null,
+      unrealizedPnlUsd: -25.5,
+      positionValueUsd: 0,
     });
   });
 
