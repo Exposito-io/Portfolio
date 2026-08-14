@@ -82,6 +82,8 @@ export type PortfolioResponse = {
 };
 
 export type JournalAssetKind = "perp" | "spot" | "trade-xyz";
+export type JournalTradeKind = "trade" | "idea";
+export type JournalTradeDirection = "long" | "short";
 
 export type JournalTradeAsset = {
   kind: JournalAssetKind;
@@ -109,6 +111,8 @@ export type JournalTradingViewChart = {
 
 export type JournalTrade = {
   id: string;
+  kind: JournalTradeKind;
+  direction: JournalTradeDirection | null;
   title: string;
   descriptionMarkdown: string;
   startDate: string;

@@ -32,6 +32,8 @@ const tradingViewChartSchema = z.object({
 });
 
 const tradeBaseSchema = z.object({
+  kind: z.enum(["trade", "idea"]).default("trade"),
+  direction: z.enum(["long", "short"]).nullable().optional().default(null),
   title: z.string().trim().min(1).max(140),
   descriptionMarkdown: markdownSchema,
   startDate: z.string().trim().refine(isValidDateKey, {
@@ -55,6 +57,8 @@ const tradeInputSchema = tradeBaseSchema.refine(
 );
 
 const tradeUpdateSchema = z.object({
+  kind: z.enum(["trade", "idea"]).optional(),
+  direction: z.enum(["long", "short"]).nullable().optional(),
   title: z.string().trim().min(1).max(140).optional(),
   descriptionMarkdown: z.string().trim().max(12_000).optional(),
   startDate: z.string().trim().refine(isValidDateKey, {
@@ -103,6 +107,8 @@ function collection(db: Db): Collection<JournalTradeDocument> {
 export function serializeTrade(trade: JournalTradeDocument): JournalTrade {
   return {
     id: trade._id.toString(),
+    kind: trade.kind ?? "trade",
+    direction: trade.direction ?? null,
     title: trade.title,
     descriptionMarkdown: trade.descriptionMarkdown,
     startDate: trade.startDate,
@@ -150,6 +156,8 @@ export async function createTrade(db: Db, payload: unknown) {
   const now = new Date();
   const trade: JournalTradeDocument = {
     _id: new ObjectId(),
+    kind: input.kind,
+    direction: input.kind === "idea" ? null : input.direction,
     title: input.title,
     descriptionMarkdown: input.descriptionMarkdown,
     startDate: input.startDate,
@@ -192,6 +200,12 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
     updatedAt: new Date(),
   };
 
+  if (input.kind !== undefined) update.kind = input.kind;
+  if (input.kind === "idea") {
+    update.direction = null;
+  } else if (input.direction !== undefined) {
+    update.direction = input.direction;
+  }
   if (input.title !== undefined) update.title = input.title;
   if (input.descriptionMarkdown !== undefined) {
     update.descriptionMarkdown = input.descriptionMarkdown;

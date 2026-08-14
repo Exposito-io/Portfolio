@@ -33,6 +33,8 @@ describe("journal trades", () => {
     });
 
     expect(trade).toMatchObject({
+      kind: "trade",
+      direction: null,
       title: "ETH setup",
       endDate: null,
       entries: [],
@@ -99,6 +101,44 @@ describe("journal trades", () => {
     expect(await getTrade(db, "not-an-object-id")).toBeNull();
     expect(await deleteTrade(db, trade.id)).toBe(true);
     expect(await listTrades(db)).toHaveLength(0);
+  });
+
+  it("stores long and short direction for trades", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      kind: "trade",
+      direction: "short",
+      title: "ETH short",
+      descriptionMarkdown: "",
+      startDate: "2026-07-01",
+      asset,
+    });
+
+    expect(trade.direction).toBe("short");
+    expect((await updateTrade(db, trade.id, { direction: "long" }))?.direction)
+      .toBe("long");
+    expect((await updateTrade(db, trade.id, { kind: "idea" }))?.direction)
+      .toBeNull();
+  });
+
+  it("creates an open trade idea with a ticker and no trading PnL semantics", async () => {
+    const db = fakeDb();
+    const idea = await createTrade(db, {
+      kind: "idea",
+      title: "ETH watchlist idea",
+      descriptionMarkdown: "Wait for confirmation.",
+      startDate: "2026-07-01",
+      asset,
+    });
+
+    expect(idea).toMatchObject({
+      kind: "idea",
+      endDate: null,
+      asset: { coin: "ETH" },
+    });
+
+    const closed = await updateTrade(db, idea.id, { endDate: "2026-07-04" });
+    expect(closed).toMatchObject({ kind: "idea", endDate: "2026-07-04" });
   });
 
   it("validates required fields and date ordering", async () => {

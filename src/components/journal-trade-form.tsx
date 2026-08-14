@@ -4,9 +4,16 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Save, X } from "lucide-react";
 
 import { MarkdownEditor } from "@/components/markdown-editor";
-import type { JournalTrade, JournalTradeAsset } from "@/lib/types";
+import type {
+  JournalTrade,
+  JournalTradeAsset,
+  JournalTradeDirection,
+  JournalTradeKind,
+} from "@/lib/types";
 
 export type TradeFormPayload = {
+  kind: JournalTradeKind;
+  direction: JournalTradeDirection | null;
   title: string;
   descriptionMarkdown: string;
   startDate: string;
@@ -15,6 +22,8 @@ export type TradeFormPayload = {
 };
 
 type TradeFormState = {
+  kind: JournalTradeKind;
+  direction: JournalTradeDirection;
   title: string;
   descriptionMarkdown: string;
   startDate: string;
@@ -29,6 +38,8 @@ function createEmptyForm(): TradeFormState {
   const day = String(today.getDate()).padStart(2, "0");
 
   return {
+    kind: "trade",
+    direction: "long",
     title: "",
     descriptionMarkdown: "",
     startDate: `${year}-${month}-${day}`,
@@ -62,6 +73,8 @@ export function JournalTradeForm({
     const timeout = window.setTimeout(() => {
       if (trade) {
         setForm({
+          kind: trade.kind,
+          direction: trade.direction ?? "long",
           title: trade.title,
           descriptionMarkdown: trade.descriptionMarkdown,
           startDate: trade.startDate,
@@ -97,6 +110,8 @@ export function JournalTradeForm({
     if (!asset) return;
 
     await onSubmit({
+      kind: form.kind,
+      direction: form.kind === "idea" ? null : form.direction,
       title: form.title,
       descriptionMarkdown: form.descriptionMarkdown,
       startDate: form.startDate,
@@ -114,6 +129,40 @@ export function JournalTradeForm({
 
   return (
     <form className="grid gap-4" onSubmit={saveTrade}>
+      <label className="flex items-center gap-3 text-sm font-medium text-[#343a37]">
+        <input
+          checked={form.kind === "idea"}
+          className="h-4 w-4 accent-[#1f7a68]"
+          type="checkbox"
+          onChange={(event) =>
+            setForm({ ...form, kind: event.target.checked ? "idea" : "trade" })
+          }
+        />
+        This is a trade idea
+      </label>
+      {form.kind === "trade" ? (
+        <fieldset className="grid gap-2">
+          <legend className="field-label">Direction</legend>
+          <div className="flex flex-wrap gap-4">
+            {(["long", "short"] as const).map((direction) => (
+              <label
+                className="flex items-center gap-2 text-sm font-medium capitalize text-[#343a37]"
+                key={direction}
+              >
+                <input
+                  checked={form.direction === direction}
+                  className="h-4 w-4 accent-[#1f7a68]"
+                  name="trade-direction"
+                  type="radio"
+                  value={direction}
+                  onChange={() => setForm({ ...form, direction })}
+                />
+                {direction}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
       <div className="grid gap-2">
         <label className="field-label" htmlFor="trade-title">
           Title
@@ -129,7 +178,7 @@ export function JournalTradeForm({
       </div>
       <div className="grid gap-2">
         <label className="field-label" htmlFor="trade-asset">
-          Hyperliquid asset
+          Ticker / Hyperliquid asset
         </label>
         <select
           id="trade-asset"

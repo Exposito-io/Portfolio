@@ -66,5 +66,5 @@ export function useJournalFilledOrders(tradeId: string | null): FilledOrdersStat
     return () => controller.abort();
   }, [tradeId]);
 
-  return { data, error, loading };
+  return tradeId ? { data, error, loading } : { data: null, error: "", loading: false };
 }

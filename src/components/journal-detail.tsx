@@ -79,7 +79,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [saving, setSaving] = useState(false);
   const entryActionsRef = useRef<HTMLDivElement>(null);
   const chartCoin = trade?.asset.chartCoin;
-  const filledOrdersState = useJournalFilledOrders(trade?.id ?? null);
+  const filledOrdersState = useJournalFilledOrders(
+    trade?.kind === "trade" ? trade.id : null,
+  );
   const entryOrderTotals = useMemo(
     () =>
       groupOrdersByDate(
@@ -374,16 +376,20 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           loading={marketLoading}
           summary={marketSummary}
         />
-        <JournalPositionValueMetric
-          error={filledOrdersState.error}
-          loading={filledOrdersState.loading}
-          summary={filledOrdersState.data?.summary}
-        />
-        <JournalPnlMetric
-          error={filledOrdersState.error}
-          loading={filledOrdersState.loading}
-          summary={filledOrdersState.data?.summary}
-        />
+        {trade.kind === "trade" ? (
+          <>
+            <JournalPositionValueMetric
+              error={filledOrdersState.error}
+              loading={filledOrdersState.loading}
+              summary={filledOrdersState.data?.summary}
+            />
+            <JournalPnlMetric
+              error={filledOrdersState.error}
+              loading={filledOrdersState.loading}
+              summary={filledOrdersState.data?.summary}
+            />
+          </>
+        ) : null}
         <div className="journal-entry-actions" ref={entryActionsRef}>
           <button
             className="button-primary"
@@ -409,7 +415,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                 <div className="journal-entry-actions-menu" role="menu">
                   <button onClick={beginCloseTrade} role="menuitem" type="button">
                     <Check size={16} aria-hidden="true" />
-                    Close trade
+                    {trade.kind === "idea" ? "Close idea" : "Close trade"}
                   </button>
                 </div>
               ) : null}
@@ -452,6 +458,12 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                 <span className={trade.endDate ? "tag" : "tag tag-green"}>
                   {trade.endDate ? "Closed" : "Open"}
                 </span>
+                <span className="tag">
+                  {trade.kind === "idea" ? "Trade idea" : "Trade"}
+                </span>
+                {trade.kind === "trade" && trade.direction ? (
+                  <span className="tag capitalize">{trade.direction}</span>
+                ) : null}
                 <span className="tag">{trade.asset.label}</span>
               </div>
               <div className="mt-5">
@@ -529,7 +541,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         </div>
       </section>
 
-      <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
+      {trade.kind === "trade" ? (
+        <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
+      ) : null}
 
       {entryFormOpen ? (
         <div className="journal-modal-backdrop" onClick={closeEntryForm}>
@@ -544,7 +558,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               <div>
                 <p>
                   {closingTrade
-                    ? "Close trade"
+                    ? trade.kind === "idea"
+                      ? "Close idea"
+                      : "Close trade"
                     : editingEntry
                       ? "Edit journal entry"
                       : "New journal entry"}
@@ -622,7 +638,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                       <Plus size={16} aria-hidden="true" />
                     )}
                     {closingTrade
-                      ? "Close trade"
+                      ? trade.kind === "idea"
+                        ? "Close idea"
+                        : "Close trade"
                       : editingEntry
                         ? "Save entry"
                         : "Add entry"}

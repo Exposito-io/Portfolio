@@ -29,6 +29,13 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Trade not found." }, { status: 404 });
     }
 
+    if (trade.kind === "idea") {
+      return NextResponse.json(
+        { error: "Trade ideas do not have filled orders or PnL." },
+        { status: 400 },
+      );
+    }
+
     const accounts = (await listAccounts(db, true)).filter(
       (account) => account.source === "hyperliquid",
     );

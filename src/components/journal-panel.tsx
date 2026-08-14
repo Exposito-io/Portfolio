@@ -98,7 +98,7 @@ export function JournalPanel() {
 
       setTradePnlById((current) =>
         Object.fromEntries(
-          trades.map((trade) => [
+          trades.filter((trade) => trade.kind === "trade").map((trade) => [
             trade.id,
             current[trade.id] ?? {
               summary: null,
@@ -110,7 +110,9 @@ export function JournalPanel() {
       );
 
       for (const trade of trades) {
-        void loadTradePnl(trade.id, controller.signal);
+        if (trade.kind === "trade") {
+          void loadTradePnl(trade.id, controller.signal);
+        }
       }
     }, 0);
 
@@ -260,12 +262,20 @@ export function JournalPanel() {
             <span className={trade.endDate ? "tag" : "tag tag-green"}>
               {trade.endDate ? "Closed" : "Open"}
             </span>
+            <span className="tag">
+              {trade.kind === "idea" ? "Trade idea" : "Trade"}
+            </span>
+            {trade.kind === "trade" && trade.direction ? (
+              <span className="tag capitalize">{trade.direction}</span>
+            ) : null}
             <span className="tag">{trade.asset.label}</span>
-            <JournalPnlBadge
-              error={tradePnlById[trade.id]?.error}
-              loading={tradePnlById[trade.id]?.loading}
-              summary={tradePnlById[trade.id]?.summary}
-            />
+            {trade.kind === "trade" ? (
+              <JournalPnlBadge
+                error={tradePnlById[trade.id]?.error}
+                loading={tradePnlById[trade.id]?.loading}
+                summary={tradePnlById[trade.id]?.summary}
+              />
+            ) : null}
           </div>
           <p className="mt-2 text-sm font-medium text-[#69706c]">
             {formatDateRange(trade)}
@@ -313,7 +323,7 @@ export function JournalPanel() {
               type="button"
             >
               <Plus size={16} aria-hidden="true" />
-              New Trade
+              New journal item
             </button>
           </div>
         </div>
@@ -330,7 +340,7 @@ export function JournalPanel() {
           <div className="empty-state">
             <Plus size={28} aria-hidden="true" />
             <div>
-              <h2>No trades yet</h2>
+              <h2>No journal items yet</h2>
               <p>Add the first idea to start building the journal.</p>
             </div>
           </div>
@@ -340,13 +350,15 @@ export function JournalPanel() {
           <>
             <div className="journal-trade-section">
               <div className="journal-trade-section-heading">
-                <h2>Open trades</h2>
+                <h2>Open journal items</h2>
                 <span>{openTrades.length}</span>
               </div>
               <div className="grid gap-3">
                 {openTrades.map(renderTrade)}
                 {!openTrades.length ? (
-                  <p className="py-3 text-sm text-[#69706c]">No open trades.</p>
+                  <p className="py-3 text-sm text-[#69706c]">
+                    No open journal items.
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -365,7 +377,7 @@ export function JournalPanel() {
                     ) : (
                       <ChevronRight size={18} aria-hidden="true" />
                     )}
-                    Closed trades
+                    Closed journal items
                   </span>
                   <span className="tag">{closedTrades.length}</span>
                 </button>
@@ -391,9 +403,9 @@ export function JournalPanel() {
           >
             <div className="journal-modal-header">
               <div>
-                <p>{editingTrade ? "Edit trade idea" : "New trade idea"}</p>
+                <p>{editingTrade ? "Edit journal item" : "New journal item"}</p>
                 <h2 id="journal-trade-modal-title">
-                  {editingTrade ? editingTrade.title : "New Trade"}
+                  {editingTrade ? editingTrade.title : "New journal item"}
                 </h2>
               </div>
               <button
@@ -414,7 +426,7 @@ export function JournalPanel() {
                 trade={editingTrade}
                 markets={markets}
                 saving={saving}
-                submitLabel={editingTrade ? "Save trade" : "Add trade"}
+                submitLabel={editingTrade ? "Save item" : "Add item"}
                 onCancel={closeTradeForm}
                 onSubmit={saveTrade}
               />
