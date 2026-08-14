@@ -259,12 +259,9 @@ export function JournalPanel() {
             <Link className="trade-title" href={`/journal/${trade.id}`}>
               {trade.title}
             </Link>
-            <span className={trade.endDate ? "tag" : "tag tag-green"}>
-              {trade.endDate ? "Closed" : "Open"}
-            </span>
-            <span className="tag">
-              {trade.kind === "idea" ? "Trade idea" : "Trade"}
-            </span>
+            {trade.kind === "idea" ? (
+              <span className="tag">Trade idea</span>
+            ) : null}
             {trade.kind === "trade" && trade.direction ? (
               <span className="tag capitalize">{trade.direction}</span>
             ) : null}
