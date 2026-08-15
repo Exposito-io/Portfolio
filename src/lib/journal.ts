@@ -1,7 +1,7 @@
 import { ObjectId, type Collection, type Db, type Document } from "mongodb";
 import { z } from "zod";
 
-import { isValidDateKey } from "@/lib/date";
+import { isValidDateTimeKey } from "@/lib/date";
 import type {
   JournalEntry,
   JournalTrade,
@@ -36,14 +36,14 @@ const tradeBaseSchema = z.object({
   direction: z.enum(["long", "short"]).nullable().optional().default(null),
   title: z.string().trim().min(1).max(140),
   descriptionMarkdown: markdownSchema,
-  startDate: z.string().trim().refine(isValidDateKey, {
-    message: "Start date must use YYYY-MM-DD format.",
+  startDate: z.string().trim().refine(isValidDateTimeKey, {
+    message: "Start date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
   }),
   endDate: z
     .string()
     .trim()
-    .refine((value) => value === "" || isValidDateKey(value), {
-      message: "End date must use YYYY-MM-DD format.",
+    .refine((value) => value === "" || isValidDateTimeKey(value), {
+      message: "End date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
     })
     .optional()
     .transform((value) => value || null),
@@ -61,20 +61,20 @@ const tradeUpdateSchema = z.object({
   direction: z.enum(["long", "short"]).nullable().optional(),
   title: z.string().trim().min(1).max(140).optional(),
   descriptionMarkdown: z.string().trim().max(12_000).optional(),
-  startDate: z.string().trim().refine(isValidDateKey, {
-    message: "Start date must use YYYY-MM-DD format.",
+  startDate: z.string().trim().refine(isValidDateTimeKey, {
+    message: "Start date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
   }).optional(),
   endDate: z.string().trim().refine(
-    (value) => value === "" || isValidDateKey(value),
-    { message: "End date must use YYYY-MM-DD format." },
+    (value) => value === "" || isValidDateTimeKey(value),
+    { message: "End date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format." },
   ).optional().transform((value) => value || null),
   asset: assetSchema.optional(),
   tradingViewCharts: z.array(tradingViewChartSchema).max(12).optional(),
 });
 
 const entryInputSchema = z.object({
-  date: z.string().trim().refine(isValidDateKey, {
-    message: "Entry date must use YYYY-MM-DD format.",
+  date: z.string().trim().refine(isValidDateTimeKey, {
+    message: "Entry date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
   }),
   tags: entryTagsSchema,
   descriptionMarkdown: markdownSchema.refine((value) => value.length > 0, {

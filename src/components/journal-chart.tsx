@@ -31,6 +31,12 @@ import {
 } from "@/components/journal-entry-order-totals";
 import { MarkdownView } from "@/components/markdown-editor";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
+import { PORTFOLIO_TIMEZONE } from "@/lib/config";
+import {
+  formatJournalDateTimeKey,
+  getJournalDateKey,
+  getZonedJournalDateMs,
+} from "@/lib/date";
 import type {
   HyperliquidCandle,
   HyperliquidFilledOrder,
@@ -695,12 +701,14 @@ export function JournalChart({
             <div className="journal-entry-modal-header">
               <div>
                 <p>Journal entry</p>
-                <h3 id="journal-entry-modal-title">{selectedEntry.date}</h3>
+                <h3 id="journal-entry-modal-title">
+                  {formatJournalDateTimeKey(selectedEntry.date)}
+                </h3>
               </div>
               <div className="journal-entry-modal-actions">
                 <EntryOrderTotalsView
                   loading={ordersState.loading}
-                  totals={entryOrderTotals.get(selectedEntry.date)}
+                  totals={entryOrderTotals.get(getJournalDateKey(selectedEntry.date))}
                 />
                 <button
                   aria-label="Close entry"
@@ -752,7 +760,7 @@ function EntryMarkerTooltip({ marker }: { marker: ChartEntryMarker }) {
   return (
     <>
       <strong>Journal entry</strong>
-      <span>{marker.date}</span>
+      <span>{formatJournalDateTimeKey(marker.date)}</span>
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element -- Tooltip images come from Markdown/GridFS without stable dimensions for next/image.
         <img
@@ -846,7 +854,7 @@ function buildChartMarkers({
 
   for (const entry of entries) {
     const candle = findContainingCandle(
-      Date.parse(`${entry.date}T00:00:00.000Z`),
+      getZonedJournalDateMs(entry.date, PORTFOLIO_TIMEZONE, "start"),
       candles,
     );
     if (!candle) continue;

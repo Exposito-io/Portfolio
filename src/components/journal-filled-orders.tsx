@@ -6,6 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { JournalPnlBadge } from "@/components/journal-pnl-badge";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import { calculateCumulativeRealizedPnlByOrder } from "@/lib/journal-pnl";
+import { formatJournalDateTimeKey } from "@/lib/date";
 import type { JournalTrade } from "@/lib/types";
 
 export function JournalFilledOrders({
@@ -27,8 +28,10 @@ export function JournalFilledOrders({
         <div className="panel-heading">
           <h2>Filled orders</h2>
           <p>
-            {trade.asset.label} from {trade.startDate}
-            {trade.endDate ? ` to ${trade.endDate}` : " to now"}
+            {trade.asset.label} from {formatJournalDateTimeKey(trade.startDate)}
+            {trade.endDate
+              ? ` to ${formatJournalDateTimeKey(trade.endDate)}`
+              : " to now"}
           </p>
         </div>
         {loading ? (

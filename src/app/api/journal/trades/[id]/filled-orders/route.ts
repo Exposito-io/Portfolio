@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { listAccounts } from "@/lib/accounts";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
-import { getZonedDateEndMs, getZonedDateStartMs } from "@/lib/date";
+import { getZonedJournalDateMs } from "@/lib/date";
 import {
   fetchHyperliquidFilledOrdersByTime,
   fetchHyperliquidOpenPositionSummary,
@@ -39,9 +39,13 @@ export async function GET(_request: Request, context: RouteContext) {
     const accounts = (await listAccounts(db, true)).filter(
       (account) => account.source === "hyperliquid",
     );
-    const startTime = getZonedDateStartMs(trade.startDate, PORTFOLIO_TIMEZONE);
+    const startTime = getZonedJournalDateMs(
+      trade.startDate,
+      PORTFOLIO_TIMEZONE,
+      "start",
+    );
     const endTime = trade.endDate
-      ? getZonedDateEndMs(trade.endDate, PORTFOLIO_TIMEZONE)
+      ? getZonedJournalDateMs(trade.endDate, PORTFOLIO_TIMEZONE, "end")
       : Date.now();
     const coinAliases = getHyperliquidCoinAliases(trade.asset);
     const orders: HyperliquidFilledOrder[] = [];

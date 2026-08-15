@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Save, X } from "lucide-react";
 
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { PORTFOLIO_TIMEZONE } from "@/lib/config";
+import { getDateTimeKey } from "@/lib/date";
 import type {
   JournalTrade,
   JournalTradeAsset,
@@ -32,17 +34,12 @@ type TradeFormState = {
 };
 
 function createEmptyForm(): TradeFormState {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-
   return {
     kind: "trade",
     direction: "long",
     title: "",
     descriptionMarkdown: "",
-    startDate: `${year}-${month}-${day}`,
+    startDate: getDateTimeKey(new Date(), PORTFOLIO_TIMEZONE),
     endDate: "",
     assetKey: "",
   };
@@ -77,8 +74,10 @@ export function JournalTradeForm({
           direction: trade.direction ?? "long",
           title: trade.title,
           descriptionMarkdown: trade.descriptionMarkdown,
-          startDate: trade.startDate,
-          endDate: trade.endDate ?? "",
+          startDate: toDateTimeInputValue(trade.startDate, "00:00"),
+          endDate: trade.endDate
+            ? toDateTimeInputValue(trade.endDate, "23:59")
+            : "",
           assetKey: getAssetKey(trade.asset),
         });
         return;
@@ -199,13 +198,13 @@ export function JournalTradeForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <label className="field-label" htmlFor="trade-start">
-            Start date
+            Start date and time
           </label>
           <input
             id="trade-start"
             className="input"
             required
-            type="date"
+            type="datetime-local"
             value={form.startDate}
             onChange={(event) =>
               setForm({ ...form, startDate: event.target.value })
@@ -214,12 +213,12 @@ export function JournalTradeForm({
         </div>
         <div className="grid gap-2">
           <label className="field-label" htmlFor="trade-end">
-            End date
+            End date and time
           </label>
           <input
             id="trade-end"
             className="input"
-            type="date"
+            type="datetime-local"
             value={form.endDate}
             onChange={(event) => setForm({ ...form, endDate: event.target.value })}
           />
@@ -255,4 +254,8 @@ export function JournalTradeForm({
 
 export function getAssetKey(asset: JournalTradeAsset) {
   return `${asset.kind}:${asset.dex ?? ""}:${asset.chartCoin}`;
+}
+
+function toDateTimeInputValue(value: string, fallbackTime: string) {
+  return value.includes("T") ? value : `${value}T${fallbackTime}`;
 }

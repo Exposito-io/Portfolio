@@ -44,6 +44,12 @@ import {
   type JournalMarketSummary,
 } from "@/lib/journal-market";
 import type { JournalFundingSummary } from "@/lib/journal-funding";
+import { PORTFOLIO_TIMEZONE } from "@/lib/config";
+import {
+  formatJournalDateTimeKey,
+  getDateTimeKey,
+  getJournalDateKey,
+} from "@/lib/date";
 import type {
   HyperliquidCandle,
   JournalEntry,
@@ -57,11 +63,13 @@ type EntryFormState = {
   descriptionMarkdown: string;
 };
 
-const emptyEntryForm: EntryFormState = {
-  date: new Date().toISOString().slice(0, 10),
-  tags: [],
-  descriptionMarkdown: "",
-};
+function createEmptyEntryForm(): EntryFormState {
+  return {
+    date: getDateTimeKey(new Date(), PORTFOLIO_TIMEZONE),
+    tags: [],
+    descriptionMarkdown: "",
+  };
+}
 
 export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [trade, setTrade] = useState<JournalTrade | null>(null);
@@ -74,7 +82,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     useState<JournalFundingSummary | null>(null);
   const [fundingError, setFundingError] = useState("");
   const [fundingLoading, setFundingLoading] = useState(true);
-  const [entryForm, setEntryForm] = useState<EntryFormState>(emptyEntryForm);
+  const [entryForm, setEntryForm] = useState<EntryFormState>(
+    createEmptyEntryForm,
+  );
   const [editingTrade, setEditingTrade] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [entryFormOpen, setEntryFormOpen] = useState(false);
@@ -236,7 +246,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
       if (event.key === "Escape" && !saving) {
         setEditingEntry(null);
         setClosingTrade(false);
-        setEntryForm(emptyEntryForm);
+        setEntryForm(createEmptyEntryForm());
         setEntryFormOpen(false);
       }
     }
@@ -314,7 +324,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
       setTrade(result.trade);
       setEditingEntry(null);
       setClosingTrade(false);
-      setEntryForm(emptyEntryForm);
+      setEntryForm(createEmptyEntryForm());
       setEntryFormOpen(false);
     } catch (saveError) {
       setError(
@@ -350,7 +360,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     setError("");
     setEditingEntry(null);
     setClosingTrade(false);
-    setEntryForm(emptyEntryForm);
+    setEntryForm(createEmptyEntryForm());
     setEntryFormOpen(true);
   }
 
@@ -359,7 +369,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     setEditingEntry(entry);
     setClosingTrade(false);
     setEntryForm({
-      date: entry.date,
+      date: toDateTimeInputValue(entry.date, entry.createdAt),
       tags: entry.tags,
       descriptionMarkdown: entry.descriptionMarkdown,
     });
@@ -372,7 +382,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     setEditingEntry(null);
     setClosingTrade(true);
     setEntryForm({
-      ...emptyEntryForm,
+      ...createEmptyEntryForm(),
       tags: ["post-mortem"],
     });
     setEntryFormOpen(true);
@@ -382,7 +392,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     if (saving) return;
     setEditingEntry(null);
     setClosingTrade(false);
-    setEntryForm(emptyEntryForm);
+    setEntryForm(createEmptyEntryForm());
     setEntryFormOpen(false);
   }
 
@@ -547,7 +557,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               <article className="entry-row" key={entry.id}>
                 <div className="entry-row-header">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <p className="entry-row-date">{entry.date}</p>
+                    <p className="entry-row-date">{formatEntryDateTime(entry)}</p>
                     {entry.tags.map((tag) => (
                       <span className="tag" key={tag}>
                         {tag}
@@ -556,7 +566,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                   </div>
                   <EntryOrderTotalsView
                     loading={filledOrdersState.loading}
-                    totals={entryOrderTotals.get(entry.date)}
+                    totals={entryOrderTotals.get(getJournalDateKey(entry.date))}
                   />
                   <div className="flex shrink-0 gap-2">
                     <button
@@ -640,13 +650,13 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               <form className="grid gap-4" onSubmit={saveEntry}>
                 <div className="grid gap-2">
                   <label className="field-label" htmlFor="entry-date">
-                    {closingTrade ? "Close date" : "Date"}
+                    {closingTrade ? "Close date and time" : "Date and time"}
                   </label>
                   <input
                     id="entry-date"
                     className="input"
                     required
-                    type="date"
+                    type="datetime-local"
                     value={entryForm.date}
                     onChange={(event) =>
                       setEntryForm({ ...entryForm, date: event.target.value })
@@ -717,5 +727,16 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 }
 
 function formatDateRange(trade: JournalTrade) {
-  return trade.endDate ? `${trade.startDate} to ${trade.endDate}` : trade.startDate;
+  return trade.endDate
+    ? `${formatJournalDateTimeKey(trade.startDate)} to ${formatJournalDateTimeKey(trade.endDate)}`
+    : formatJournalDateTimeKey(trade.startDate);
+}
+
+function formatEntryDateTime(entry: JournalEntry) {
+  return formatJournalDateTimeKey(entry.date);
+}
+
+function toDateTimeInputValue(value: string, createdAt: string) {
+  if (value.includes("T")) return value;
+  return `${value}T${getDateTimeKey(new Date(createdAt), PORTFOLIO_TIMEZONE).slice(11)}`;
 }

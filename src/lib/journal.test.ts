@@ -68,25 +68,27 @@ describe("journal trades", () => {
     expect(withChart?.descriptionMarkdown).toBe("**Long** pullback");
 
     const withEntry = await createEntry(db, trade.id, {
-      date: "2026-07-02",
+      date: "2026-07-02T14:35",
       tags: ["Post-mortem", "Lessons", "post-MORTEM"],
       descriptionMarkdown: "Added after confirmation",
     });
     const entry = withEntry?.entries[0];
 
     expect(entry).toMatchObject({
-      date: "2026-07-02",
+      date: "2026-07-02T14:35",
       tags: ["Post-mortem", "Lessons"],
       descriptionMarkdown: "Added after confirmation",
     });
 
     const afterEntryUpdate = await updateEntry(db, trade.id, entry?.id ?? "", {
+      date: "2026-07-02T15:10",
       tags: ["General"],
       descriptionMarkdown: "_Trailing stop_",
     });
 
     expect(afterEntryUpdate?.entries[0].descriptionMarkdown).toBe("_Trailing stop_");
     expect(afterEntryUpdate?.entries[0].tags).toEqual(["General"]);
+    expect(afterEntryUpdate?.entries[0].date).toBe("2026-07-02T15:10");
 
     const afterEntryDelete = await deleteEntry(db, trade.id, entry?.id ?? "");
     expect(afterEntryDelete?.entries).toHaveLength(0);
@@ -163,6 +165,17 @@ describe("journal trades", () => {
     await expect(
       updateTrade(db, trade.id, { endDate: "2026-07-09" }),
     ).rejects.toBeInstanceOf(ZodError);
+
+    const timedTrade = await createTrade(db, {
+      title: "Timed BTC idea",
+      descriptionMarkdown: "",
+      startDate: "2026-07-10T14:30",
+      asset,
+    });
+    expect(timedTrade.startDate).toBe("2026-07-10T14:30");
+    await expect(
+      updateTrade(db, timedTrade.id, { endDate: "2026-07-10T14:29" }),
+    ).rejects.toBeInstanceOf(ZodError);
   });
 
   it("closes a trade and creates its post-mortem entry atomically", async () => {
@@ -194,6 +207,30 @@ describe("journal trades", () => {
         descriptionMarkdown: "Too early.",
       }),
     ).rejects.toBeInstanceOf(ZodError);
+  });
+
+  it("sorts entries on the same day by their saved time", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      title: "Timed entries",
+      descriptionMarkdown: "",
+      startDate: "2026-07-10",
+      asset,
+    });
+
+    await createEntry(db, trade.id, {
+      date: "2026-07-11T09:15",
+      descriptionMarkdown: "Morning",
+    });
+    const result = await createEntry(db, trade.id, {
+      date: "2026-07-11T15:45",
+      descriptionMarkdown: "Afternoon",
+    });
+
+    expect(result?.entries.map((entry) => entry.descriptionMarkdown)).toEqual([
+      "Afternoon",
+      "Morning",
+    ]);
   });
 });
 
