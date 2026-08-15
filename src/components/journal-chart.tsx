@@ -702,13 +702,18 @@ export function JournalChart({
               <div>
                 <p>Journal entry</p>
                 <h3 id="journal-entry-modal-title">
-                  {formatJournalDateTimeKey(selectedEntry.date)}
+                  {formatJournalDateTimeKey(
+                    selectedEntry.date,
+                    PORTFOLIO_TIMEZONE,
+                  )}
                 </h3>
               </div>
               <div className="journal-entry-modal-actions">
                 <EntryOrderTotalsView
                   loading={ordersState.loading}
-                  totals={entryOrderTotals.get(getJournalDateKey(selectedEntry.date))}
+                  totals={entryOrderTotals.get(
+                    getJournalDateKey(selectedEntry.date, PORTFOLIO_TIMEZONE),
+                  )}
                 />
                 <button
                   aria-label="Close entry"
@@ -760,7 +765,7 @@ function EntryMarkerTooltip({ marker }: { marker: ChartEntryMarker }) {
   return (
     <>
       <strong>Journal entry</strong>
-      <span>{formatJournalDateTimeKey(marker.date)}</span>
+      <span>{formatJournalDateTimeKey(marker.date, PORTFOLIO_TIMEZONE)}</span>
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element -- Tooltip images come from Markdown/GridFS without stable dimensions for next/image.
         <img

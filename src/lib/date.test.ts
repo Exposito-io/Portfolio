@@ -47,8 +47,12 @@ describe("date helpers", () => {
     expect(isValidDateTimeKey("2026-07-20T14:35")).toBe(true);
     expect(isValidDateTimeKey("2026-07-20")).toBe(true);
     expect(isValidDateTimeKey("2026-07-20T25:00")).toBe(false);
-    expect(getJournalDateKey("2026-07-20T14:35")).toBe("2026-07-20");
-    expect(formatJournalDateTimeKey("2026-07-20T14:35")).toBe(
+    expect(getJournalDateKey("2026-07-20T14:35", "America/Toronto")).toBe(
+      "2026-07-20",
+    );
+    expect(
+      formatJournalDateTimeKey("2026-07-20T14:35", "America/Toronto"),
+    ).toBe(
       "2026-07-20 · 2:35 PM",
     );
     expect(

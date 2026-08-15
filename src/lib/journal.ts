@@ -1,7 +1,8 @@
 import { ObjectId, type Collection, type Db, type Document } from "mongodb";
 import { z } from "zod";
 
-import { isValidDateTimeKey } from "@/lib/date";
+import { PORTFOLIO_TIMEZONE } from "@/lib/config";
+import { getZonedJournalDateMs, isValidDateTimeKey } from "@/lib/date";
 import type {
   JournalEntry,
   JournalTrade,
@@ -84,17 +85,23 @@ const entryInputSchema = z.object({
 
 const entryUpdateSchema = entryInputSchema.partial();
 
-type JournalEntryDocument = Omit<JournalEntry, "id" | "createdAt" | "updatedAt"> & {
+type JournalEntryDocument = Omit<
+  JournalEntry,
+  "id" | "date" | "createdAt" | "updatedAt"
+> & {
   _id: ObjectId;
+  date: Date | string;
   createdAt: Date;
   updatedAt: Date;
 };
 
 type JournalTradeDocument = Omit<
   JournalTrade,
-  "id" | "entries" | "createdAt" | "updatedAt"
+  "id" | "startDate" | "endDate" | "entries" | "createdAt" | "updatedAt"
 > & {
   _id: ObjectId;
+  startDate: Date | string;
+  endDate: Date | string | null;
   entries: JournalEntryDocument[];
   createdAt: Date;
   updatedAt: Date;
@@ -111,12 +118,12 @@ export function serializeTrade(trade: JournalTradeDocument): JournalTrade {
     direction: trade.direction ?? null,
     title: trade.title,
     descriptionMarkdown: trade.descriptionMarkdown,
-    startDate: trade.startDate,
-    endDate: trade.endDate ?? null,
+    startDate: serializeDate(trade.startDate),
+    endDate: trade.endDate ? serializeDate(trade.endDate) : null,
     asset: trade.asset,
     tradingViewCharts: normalizeTradingViewCharts(trade.tradingViewCharts ?? []),
     entries: [...(trade.entries ?? [])]
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => toDate(b.date).getTime() - toDate(a.date).getTime())
       .map(serializeEntry),
     createdAt: trade.createdAt.toISOString(),
     updatedAt: trade.updatedAt.toISOString(),
@@ -126,7 +133,7 @@ export function serializeTrade(trade: JournalTradeDocument): JournalTrade {
 function serializeEntry(entry: JournalEntryDocument): JournalEntry {
   return {
     id: entry._id.toString(),
-    date: entry.date,
+    date: serializeDate(entry.date),
     tags: normalizeTags(entry.tags ?? []),
     descriptionMarkdown: entry.descriptionMarkdown,
     createdAt: entry.createdAt.toISOString(),
@@ -160,8 +167,8 @@ export async function createTrade(db: Db, payload: unknown) {
     direction: input.kind === "idea" ? null : input.direction,
     title: input.title,
     descriptionMarkdown: input.descriptionMarkdown,
-    startDate: input.startDate,
-    endDate: input.endDate ?? null,
+    startDate: parseInputDate(input.startDate, "start"),
+    endDate: input.endDate ? parseInputDate(input.endDate, "end") : null,
     asset: normalizeAsset(input.asset),
     tradingViewCharts: input.tradingViewCharts ?? [],
     entries: [],
@@ -181,11 +188,19 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
   if (!existing) return null;
 
   const input = tradeUpdateSchema.parse(payload);
-  const nextStartDate = input.startDate ?? existing.startDate;
+  const nextStartDate = input.startDate
+    ? parseInputDate(input.startDate, "start")
+    : toDate(existing.startDate);
   const nextEndDate =
-    "endDate" in input ? (input.endDate ?? null) : (existing.endDate ?? null);
+    "endDate" in input
+      ? input.endDate
+        ? parseInputDate(input.endDate, "end")
+        : null
+      : existing.endDate
+        ? toDate(existing.endDate)
+        : null;
 
-  if (nextEndDate && nextEndDate < nextStartDate) {
+  if (nextEndDate && nextEndDate.getTime() < nextStartDate.getTime()) {
     throw new z.ZodError([
       {
         code: "custom",
@@ -210,8 +225,8 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
   if (input.descriptionMarkdown !== undefined) {
     update.descriptionMarkdown = input.descriptionMarkdown;
   }
-  if (input.startDate !== undefined) update.startDate = input.startDate;
-  if ("endDate" in input) update.endDate = input.endDate ?? null;
+  if (input.startDate !== undefined) update.startDate = nextStartDate;
+  if ("endDate" in input) update.endDate = nextEndDate;
   if (input.asset !== undefined) update.asset = normalizeAsset(input.asset);
   if (input.tradingViewCharts !== undefined) {
     update.tradingViewCharts = normalizeTradingViewCharts(input.tradingViewCharts);
@@ -242,7 +257,7 @@ export async function createEntry(db: Db, tradeId: string, payload: unknown) {
   const now = new Date();
   const entry: JournalEntryDocument = {
     _id: new ObjectId(),
-    date: input.date,
+    date: parseInputDate(input.date, "start"),
     tags: input.tags,
     descriptionMarkdown: input.descriptionMarkdown,
     createdAt: now,
@@ -269,7 +284,8 @@ export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
   if (!existing) return null;
 
   const input = entryInputSchema.parse(payload);
-  if (input.date < existing.startDate) {
+  const closeDate = parseInputDate(input.date, "start");
+  if (closeDate.getTime() < toDate(existing.startDate).getTime()) {
     throw new z.ZodError([
       {
         code: "custom",
@@ -283,7 +299,7 @@ export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
   const now = new Date();
   const entry: JournalEntryDocument = {
     _id: new ObjectId(),
-    date: input.date,
+    date: closeDate,
     tags: input.tags,
     descriptionMarkdown: input.descriptionMarkdown,
     createdAt: now,
@@ -294,7 +310,7 @@ export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
     { _id },
     {
       $push: { entries: entry },
-      $set: { endDate: input.date, updatedAt: now },
+      $set: { endDate: closeDate, updatedAt: now },
     },
     { returnDocument: "after" },
   );
@@ -318,7 +334,9 @@ export async function updateEntry(
     "entries.$.updatedAt": new Date(),
   };
 
-  if (input.date !== undefined) set["entries.$.date"] = input.date;
+  if (input.date !== undefined) {
+    set["entries.$.date"] = parseInputDate(input.date, "start");
+  }
   if (input.tags !== undefined) set["entries.$.tags"] = input.tags;
   if (input.descriptionMarkdown !== undefined) {
     set["entries.$.descriptionMarkdown"] = input.descriptionMarkdown;
@@ -385,4 +403,19 @@ function normalizeTradingViewCharts(charts: JournalTradingViewChart[]) {
 
 function toObjectId(id: string) {
   return ObjectId.isValid(id) ? new ObjectId(id) : null;
+}
+
+function parseInputDate(value: string, dateOnlyBoundary: "start" | "end") {
+  return new Date(
+    getZonedJournalDateMs(value, PORTFOLIO_TIMEZONE, dateOnlyBoundary),
+  );
+}
+
+function toDate(value: Date | string) {
+  if (value instanceof Date) return value;
+  return parseInputDate(value, "start");
+}
+
+function serializeDate(value: Date | string) {
+  return toDate(value).toISOString();
 }

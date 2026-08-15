@@ -566,7 +566,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                   </div>
                   <EntryOrderTotalsView
                     loading={filledOrdersState.loading}
-                    totals={entryOrderTotals.get(getJournalDateKey(entry.date))}
+                    totals={entryOrderTotals.get(
+                      getJournalDateKey(entry.date, PORTFOLIO_TIMEZONE),
+                    )}
                   />
                   <div className="flex shrink-0 gap-2">
                     <button
@@ -728,15 +730,18 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
 function formatDateRange(trade: JournalTrade) {
   return trade.endDate
-    ? `${formatJournalDateTimeKey(trade.startDate)} to ${formatJournalDateTimeKey(trade.endDate)}`
-    : formatJournalDateTimeKey(trade.startDate);
+    ? `${formatJournalDateTimeKey(trade.startDate, PORTFOLIO_TIMEZONE)} to ${formatJournalDateTimeKey(trade.endDate, PORTFOLIO_TIMEZONE)}`
+    : formatJournalDateTimeKey(trade.startDate, PORTFOLIO_TIMEZONE);
 }
 
 function formatEntryDateTime(entry: JournalEntry) {
-  return formatJournalDateTimeKey(entry.date);
+  return formatJournalDateTimeKey(entry.date, PORTFOLIO_TIMEZONE);
 }
 
 function toDateTimeInputValue(value: string, createdAt: string) {
+  if (/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+    return getDateTimeKey(new Date(value), PORTFOLIO_TIMEZONE);
+  }
   if (value.includes("T")) return value;
   return `${value}T${getDateTimeKey(new Date(createdAt), PORTFOLIO_TIMEZONE).slice(11)}`;
 }

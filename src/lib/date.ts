@@ -46,11 +46,18 @@ export function isValidDateTimeKey(value: string) {
   return !remainder && isValidDateKey(dateKey) && isValidTimeKey(timeKey);
 }
 
-export function getJournalDateKey(value: string) {
+export function getJournalDateKey(value: string, timezone: string) {
+  if (hasExplicitTimezone(value)) return getDateKey(new Date(value), timezone);
   return value.slice(0, 10);
 }
 
-export function formatJournalDateTimeKey(value: string) {
+export function formatJournalDateTimeKey(value: string, timezone: string) {
+  if (hasExplicitTimezone(value)) {
+    return formatJournalDateTimeKey(
+      getDateTimeKey(new Date(value), timezone),
+      timezone,
+    );
+  }
   const [date, time] = value.split("T");
   if (!time) return date;
   const [hour, minute] = time.split(":").map(Number);
@@ -66,11 +73,16 @@ export function getZonedJournalDateMs(
   timezone: string,
   dateOnlyBoundary: "start" | "end",
 ) {
+  if (hasExplicitTimezone(value)) return new Date(value).getTime();
   const [dateKey, timeKey] = value.split("T");
   if (timeKey) return getZonedDateTimeMs(dateKey, timeKey, timezone);
   return dateOnlyBoundary === "start"
     ? getZonedDateStartMs(dateKey, timezone)
     : getZonedDateEndMs(dateKey, timezone);
+}
+
+function hasExplicitTimezone(value: string) {
+  return /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
 }
 
 export function getZonedDateTimeMs(

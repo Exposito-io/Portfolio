@@ -257,5 +257,8 @@ export function getAssetKey(asset: JournalTradeAsset) {
 }
 
 function toDateTimeInputValue(value: string, fallbackTime: string) {
+  if (/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+    return getDateTimeKey(new Date(value), PORTFOLIO_TIMEZONE);
+  }
   return value.includes("T") ? value : `${value}T${fallbackTime}`;
 }

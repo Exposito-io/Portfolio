@@ -7,6 +7,7 @@ import { JournalPnlBadge } from "@/components/journal-pnl-badge";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import { calculateCumulativeRealizedPnlByOrder } from "@/lib/journal-pnl";
 import { formatJournalDateTimeKey } from "@/lib/date";
+import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import type { JournalTrade } from "@/lib/types";
 
 export function JournalFilledOrders({
@@ -28,9 +29,10 @@ export function JournalFilledOrders({
         <div className="panel-heading">
           <h2>Filled orders</h2>
           <p>
-            {trade.asset.label} from {formatJournalDateTimeKey(trade.startDate)}
+            {trade.asset.label} from{" "}
+            {formatJournalDateTimeKey(trade.startDate, PORTFOLIO_TIMEZONE)}
             {trade.endDate
-              ? ` to ${formatJournalDateTimeKey(trade.endDate)}`
+              ? ` to ${formatJournalDateTimeKey(trade.endDate, PORTFOLIO_TIMEZONE)}`
               : " to now"}
           </p>
         </div>

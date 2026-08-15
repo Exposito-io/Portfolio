@@ -44,7 +44,7 @@ describe("journal trades", () => {
       endDate: "2026-07-03",
     });
 
-    expect(updated?.endDate).toBe("2026-07-03");
+    expect(updated?.endDate).toBe("2026-07-04T03:59:59.999Z");
     expect(updated?.descriptionMarkdown).toBe("**Long** pullback");
 
     const withChart = await updateTrade(db, trade.id, {
@@ -75,7 +75,7 @@ describe("journal trades", () => {
     const entry = withEntry?.entries[0];
 
     expect(entry).toMatchObject({
-      date: "2026-07-02T14:35",
+      date: "2026-07-02T18:35:00.000Z",
       tags: ["Post-mortem", "Lessons"],
       descriptionMarkdown: "Added after confirmation",
     });
@@ -88,7 +88,7 @@ describe("journal trades", () => {
 
     expect(afterEntryUpdate?.entries[0].descriptionMarkdown).toBe("_Trailing stop_");
     expect(afterEntryUpdate?.entries[0].tags).toEqual(["General"]);
-    expect(afterEntryUpdate?.entries[0].date).toBe("2026-07-02T15:10");
+    expect(afterEntryUpdate?.entries[0].date).toBe("2026-07-02T19:10:00.000Z");
 
     const afterEntryDelete = await deleteEntry(db, trade.id, entry?.id ?? "");
     expect(afterEntryDelete?.entries).toHaveLength(0);
@@ -140,7 +140,10 @@ describe("journal trades", () => {
     });
 
     const closed = await updateTrade(db, idea.id, { endDate: "2026-07-04" });
-    expect(closed).toMatchObject({ kind: "idea", endDate: "2026-07-04" });
+    expect(closed).toMatchObject({
+      kind: "idea",
+      endDate: "2026-07-05T03:59:59.999Z",
+    });
   });
 
   it("validates required fields and date ordering", async () => {
@@ -172,7 +175,7 @@ describe("journal trades", () => {
       startDate: "2026-07-10T14:30",
       asset,
     });
-    expect(timedTrade.startDate).toBe("2026-07-10T14:30");
+    expect(timedTrade.startDate).toBe("2026-07-10T18:30:00.000Z");
     await expect(
       updateTrade(db, timedTrade.id, { endDate: "2026-07-10T14:29" }),
     ).rejects.toBeInstanceOf(ZodError);
@@ -193,9 +196,9 @@ describe("journal trades", () => {
       descriptionMarkdown: "What worked and what did not.",
     });
 
-    expect(closed?.endDate).toBe("2026-07-12");
+    expect(closed?.endDate).toBe("2026-07-12T04:00:00.000Z");
     expect(closed?.entries[0]).toMatchObject({
-      date: "2026-07-12",
+      date: "2026-07-12T04:00:00.000Z",
       tags: ["post-mortem"],
       descriptionMarkdown: "What worked and what did not.",
     });

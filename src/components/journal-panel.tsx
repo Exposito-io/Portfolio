@@ -24,6 +24,7 @@ import type {
   JournalTradePnlSummary,
 } from "@/lib/types";
 import { formatJournalDateTimeKey } from "@/lib/date";
+import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 
 type TradePnlState = {
   summary: JournalTradePnlSummary | null;
@@ -438,6 +439,6 @@ export function JournalPanel() {
 
 function formatDateRange(trade: JournalTrade) {
   return trade.endDate
-    ? `${formatJournalDateTimeKey(trade.startDate)} to ${formatJournalDateTimeKey(trade.endDate)}`
-    : formatJournalDateTimeKey(trade.startDate);
+    ? `${formatJournalDateTimeKey(trade.startDate, PORTFOLIO_TIMEZONE)} to ${formatJournalDateTimeKey(trade.endDate, PORTFOLIO_TIMEZONE)}`
+    : formatJournalDateTimeKey(trade.startDate, PORTFOLIO_TIMEZONE);
 }

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "migrate:journal-dates": "node --env-file=.env.local scripts/migrate-journal-dates.mjs",
     "test": "vitest run"
   },
   "dependencies": {
