@@ -46,6 +46,8 @@ import type {
 
 type CandleInterval = "15m" | "1h" | "4h" | "1d" | "1w";
 
+const candleIntervals: CandleInterval[] = ["15m", "1h", "4h", "1d", "1w"];
+
 type RangeOption = {
   label: string;
   days: number;
@@ -444,36 +446,44 @@ export function JournalChart({
   return (
     <div ref={panelRef} className="panel chart-panel">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="panel-heading">
-          <h2>
-            {activeTradingViewChart?.name ??
-              activeTradingViewChart?.symbol ??
-              trade.asset.label}
-          </h2>
-          <p>
-            {activeTradingViewChart
-              ? `${activeTradingViewChart.symbol} · ${activeChartSource === "hyperliquid" ? "Hyperliquid" : "TradingView"}`
-              : trade.asset.chartCoin}
-            {!activeTradingViewChart && markerData.markers.length
-              ? ` · ${markerData.markers.length} chart markers`
-              : ""}
-          </p>
+        <div>
+          <div className="panel-heading">
+            <h2>
+              {activeTradingViewChart?.name ??
+                activeTradingViewChart?.symbol ??
+                trade.asset.label}
+            </h2>
+            <p>
+              {activeTradingViewChart
+                ? `${activeTradingViewChart.symbol} · ${activeChartSource === "hyperliquid" ? "Hyperliquid" : "TradingView"}`
+                : trade.asset.chartCoin}
+            </p>
+          </div>
+          {!isTradingViewChart ? (
+            <div
+              aria-label="Chart interval"
+              className="chart-intervals"
+              role="group"
+            >
+              {candleIntervals.map((option) => (
+                <button
+                  aria-pressed={interval === option}
+                  className={
+                    interval === option
+                      ? "chart-interval active"
+                      : "chart-interval"
+                  }
+                  key={option}
+                  onClick={() => changeInterval(option)}
+                  type="button"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          {!isTradingViewChart ? <select
-            className="input h-10 w-24"
-            value={interval}
-            onChange={(event) =>
-              changeInterval(event.target.value as CandleInterval)
-            }
-          >
-            <option value="15m">15m</option>
-            <option value="1h">1h</option>
-            <option value="4h">4h</option>
-            <option value="1d">1d</option>
-            <option value="1w">1w</option>
-          </select> : null}
-
           <button
             className="button-secondary"
             type="button"

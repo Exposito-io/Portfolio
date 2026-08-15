@@ -488,6 +488,44 @@ textarea {
   min-height: 26rem;
 }
 
+.chart-intervals {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.55rem;
+}
+
+.chart-interval {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #69706c;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.38rem 0.48rem;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.chart-interval:hover {
+  background: #f1f3f0;
+  color: #1f2523;
+}
+
+.chart-interval.active {
+  background: #e6f1ed;
+  color: #1f7a68;
+}
+
+.chart-interval:focus-visible {
+  outline: 2px solid #1f7a68;
+  outline-offset: 2px;
+}
+
 @media (min-width: 768px) {
   .chart-frame {
     height: clamp(34rem, 80dvh, 72rem);
