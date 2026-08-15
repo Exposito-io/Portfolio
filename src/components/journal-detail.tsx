@@ -371,56 +371,46 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           <ArrowLeft size={16} aria-hidden="true" />
           Journal
         </Link>
-        <JournalMarketMetric
-          error={marketError}
-          loading={marketLoading}
-          summary={marketSummary}
-        />
-        {trade.kind === "trade" ? (
-          <>
+        <div className="journal-detail-topbar-controls">
+          {trade.kind === "trade" ? (
             <JournalPositionValueMetric
               error={filledOrdersState.error}
               loading={filledOrdersState.loading}
               summary={filledOrdersState.data?.summary}
             />
-            <JournalPnlMetric
-              error={filledOrdersState.error}
-              loading={filledOrdersState.loading}
-              summary={filledOrdersState.data?.summary}
-            />
-          </>
-        ) : null}
-        <div className="journal-entry-actions" ref={entryActionsRef}>
-          <button
-            className="button-primary"
-            onClick={beginNewEntry}
-            type="button"
-          >
-            <Plus size={16} aria-hidden="true" />
-            New journal entry
-          </button>
-          {!trade.endDate ? (
-            <>
-              <button
-                aria-expanded={entryActionsOpen}
-                aria-haspopup="menu"
-                aria-label="More journal actions"
-                className="journal-entry-actions-toggle"
-                onClick={() => setEntryActionsOpen((open) => !open)}
-                type="button"
-              >
-                <EllipsisVertical size={18} aria-hidden="true" />
-              </button>
-              {entryActionsOpen ? (
-                <div className="journal-entry-actions-menu" role="menu">
-                  <button onClick={beginCloseTrade} role="menuitem" type="button">
-                    <Check size={16} aria-hidden="true" />
-                    {trade.kind === "idea" ? "Close idea" : "Close trade"}
-                  </button>
-                </div>
-              ) : null}
-            </>
           ) : null}
+          <div className="journal-entry-actions" ref={entryActionsRef}>
+            <button
+              className="button-primary"
+              onClick={beginNewEntry}
+              type="button"
+            >
+              <Plus size={16} aria-hidden="true" />
+              New journal entry
+            </button>
+            {!trade.endDate ? (
+              <>
+                <button
+                  aria-expanded={entryActionsOpen}
+                  aria-haspopup="menu"
+                  aria-label="More journal actions"
+                  className="journal-entry-actions-toggle"
+                  onClick={() => setEntryActionsOpen((open) => !open)}
+                  type="button"
+                >
+                  <EllipsisVertical size={18} aria-hidden="true" />
+                </button>
+                {entryActionsOpen ? (
+                  <div className="journal-entry-actions-menu" role="menu">
+                    <button onClick={beginCloseTrade} role="menuitem" type="button">
+                      <Check size={16} aria-hidden="true" />
+                      {trade.kind === "idea" ? "Close idea" : "Close trade"}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -428,7 +418,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         <div className="alert alert-error">{error}</div>
       ) : null}
 
-      <section className="grid gap-6">
+      <section className="journal-detail-summary-grid">
         <div className="panel">
           {editingTrade ? (
             <JournalTradeForm
@@ -472,7 +462,20 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
             </>
           )}
         </div>
-
+        <aside className="journal-detail-metrics" aria-label="Trade metrics">
+          <JournalMarketMetric
+            error={marketError}
+            loading={marketLoading}
+            summary={marketSummary}
+          />
+          {trade.kind === "trade" ? (
+            <JournalPnlMetric
+              error={filledOrdersState.error}
+              loading={filledOrdersState.loading}
+              summary={filledOrdersState.data?.summary}
+            />
+          ) : null}
+        </aside>
       </section>
 
       <JournalChart
