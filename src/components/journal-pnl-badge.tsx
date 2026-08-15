@@ -166,19 +166,61 @@ export function JournalPnlMetric({
 
   return (
     <section className={`journal-pnl-metric ${tone}`} title={formatPnlTitle(summary)}>
-      <div>
-        <span>PnL</span>
-        <strong>{formatSignedCurrency(summary.pnlUsd)}</strong>
-      </div>
-      <div className="journal-pnl-metric-percent">
-        <b>
-          {isFiniteNumber(summary.pnlPercent)
-            ? formatSignedPercent(summary.pnlPercent)
-            : "N/A"}
-        </b>
+      <div className="journal-pnl-breakdown">
+        <PnlBreakdownItem
+          label="Transactions PnL"
+          percent={calculatePnlPercent(summary.realizedPnlUsd, summary.notionalUsd)}
+          value={summary.realizedPnlUsd}
+        />
+        <PnlBreakdownItem
+          label="Unrealized PnL"
+          percent={calculatePnlPercent(summary.unrealizedPnlUsd, summary.notionalUsd)}
+          value={summary.unrealizedPnlUsd}
+        />
+        <PnlBreakdownItem
+          label="Total PnL"
+          percent={summary.pnlPercent}
+          value={summary.pnlUsd}
+        />
       </div>
     </section>
   );
+}
+
+function PnlBreakdownItem({
+  label,
+  percent,
+  value,
+}: {
+  label: string;
+  percent: number | null;
+  value: number | null;
+}) {
+  const tone = isFiniteNumber(value)
+    ? value > 0
+      ? "journal-market-change-positive"
+      : value < 0
+        ? "journal-market-change-negative"
+        : ""
+    : "";
+
+  return (
+    <div className={`journal-pnl-breakdown-item ${tone}`}>
+      <span>{label}</span>
+      <b>{isFiniteNumber(value) ? formatSignedCurrency(value) : "N/A"}</b>
+      <small className="journal-pnl-breakdown-percent">
+        {isFiniteNumber(percent) ? formatSignedPercent(percent) : "N/A"}
+      </small>
+    </div>
+  );
+}
+
+function calculatePnlPercent(value: number | null, notionalUsd: number) {
+  if (!isFiniteNumber(value) || !isFiniteNumber(notionalUsd) || notionalUsd === 0) {
+    return null;
+  }
+
+  return Math.round((value / notionalUsd) * 10_000) / 100;
 }
 
 export function JournalPositionValueMetric({
