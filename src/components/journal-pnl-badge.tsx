@@ -217,14 +217,37 @@ export function JournalPositionValueMetric({
     );
   }
 
+  const pnlPercentTone = isFiniteNumber(summary.pnlPercent)
+    ? summary.pnlPercent > 0
+      ? "journal-market-change-positive"
+      : summary.pnlPercent < 0
+        ? "journal-market-change-negative"
+        : ""
+    : "";
+  const widgetTone = isFiniteNumber(summary.pnlPercent)
+    ? summary.pnlPercent > 0
+      ? "journal-pnl-metric-positive"
+      : summary.pnlPercent < 0
+        ? "journal-pnl-metric-negative"
+        : "journal-pnl-metric-neutral"
+    : "journal-pnl-metric-neutral";
+
   return (
     <section
-      className="journal-pnl-metric journal-pnl-metric-neutral"
+      className={`journal-pnl-metric ${widgetTone}`}
       title="Current Hyperliquid position value"
     >
       <div>
         <span>Position value</span>
         <strong>{formatCurrency(summary.positionValueUsd)}</strong>
+      </div>
+      <div className={`journal-pnl-metric-percent ${pnlPercentTone}`}>
+        <span>Total PnL</span>
+        <b>
+          {isFiniteNumber(summary.pnlPercent)
+            ? formatSignedPercent(summary.pnlPercent)
+            : "N/A"}
+        </b>
       </div>
     </section>
   );
