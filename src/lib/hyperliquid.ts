@@ -3,6 +3,7 @@ import type {
   HyperliquidCandle,
   HyperliquidFill,
   HyperliquidFilledOrder,
+  HyperliquidFundingRate,
   JournalTradeAsset,
   PortfolioAccount,
   PortfolioPosition,
@@ -87,6 +88,17 @@ type HyperliquidUserFillResponse = Array<{
   feeToken?: string;
   tid?: number;
 }>;
+
+type HyperliquidFundingHistoryResponse = Array<{
+  coin?: string;
+  fundingRate?: string;
+  time?: number;
+}>;
+
+type HyperliquidMetaAndAssetCtxsResponse = [
+  { universe?: Array<{ name?: string }> },
+  Array<{ funding?: string }>,
+];
 
 export type HyperliquidAccountResult = {
   summary: SourceSummary;
@@ -301,6 +313,82 @@ export async function fetchHyperliquidCandles(
       };
     })
     .filter((candle) => candle.time > 0 && Number.isFinite(candle.close));
+}
+
+export async function fetchHyperliquidFundingHistory(
+  {
+    coin,
+    startTime,
+    endTime = Date.now(),
+  }: {
+    coin: string;
+    startTime: number;
+    endTime?: number;
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<HyperliquidFundingRate[]> {
+  const rates: HyperliquidFundingRate[] = [];
+  let nextStartTime = startTime;
+
+  for (let page = 0; page < 5 && nextStartTime <= endTime; page += 1) {
+    const response = await postInfo<HyperliquidFundingHistoryResponse>(
+      {
+        type: "fundingHistory",
+        coin,
+        startTime: nextStartTime,
+        endTime,
+      },
+      fetcher,
+      "Hyperliquid funding history",
+    );
+    if (!response.length) break;
+
+    const pageRates = response
+      .map((rate) => ({
+        coin: rate.coin ?? coin,
+        fundingRate: Number(rate.fundingRate),
+        time: Number(rate.time),
+      }))
+      .filter(
+        (rate) =>
+          Number.isFinite(rate.fundingRate) &&
+          Number.isFinite(rate.time) &&
+          rate.time >= startTime &&
+          rate.time <= endTime,
+      );
+    rates.push(...pageRates);
+
+    const latestTime = Math.max(...response.map((rate) => Number(rate.time ?? 0)));
+    if (!Number.isFinite(latestTime) || latestTime < nextStartTime) break;
+    nextStartTime = latestTime + 1;
+  }
+
+  return rates.sort((left, right) => left.time - right.time);
+}
+
+export async function fetchHyperliquidCurrentFundingRate(
+  {
+    coin,
+    dex,
+  }: {
+    coin: string;
+    dex?: string;
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<number | null> {
+  const [meta, contexts] = await postInfo<HyperliquidMetaAndAssetCtxsResponse>(
+    {
+      type: "metaAndAssetCtxs",
+      ...(dex ? { dex } : {}),
+    },
+    fetcher,
+    "Hyperliquid current funding rate",
+  );
+  const index = (meta.universe ?? []).findIndex((market) => market.name === coin);
+  if (index < 0) return null;
+
+  const fundingRate = Number(contexts[index]?.funding);
+  return Number.isFinite(fundingRate) ? fundingRate : null;
 }
 
 export async function fetchHyperliquidUserFillsByTime(

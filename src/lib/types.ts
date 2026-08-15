@@ -145,6 +145,12 @@ export type HyperliquidCandle = {
   volume: number;
 };
 
+export type HyperliquidFundingRate = {
+  coin: string;
+  fundingRate: number;
+  time: number;
+};
+
 export type HyperliquidFill = {
   id: string;
   accountId: string;

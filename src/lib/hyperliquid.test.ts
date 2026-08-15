@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchHyperliquidAccount,
   fetchHyperliquidCandles,
+  fetchHyperliquidCurrentFundingRate,
   fetchHyperliquidFilledOrdersByTime,
+  fetchHyperliquidFundingHistory,
   fetchHyperliquidMarkets,
   fetchHyperliquidOpenPositionPnl,
   fetchHyperliquidOpenPositionSummary,
@@ -310,6 +312,64 @@ describe("Hyperliquid normalization", () => {
         closedPnl: 0,
       }),
     ]);
+  });
+
+  it("loads and normalizes paginated funding history", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { coin: "ETH", fundingRate: "0.00001", time: 1000 },
+          { coin: "ETH", fundingRate: "-0.00002", time: 2000 },
+        ],
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+    await expect(
+      fetchHyperliquidFundingHistory(
+        { coin: "ETH", startTime: 0, endTime: 3000 },
+        fetcher,
+      ),
+    ).resolves.toEqual([
+      { coin: "ETH", fundingRate: 0.00001, time: 1000 },
+      { coin: "ETH", fundingRate: -0.00002, time: 2000 },
+    ]);
+
+    expect(fetcher).toHaveBeenLastCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({
+          type: "fundingHistory",
+          coin: "ETH",
+          startTime: 2001,
+          endTime: 3000,
+        }),
+      }),
+    );
+  });
+
+  it("loads the live funding rate from the matching perp context", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        { universe: [{ name: "BTC" }, { name: "xyz:XYZ100" }] },
+        [{ funding: "0.00001" }, { funding: "-0.00002" }],
+      ],
+    });
+
+    await expect(
+      fetchHyperliquidCurrentFundingRate(
+        { coin: "xyz:XYZ100", dex: "xyz" },
+        fetcher,
+      ),
+    ).resolves.toBe(-0.00002);
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({ type: "metaAndAssetCtxs", dex: "xyz" }),
+      }),
+    );
   });
 
   it("builds Trade XYZ coin aliases with and without the dex prefix", () => {

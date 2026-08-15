@@ -29,6 +29,7 @@ import { JournalFilledOrders } from "@/components/journal-filled-orders";
 import { JournalTagInput } from "@/components/journal-tag-input";
 import {
   JournalMarketMetric,
+  JournalFundingMetric,
   JournalPnlMetric,
   JournalPositionValueMetric,
 } from "@/components/journal-pnl-badge";
@@ -42,6 +43,7 @@ import {
   calculateJournalMarketSummary,
   type JournalMarketSummary,
 } from "@/lib/journal-market";
+import type { JournalFundingSummary } from "@/lib/journal-funding";
 import type {
   HyperliquidCandle,
   JournalEntry,
@@ -68,6 +70,10 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     useState<JournalMarketSummary | null>(null);
   const [marketError, setMarketError] = useState("");
   const [marketLoading, setMarketLoading] = useState(true);
+  const [fundingSummary, setFundingSummary] =
+    useState<JournalFundingSummary | null>(null);
+  const [fundingError, setFundingError] = useState("");
+  const [fundingLoading, setFundingLoading] = useState(true);
   const [entryForm, setEntryForm] = useState<EntryFormState>(emptyEntryForm);
   const [editingTrade, setEditingTrade] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
@@ -186,6 +192,42 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     void loadMarketSummary();
     return () => controller.abort();
   }, [chartCoin]);
+
+  useEffect(() => {
+    if (!chartCoin || trade?.asset.kind === "spot") return;
+    const controller = new AbortController();
+    const requestedCoin = chartCoin;
+
+    async function loadFundingSummary() {
+      setFundingLoading(true);
+      setFundingError("");
+      try {
+        const params = new URLSearchParams({ coin: requestedCoin });
+        if (trade?.asset.dex) params.set("dex", trade.asset.dex);
+        const response = await fetch(`/api/hyperliquid/funding?${params}`, {
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to load funding rates.");
+        }
+        setFundingSummary(payload.summary as JournalFundingSummary | null);
+      } catch (loadError) {
+        if (!controller.signal.aborted) {
+          setFundingError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load funding rates.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setFundingLoading(false);
+      }
+    }
+
+    void loadFundingSummary();
+    return () => controller.abort();
+  }, [chartCoin, trade?.asset.dex, trade?.asset.kind]);
 
   useEffect(() => {
     if (!entryFormOpen) return;
@@ -468,6 +510,13 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
             loading={marketLoading}
             summary={marketSummary}
           />
+          {trade.asset.kind !== "spot" ? (
+            <JournalFundingMetric
+              error={fundingError}
+              loading={fundingLoading}
+              summary={fundingSummary}
+            />
+          ) : null}
           {trade.kind === "trade" ? (
             <JournalPnlMetric
               error={filledOrdersState.error}

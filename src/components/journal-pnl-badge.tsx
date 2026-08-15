@@ -1,4 +1,5 @@
 import type { JournalTradePnlSummary } from "@/lib/types";
+import type { JournalFundingSummary } from "@/lib/journal-funding";
 import type { JournalMarketSummary } from "@/lib/journal-market";
 
 export function JournalMarketMetric({
@@ -44,6 +45,71 @@ export function JournalMarketMetric({
       </div>
     </section>
   );
+}
+
+export function JournalFundingMetric({
+  error,
+  loading,
+  summary,
+}: {
+  error?: string;
+  loading?: boolean;
+  summary?: JournalFundingSummary | null;
+}) {
+  if (loading) {
+    return <MetricShell label="Funding rate" value="Loading" />;
+  }
+
+  if (error || !summary) {
+    return (
+      <MetricShell
+        label="Funding rate"
+        title={error}
+        value={error ? "Unavailable" : "N/A"}
+      />
+    );
+  }
+
+  const tone = getMetricTone(summary.currentAnnualizedPercent);
+
+  return (
+    <section className={`journal-pnl-metric journal-market-metric ${tone}`}>
+      <div>
+        <span>Current funding rate</span>
+        <strong>{formatSignedPercent(summary.currentAnnualizedPercent)}</strong>
+      </div>
+      <div className="journal-market-changes">
+        <FundingAverage label="Avg 24h" value={summary.average24hAnnualizedPercent} />
+        <FundingAverage label="Avg 7d" value={summary.average7dAnnualizedPercent} />
+        <FundingAverage label="Avg 30d" value={summary.average30dAnnualizedPercent} />
+      </div>
+    </section>
+  );
+}
+
+function FundingAverage({ label, value }: { label: string; value: number | null }) {
+  const tone = isFiniteNumber(value)
+    ? value > 0
+      ? "journal-market-change-positive"
+      : value < 0
+        ? "journal-market-change-negative"
+        : ""
+    : "";
+
+  return (
+    <div className={`journal-pnl-metric-percent ${tone}`}>
+      <span>{label}</span>
+      <b>{isFiniteNumber(value) ? formatSignedPercent(value) : "N/A"}</b>
+    </div>
+  );
+}
+
+function getMetricTone(value: number) {
+  return value > 0
+    ? "journal-pnl-metric-positive"
+    : value < 0
+      ? "journal-pnl-metric-negative"
+      : "";
 }
 
 function MarketChange({ label, value }: { label: string; value: number }) {
