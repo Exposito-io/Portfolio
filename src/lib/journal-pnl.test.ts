@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateJournalTradePnlSummary } from "@/lib/journal-pnl";
+import {
+  calculateCumulativeRealizedPnlByOrder,
+  calculateJournalTradePnlSummary,
+} from "@/lib/journal-pnl";
 import type { HyperliquidFilledOrder } from "@/lib/types";
 
 const baseOrder: HyperliquidFilledOrder = {
@@ -23,6 +26,20 @@ const baseOrder: HyperliquidFilledOrder = {
 };
 
 describe("journal PnL", () => {
+  it("calculates realized PnL through each transaction chronologically", () => {
+    const totals = calculateCumulativeRealizedPnlByOrder([
+      { ...baseOrder, id: "latest", lastTime: 3, closedPnl: -2.1 },
+      { ...baseOrder, id: "earliest", lastTime: 1, closedPnl: 12.345 },
+      { ...baseOrder, id: "middle", lastTime: 2, closedPnl: null },
+    ]);
+
+    expect(Object.fromEntries(totals)).toEqual({
+      earliest: 12.35,
+      middle: 12.35,
+      latest: 10.25,
+    });
+  });
+
   it("sums closed PnL, notional, orders, and fills", () => {
     expect(
       calculateJournalTradePnlSummary([

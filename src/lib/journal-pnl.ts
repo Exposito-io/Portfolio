@@ -40,3 +40,24 @@ export function calculateJournalTradePnlSummary(
     notionalUsd,
   };
 }
+
+export function calculateCumulativeRealizedPnlByOrder(
+  orders: HyperliquidFilledOrder[],
+) {
+  const cumulativePnlByOrderId = new Map<string, number>();
+  let cumulativePnlUsd = 0;
+
+  const chronologicalOrders = [...orders].sort(
+    (left, right) =>
+      left.lastTime - right.lastTime ||
+      left.firstTime - right.firstTime ||
+      left.id.localeCompare(right.id),
+  );
+
+  for (const order of chronologicalOrders) {
+    cumulativePnlUsd += order.closedPnl ?? 0;
+    cumulativePnlByOrderId.set(order.id, roundCurrency(cumulativePnlUsd));
+  }
+
+  return cumulativePnlByOrderId;
+}

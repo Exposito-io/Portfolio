@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 
 import { JournalPnlBadge } from "@/components/journal-pnl-badge";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
+import { calculateCumulativeRealizedPnlByOrder } from "@/lib/journal-pnl";
 import type { JournalTrade } from "@/lib/types";
 
 export function JournalFilledOrders({
@@ -14,6 +16,10 @@ export function JournalFilledOrders({
   ordersState: FilledOrdersState;
 }) {
   const { data, error, loading } = ordersState;
+  const cumulativePnlByOrderId = useMemo(
+    () => calculateCumulativeRealizedPnlByOrder(data?.orders ?? []),
+    [data?.orders],
+  );
 
   return (
     <section className="panel overflow-hidden">
@@ -78,8 +84,7 @@ export function JournalFilledOrders({
                 <th>Notional</th>
                 <th>Fee</th>
                 <th>Closed PnL</th>
-                <th>Fills</th>
-                <th>Account</th>
+                <th>Total PnL</th>
               </tr>
             </thead>
             <tbody>
@@ -126,8 +131,9 @@ export function JournalFilledOrders({
                       ? "N/A"
                       : formatCurrency(order.closedPnl)}
                   </td>
-                  <td>{order.fillCount}</td>
-                  <td>{order.accountLabel}</td>
+                  <td className={getPnlClassName(cumulativePnlByOrderId.get(order.id))}>
+                    {formatCurrency(cumulativePnlByOrderId.get(order.id) ?? 0)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -157,4 +163,9 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 8,
   }).format(value);
+}
+
+function getPnlClassName(value: number | undefined) {
+  if (value === undefined || value === 0) return "";
+  return value > 0 ? "text-[#1f7a68]" : "text-[#9b3d30]";
 }

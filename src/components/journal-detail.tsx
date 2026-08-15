@@ -505,6 +505,13 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           )}
         </div>
         <aside className="journal-detail-metrics" aria-label="Trade metrics">
+          {trade.kind === "trade" ? (
+            <JournalPnlMetric
+              error={filledOrdersState.error}
+              loading={filledOrdersState.loading}
+              summary={filledOrdersState.data?.summary}
+            />
+          ) : null}
           <JournalMarketMetric
             error={marketError}
             loading={marketLoading}
@@ -515,13 +522,6 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               error={fundingError}
               loading={fundingLoading}
               summary={fundingSummary}
-            />
-          ) : null}
-          {trade.kind === "trade" ? (
-            <JournalPnlMetric
-              error={filledOrdersState.error}
-              loading={filledOrdersState.loading}
-              summary={filledOrdersState.data?.summary}
             />
           ) : null}
         </aside>
