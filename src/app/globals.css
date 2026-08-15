@@ -545,8 +545,7 @@ textarea {
 }
 
 .chart-panel:fullscreen .chart-frame {
-  flex: 1;
-  height: auto;
+  height: 100%;
   min-height: 0;
 }
 
@@ -560,6 +559,12 @@ textarea {
 .chart-workspace {
   display: grid;
   gap: 0.85rem;
+}
+
+.chart-panel:fullscreen .chart-workspace {
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
 }
 
 .tradingview-embed {
@@ -633,6 +638,15 @@ textarea {
 
 @media (min-width: 900px) {
   .chart-workspace { grid-template-columns: minmax(0, 1fr) 14rem; }
+
+  .chart-panel:fullscreen .chart-workspace {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .chart-panel:fullscreen .chart-sidebar {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 .chart-overlay {
