@@ -55,6 +55,7 @@ import type {
   JournalEntry,
   JournalTrade,
   JournalTradeAsset,
+  PortfolioResponse,
 } from "@/lib/types";
 
 type EntryFormState = {
@@ -82,6 +83,11 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     useState<JournalFundingSummary | null>(null);
   const [fundingError, setFundingError] = useState("");
   const [fundingLoading, setFundingLoading] = useState(true);
+  const [portfolioInvestmentsUsd, setPortfolioInvestmentsUsd] = useState<
+    number | null
+  >(null);
+  const [portfolioError, setPortfolioError] = useState("");
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [entryForm, setEntryForm] = useState<EntryFormState>(
     createEmptyEntryForm,
   );
@@ -142,6 +148,42 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
 
     return () => window.clearTimeout(timeout);
   }, [loadTrade]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadPortfolioInvestments() {
+      setPortfolioLoading(true);
+      setPortfolioError("");
+      try {
+        const response = await fetch("/api/portfolio", {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as PortfolioResponse & {
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to load portfolio value.");
+        }
+        setPortfolioInvestmentsUsd(
+          payload.snapshot?.totals.totalInvestmentsUsd ?? null,
+        );
+      } catch (loadError) {
+        if (!controller.signal.aborted) {
+          setPortfolioError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load portfolio value.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setPortfolioLoading(false);
+      }
+    }
+
+    void loadPortfolioInvestments();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     async function loadMarkets() {
@@ -428,6 +470,9 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
             <JournalPositionValueMetric
               error={filledOrdersState.error}
               loading={filledOrdersState.loading}
+              portfolioError={portfolioError}
+              portfolioLoading={portfolioLoading}
+              portfolioInvestmentsUsd={portfolioInvestmentsUsd}
               summary={filledOrdersState.data?.summary}
             />
           ) : null}

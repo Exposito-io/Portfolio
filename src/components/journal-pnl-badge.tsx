@@ -1,6 +1,7 @@
 import type { JournalTradePnlSummary } from "@/lib/types";
 import type { JournalFundingSummary } from "@/lib/journal-funding";
 import type { JournalMarketSummary } from "@/lib/journal-market";
+import { calculatePortfolioPercent } from "@/lib/journal-portfolio";
 
 export function JournalMarketMetric({
   error,
@@ -292,10 +293,16 @@ function calculatePnlPercent(value: number | null, notionalUsd: number) {
 export function JournalPositionValueMetric({
   error,
   loading,
+  portfolioError,
+  portfolioInvestmentsUsd,
+  portfolioLoading,
   summary,
 }: {
   error?: string;
   loading?: boolean;
+  portfolioError?: string;
+  portfolioInvestmentsUsd?: number | null;
+  portfolioLoading?: boolean;
   summary?: JournalTradePnlSummary | null;
 }) {
   if (loading) {
@@ -325,20 +332,11 @@ export function JournalPositionValueMetric({
     );
   }
 
-  const pnlPercentTone = isFiniteNumber(summary.pnlPercent)
-    ? summary.pnlPercent > 0
-      ? "journal-market-change-positive"
-      : summary.pnlPercent < 0
-        ? "journal-market-change-negative"
-        : ""
-    : "";
-  const widgetTone = isFiniteNumber(summary.pnlPercent)
-    ? summary.pnlPercent > 0
-      ? "journal-pnl-metric-positive"
-      : summary.pnlPercent < 0
-        ? "journal-pnl-metric-negative"
-        : "journal-pnl-metric-neutral"
-    : "journal-pnl-metric-neutral";
+  const portfolioPercent = calculatePortfolioPercent(
+    summary.positionValueUsd,
+    portfolioInvestmentsUsd,
+  );
+  const widgetTone = "journal-pnl-metric-neutral";
 
   return (
     <section
@@ -349,16 +347,24 @@ export function JournalPositionValueMetric({
         <span>Position value</span>
         <strong>{formatCurrency(summary.positionValueUsd)}</strong>
       </div>
-      <div className={`journal-pnl-metric-percent ${pnlPercentTone}`}>
-        <span>Total PnL</span>
-        <b>
-          {isFiniteNumber(summary.pnlPercent)
-            ? formatSignedPercent(summary.pnlPercent)
-            : "N/A"}
-        </b>
+      <div
+        className="journal-pnl-metric-percent"
+        title={portfolioError || undefined}
+      >
+        <span>Of portfolio</span>
+        <b>{portfolioLoading ? "Loading" : formatPortfolioPercent(portfolioPercent)}</b>
       </div>
     </section>
   );
+}
+
+function formatPortfolioPercent(value: number | null) {
+  if (!isFiniteNumber(value)) return "N/A";
+
+  return `${value.toLocaleString("en-US", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })}%`;
 }
 
 function formatPnlTitle(summary: JournalTradePnlSummary) {
