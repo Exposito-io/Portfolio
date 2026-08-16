@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
+import { MarkdownEditor } from "@/components/markdown-editor";
 import type { AccountSource, PortfolioAccount } from "@/lib/types";
 
 type FormState = {
@@ -28,6 +29,9 @@ export function SettingsPanel() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [journalDescriptionTemplate, setJournalDescriptionTemplate] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
 
   const loadAccounts = useCallback(async (showLoading = true) => {
     if (showLoading) {
@@ -55,6 +59,51 @@ export function SettingsPanel() {
 
     return () => window.clearTimeout(timeout);
   }, [loadAccounts]);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error);
+        setJournalDescriptionTemplate(
+          payload.settings?.journalDescriptionTemplate ?? "",
+        );
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load settings.",
+        );
+      }
+    }
+
+    void loadSettings();
+  }, []);
+
+  async function saveJournalTemplate(event: FormEvent) {
+    event.preventDefault();
+    setSavingTemplate(true);
+    setTemplateSaved(false);
+    setError("");
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ journalDescriptionTemplate }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to save settings.");
+      setJournalDescriptionTemplate(payload.settings.journalDescriptionTemplate);
+      setTemplateSaved(true);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Unable to save settings.",
+      );
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
 
   async function saveAccount(event: FormEvent) {
     event.preventDefault();
@@ -112,6 +161,32 @@ export function SettingsPanel() {
 
   return (
     <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[440px_1fr] lg:px-8">
+      <section className="panel lg:col-span-2">
+        <div className="panel-heading">
+          <h1>Journal defaults</h1>
+          <p>Set the Markdown added to the description of each new journal item.</p>
+        </div>
+        <form className="mt-5 grid gap-4" onSubmit={saveJournalTemplate}>
+          <MarkdownEditor
+            id="journal-description-template"
+            label="Journal description template"
+            value={journalDescriptionTemplate}
+            onChange={(value) => {
+              setJournalDescriptionTemplate(value);
+              setTemplateSaved(false);
+            }}
+          />
+          <div className="flex items-center gap-3">
+            <button className="button-primary" disabled={savingTemplate} type="submit">
+              <Save size={16} aria-hidden="true" />
+              {savingTemplate ? "Saving..." : "Save template"}
+            </button>
+            {templateSaved ? (
+              <span className="text-sm font-medium text-[#1f7a68]">Saved</span>
+            ) : null}
+          </div>
+        </form>
+      </section>
       <section className="panel h-fit">
         <div className="panel-heading">
           <h1>Settings</h1>

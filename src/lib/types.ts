@@ -14,6 +14,12 @@ export type PortfolioAccount = {
   updatedAt: string;
 };
 
+export type ApplicationSettings = {
+  journalDescriptionTemplate: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export type AaveReserveHint = {
   symbol: string;
   address: string;

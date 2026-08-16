@@ -33,12 +33,12 @@ type TradeFormState = {
   assetKey: string;
 };
 
-function createEmptyForm(): TradeFormState {
+function createEmptyForm(descriptionMarkdown = ""): TradeFormState {
   return {
     kind: "trade",
     direction: "long",
     title: "",
-    descriptionMarkdown: "",
+    descriptionMarkdown,
     startDate: getDateTimeKey(new Date(), PORTFOLIO_TIMEZONE),
     endDate: "",
     assetKey: "",
@@ -52,6 +52,7 @@ export function JournalTradeForm({
   submitLabel,
   onCancel,
   onSubmit,
+  defaultDescriptionMarkdown = "",
 }: {
   trade?: JournalTrade | null;
   markets: JournalTradeAsset[];
@@ -59,12 +60,15 @@ export function JournalTradeForm({
   submitLabel: string;
   onCancel?: () => void;
   onSubmit: (payload: TradeFormPayload) => Promise<void>;
+  defaultDescriptionMarkdown?: string;
 }) {
   const marketOptions = useMemo(
     () => markets.map((market) => [getAssetKey(market), market] as const),
     [markets],
   );
-  const [form, setForm] = useState<TradeFormState>(() => createEmptyForm());
+  const [form, setForm] = useState<TradeFormState>(() =>
+    createEmptyForm(defaultDescriptionMarkdown),
+  );
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -83,11 +87,11 @@ export function JournalTradeForm({
         return;
       }
 
-      setForm(createEmptyForm());
+      setForm(createEmptyForm(defaultDescriptionMarkdown));
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [trade]);
+  }, [defaultDescriptionMarkdown, trade]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -120,7 +124,7 @@ export function JournalTradeForm({
 
     if (!trade) {
       setForm({
-        ...createEmptyForm(),
+        ...createEmptyForm(defaultDescriptionMarkdown),
         assetKey: marketOptions[0]?.[0] || "",
       });
     }

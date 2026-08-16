@@ -35,6 +35,9 @@ type TradePnlState = {
 export function JournalPanel() {
   const [trades, setTrades] = useState<JournalTrade[]>([]);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
+  const [journalDescriptionTemplate, setJournalDescriptionTemplate] = useState<
+    string | null
+  >(null);
   const [editingTrade, setEditingTrade] = useState<JournalTrade | null>(null);
   const [tradeFormOpen, setTradeFormOpen] = useState(false);
   const [closedTradesOpen, setClosedTradesOpen] = useState(false);
@@ -87,6 +90,27 @@ export function JournalPanel() {
     }
 
     void loadMarkets();
+  }, []);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error);
+        setJournalDescriptionTemplate(
+          payload.settings?.journalDescriptionTemplate ?? "",
+        );
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load journal settings.",
+        );
+      }
+    }
+
+    void loadSettings();
   }, []);
 
   useEffect(() => {
@@ -318,6 +342,7 @@ export function JournalPanel() {
             </span>
             <button
               className="button-primary"
+              disabled={journalDescriptionTemplate === null}
               onClick={openNewTradeForm}
               type="button"
             >
@@ -423,6 +448,7 @@ export function JournalPanel() {
               <JournalTradeForm
                 key={editingTrade?.id ?? "new"}
                 trade={editingTrade}
+                defaultDescriptionMarkdown={journalDescriptionTemplate ?? ""}
                 markets={markets}
                 saving={saving}
                 submitLabel={editingTrade ? "Save item" : "Add item"}
