@@ -51,6 +51,8 @@ export async function GET(_request: Request, context: RouteContext) {
     const orders: HyperliquidFilledOrder[] = [];
     const sourceErrors: SourceError[] = [];
     let unrealizedPnlUsd: number | null = null;
+    let entryPriceWeightedSize = 0;
+    let positionSize = 0;
     let positionValueUsd = 0;
 
     for (const account of accounts) {
@@ -83,6 +85,11 @@ export async function GET(_request: Request, context: RouteContext) {
           if (openPosition) {
             unrealizedPnlUsd =
               (unrealizedPnlUsd ?? 0) + openPosition.unrealizedPnlUsd;
+            if (openPosition.entryPriceUsd !== null) {
+              entryPriceWeightedSize +=
+                openPosition.entryPriceUsd * openPosition.positionSize;
+              positionSize += openPosition.positionSize;
+            }
             positionValueUsd += openPosition.positionValueUsd;
           }
         } catch (error) {
@@ -106,6 +113,7 @@ export async function GET(_request: Request, context: RouteContext) {
         unrealizedPnlUsd,
         positionValueUsd,
         trade.endDate !== null,
+        positionSize > 0 ? entryPriceWeightedSize / positionSize : null,
       ),
       sourceErrors,
       accountsCount: accounts.length,

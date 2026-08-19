@@ -392,6 +392,8 @@ describe("Hyperliquid normalization", () => {
           {
             position: {
               coin: "xyz:DRAM",
+              entryPx: "1.234567",
+              szi: "419044.27",
               positionValue: "517419.8696",
               unrealizedPnl: "17443.2072",
             },
@@ -431,8 +433,59 @@ describe("Hyperliquid normalization", () => {
       }),
     );
     expect(summary).toEqual({
+      entryPriceUsd: 1.234567,
+      positionSize: 419044.27,
       positionValueUsd: 517419.87,
       unrealizedPnlUsd: 17443.21,
+    });
+  });
+
+  it("size-weights entry prices across matching position aliases", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        assetPositions: [
+          {
+            position: {
+              coin: "xyz:DRAM",
+              entryPx: "1",
+              szi: "100",
+              positionValue: "100",
+              unrealizedPnl: "10",
+            },
+          },
+          {
+            position: {
+              coin: "DRAM",
+              entryPx: "2",
+              szi: "300",
+              positionValue: "600",
+              unrealizedPnl: "20",
+            },
+          },
+        ],
+      }),
+    });
+
+    await expect(
+      fetchHyperliquidOpenPositionSummary(
+        {
+          account,
+          asset: {
+            kind: "trade-xyz",
+            label: "xyz:DRAM Trade XYZ perp",
+            coin: "xyz:DRAM",
+            chartCoin: "xyz:DRAM",
+            dex: "xyz",
+          },
+        },
+        fetcher,
+      ),
+    ).resolves.toEqual({
+      entryPriceUsd: 1.75,
+      positionSize: 400,
+      positionValueUsd: 700,
+      unrealizedPnlUsd: 30,
     });
   });
 
@@ -444,6 +497,8 @@ describe("Hyperliquid normalization", () => {
           {
             position: {
               coin: "BTC",
+              entryPx: "50000",
+              szi: "0.02",
               positionValue: "1000",
               unrealizedPnl: "-25",
             },

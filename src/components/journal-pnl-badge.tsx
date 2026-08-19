@@ -140,8 +140,10 @@ function MetricShell({
 }) {
   return (
     <section className="journal-pnl-metric" title={title}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
     </section>
   );
 }
@@ -251,6 +253,35 @@ export function JournalPnlMetric({
         />
       </div>
     </section>
+  );
+}
+
+export function JournalEntryPriceMetric({
+  error,
+  loading,
+  summary,
+}: {
+  error?: string;
+  loading?: boolean;
+  summary?: JournalTradePnlSummary | null;
+}) {
+  if (loading) {
+    return <MetricShell label="Entry price" value="Loading" />;
+  }
+
+  if (error) {
+    return <MetricShell label="Entry price" title={error} value="Unavailable" />;
+  }
+
+  return (
+    <MetricShell
+      label="Entry price"
+      value={
+        summary && isFiniteNumber(summary.entryPriceUsd)
+          ? formatAssetPrice(summary.entryPriceUsd)
+          : "N/A"
+      }
+    />
   );
 }
 

@@ -22,6 +22,7 @@ type HyperliquidClearinghouseState = {
     position?: {
       coin?: string;
       szi?: string;
+      entryPx?: string;
       positionValue?: string;
       unrealizedPnl?: string;
       marginUsed?: string;
@@ -464,6 +465,8 @@ export async function fetchHyperliquidFilledOrdersByTime(
 }
 
 type HyperliquidOpenPositionSummary = {
+  entryPriceUsd: number | null;
+  positionSize: number;
   positionValueUsd: number;
   unrealizedPnlUsd: number;
 };
@@ -503,7 +506,20 @@ export async function fetchHyperliquidOpenPositionSummary(
     return null;
   }
 
+  let entryPriceWeightedSize = 0;
+  let positionSize = 0;
+  for (const position of matchingPositions) {
+    const entryPrice = parseNullableNumber(position?.entryPx);
+    const size = Math.abs(parseNullableNumber(position?.szi) ?? 0);
+    if (entryPrice === null || size === 0) continue;
+    entryPriceWeightedSize += entryPrice * size;
+    positionSize += size;
+  }
+
   return {
+    entryPriceUsd:
+      positionSize > 0 ? entryPriceWeightedSize / positionSize : null,
+    positionSize,
     positionValueUsd: roundCurrency(
       matchingPositions.reduce(
         (sum, position) => sum + (parseNullableNumber(position?.positionValue) ?? 0),

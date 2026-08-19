@@ -29,6 +29,7 @@ import { JournalFilledOrders } from "@/components/journal-filled-orders";
 import { JournalTagInput } from "@/components/journal-tag-input";
 import {
   JournalMarketMetric,
+  JournalEntryPriceMetric,
   JournalFundingMetric,
   JournalPnlMetric,
   JournalPositionValueMetric,
@@ -561,11 +562,18 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         </div>
         <aside className="journal-detail-metrics" aria-label="Trade metrics">
           {trade.kind === "trade" ? (
-            <JournalPnlMetric
-              error={filledOrdersState.error}
-              loading={filledOrdersState.loading}
-              summary={filledOrdersState.data?.summary}
-            />
+            <div className="journal-detail-position-metrics">
+              <JournalEntryPriceMetric
+                error={filledOrdersState.error}
+                loading={filledOrdersState.loading}
+                summary={filledOrdersState.data?.summary}
+              />
+              <JournalPnlMetric
+                error={filledOrdersState.error}
+                loading={filledOrdersState.loading}
+                summary={filledOrdersState.data?.summary}
+              />
+            </div>
           ) : null}
           <JournalMarketMetric
             error={marketError}

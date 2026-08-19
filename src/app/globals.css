@@ -777,6 +777,11 @@ textarea {
   gap: 1.5rem;
 }
 
+.journal-detail-position-metrics {
+  display: grid;
+  gap: 1rem;
+}
+
 .journal-entry-actions {
   display: inline-flex;
   gap: 0.5rem;
@@ -971,6 +976,14 @@ textarea {
 
   .journal-detail-metrics {
     gap: 1rem;
+  }
+
+  .journal-detail-position-metrics {
+    grid-template-columns: minmax(9rem, 0.55fr) minmax(0, 1.45fr);
+  }
+
+  .journal-detail-position-metrics .journal-pnl-breakdown {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .journal-market-changes {

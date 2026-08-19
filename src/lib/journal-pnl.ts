@@ -9,6 +9,7 @@ export function calculateJournalTradePnlSummary(
   unrealizedPnlUsd: number | null = null,
   positionValueUsd: number | null = 0,
   isFinished = unrealizedPnlUsd === null,
+  entryPriceUsd: number | null = null,
 ): JournalTradePnlSummary {
   const closedPnlOrders = orders.filter((order) => order.closedPnl !== null);
   const realizedPnlUsd = closedPnlOrders.length
@@ -34,6 +35,7 @@ export function calculateJournalTradePnlSummary(
     pnlPercent,
     realizedPnlUsd,
     unrealizedPnlUsd,
+    entryPriceUsd,
     positionValueUsd: positionValueUsd ?? 0,
     orderCount: orders.length,
     fillCount: orders.reduce((sum, order) => sum + order.fillCount, 0),
