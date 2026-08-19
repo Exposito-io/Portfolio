@@ -435,6 +435,19 @@ textarea {
   background: #fff;
 }
 
+.markdown-editor-input {
+  min-height: 24rem;
+}
+
+.markdown-template-preview {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  height: 24rem;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
 .markdown-view {
   color: #39423e;
   font-size: 0.92rem;

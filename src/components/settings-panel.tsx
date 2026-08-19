@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
-import { MarkdownEditor } from "@/components/markdown-editor";
+import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
 import type { AccountSource, PortfolioAccount } from "@/lib/types";
 
 type FormState = {
@@ -166,7 +166,10 @@ export function SettingsPanel() {
           <h1>Journal defaults</h1>
           <p>Set the Markdown added to the description of each new journal item.</p>
         </div>
-        <form className="mt-5 grid gap-4" onSubmit={saveJournalTemplate}>
+        <form
+          className="mt-5 grid gap-4 lg:grid-cols-2"
+          onSubmit={saveJournalTemplate}
+        >
           <MarkdownEditor
             id="journal-description-template"
             label="Journal description template"
@@ -176,7 +179,13 @@ export function SettingsPanel() {
               setTemplateSaved(false);
             }}
           />
-          <div className="flex items-center gap-3">
+          <div className="grid min-w-0 content-start gap-2">
+            <p className="field-label">Preview</p>
+            <div className="markdown-template-preview">
+              <MarkdownView value={journalDescriptionTemplate} />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 lg:col-span-2">
             <button className="button-primary" disabled={savingTemplate} type="submit">
               <Save size={16} aria-hidden="true" />
               {savingTemplate ? "Saving..." : "Save template"}

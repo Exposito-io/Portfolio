@@ -10,7 +10,6 @@ type MarkdownEditorProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  minHeight?: string;
   required?: boolean;
   enableImageUpload?: boolean;
 };
@@ -20,7 +19,6 @@ export function MarkdownEditor({
   label,
   value,
   onChange,
-  minHeight = "min-h-32",
   required = false,
   enableImageUpload = false,
 }: MarkdownEditorProps) {
@@ -161,7 +159,7 @@ export function MarkdownEditor({
       <textarea
         ref={textareaRef}
         id={id}
-        className={`input ${minHeight} resize-y leading-6`}
+        className="input markdown-editor-input resize-y leading-6"
         required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
