@@ -554,7 +554,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                 ) : null}
                 <span className="tag">{trade.asset.label}</span>
               </div>
-              <div className="mt-5">
+              <div className="journal-trade-description mt-5">
                 <MarkdownView value={trade.descriptionMarkdown} />
               </div>
             </>

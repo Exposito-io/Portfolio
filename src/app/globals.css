@@ -535,6 +535,14 @@ textarea {
   max-width: 100%;
 }
 
+.journal-trade-description {
+  max-height: 31.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.5rem;
+  scrollbar-gutter: stable;
+}
+
 .chart-frame {
   height: clamp(26rem, 76dvh, 70rem);
   min-height: 26rem;
