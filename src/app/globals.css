@@ -543,6 +543,43 @@ textarea {
   scrollbar-gutter: stable;
 }
 
+.journal-trade-description-editor-layout {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.journal-trade-description-preview {
+  display: none;
+  min-width: 0;
+}
+
+.journal-trade-description-preview-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.journal-trade-autosave-status {
+  color: #69706c;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.journal-trade-description-preview-body {
+  background: #f9f8f4;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  height: 24rem;
+  overflow: auto;
+  padding: 0.75rem;
+  scrollbar-gutter: stable;
+}
+
+.journal-trade-autosave-status {
+  margin-left: auto;
+}
+
 .chart-frame {
   height: clamp(26rem, 76dvh, 70rem);
   min-height: 26rem;
@@ -779,6 +816,51 @@ textarea {
   gap: 0.75rem;
 }
 
+.journal-detail-trade-widget {
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #52605a;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.06);
+  display: grid;
+  flex: 1 1 22rem;
+  gap: 0.75rem;
+  grid-template-columns: minmax(9rem, auto) minmax(0, 1fr);
+  max-width: 30rem;
+  min-width: 0;
+  padding: 0.75rem 0.9rem;
+}
+
+.journal-detail-trade-date {
+  min-width: 0;
+}
+
+.journal-detail-trade-date > span {
+  color: #69706c;
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.journal-detail-trade-date > strong {
+  color: #1f2523;
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1.25;
+  margin-top: 0.18rem;
+}
+
+.journal-detail-trade-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .journal-detail-summary-grid,
 .journal-detail-metrics {
   display: grid;
@@ -976,14 +1058,44 @@ textarea {
   }
 }
 
+@media (max-width: 639px) {
+  .journal-detail-trade-widget {
+    grid-template-columns: 1fr;
+    max-width: none;
+    width: 100%;
+  }
+
+  .journal-detail-trade-tags {
+    justify-content: flex-start;
+  }
+}
+
 @media (min-width: 1100px) {
   .journal-detail-summary-grid {
     align-items: start;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .journal-detail-summary-grid-editing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .journal-detail-metrics {
     gap: 1rem;
+  }
+
+  .journal-trade-description-editor-layout {
+    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .journal-trade-description-preview {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .journal-trade-description-preview-heading {
+    min-height: 4.4rem;
   }
 
   .journal-detail-position-metrics {

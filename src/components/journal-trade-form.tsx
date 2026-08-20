@@ -1,9 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Save, X } from "lucide-react";
 
-import { MarkdownEditor } from "@/components/markdown-editor";
+import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getDateTimeKey } from "@/lib/date";
 import type {
@@ -33,6 +40,8 @@ type TradeFormState = {
   assetKey: string;
 };
 
+type AutoSaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
+
 function createEmptyForm(descriptionMarkdown = ""): TradeFormState {
   return {
     kind: "trade",
@@ -45,6 +54,20 @@ function createEmptyForm(descriptionMarkdown = ""): TradeFormState {
   };
 }
 
+function createTradeForm(trade: JournalTrade): TradeFormState {
+  return {
+    kind: trade.kind,
+    direction: trade.direction ?? "long",
+    title: trade.title,
+    descriptionMarkdown: trade.descriptionMarkdown,
+    startDate: toDateTimeInputValue(trade.startDate, "00:00"),
+    endDate: trade.endDate
+      ? toDateTimeInputValue(trade.endDate, "23:59")
+      : "",
+    assetKey: getAssetKey(trade.asset),
+  };
+}
+
 export function JournalTradeForm({
   trade,
   markets,
@@ -52,6 +75,9 @@ export function JournalTradeForm({
   submitLabel,
   onCancel,
   onSubmit,
+  onAutoSaveDescription,
+  autoSaveIntervalMs = 5_000,
+  showDescriptionPreview = false,
   defaultDescriptionMarkdown = "",
 }: {
   trade?: JournalTrade | null;
@@ -60,6 +86,9 @@ export function JournalTradeForm({
   submitLabel: string;
   onCancel?: () => void;
   onSubmit: (payload: TradeFormPayload) => Promise<void>;
+  onAutoSaveDescription?: (descriptionMarkdown: string) => Promise<void>;
+  autoSaveIntervalMs?: number;
+  showDescriptionPreview?: boolean;
   defaultDescriptionMarkdown?: string;
 }) {
   const marketOptions = useMemo(
@@ -67,31 +96,87 @@ export function JournalTradeForm({
     [markets],
   );
   const [form, setForm] = useState<TradeFormState>(() =>
-    createEmptyForm(defaultDescriptionMarkdown),
+    trade ? createTradeForm(trade) : createEmptyForm(defaultDescriptionMarkdown),
   );
+  const previewMarkdown = useDeferredValue(form.descriptionMarkdown);
+  const [autoSaveStatus, setAutoSaveStatus] =
+    useState<AutoSaveStatus>("idle");
+  const previousDefaultDescriptionRef = useRef(defaultDescriptionMarkdown);
+  const latestDescriptionRef = useRef(form.descriptionMarkdown);
+  const lastSavedDescriptionRef = useRef(form.descriptionMarkdown);
+  const autoSavePromiseRef = useRef<Promise<void> | null>(null);
+  const manualSaveInProgressRef = useRef(false);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (trade) {
-        setForm({
-          kind: trade.kind,
-          direction: trade.direction ?? "long",
-          title: trade.title,
-          descriptionMarkdown: trade.descriptionMarkdown,
-          startDate: toDateTimeInputValue(trade.startDate, "00:00"),
-          endDate: trade.endDate
-            ? toDateTimeInputValue(trade.endDate, "23:59")
-            : "",
-          assetKey: getAssetKey(trade.asset),
-        });
-        return;
-      }
+    const previousDefaultDescription = previousDefaultDescriptionRef.current;
+    previousDefaultDescriptionRef.current = defaultDescriptionMarkdown;
+    if (trade || previousDefaultDescription === defaultDescriptionMarkdown) {
+      return;
+    }
 
-      setForm(createEmptyForm(defaultDescriptionMarkdown));
+    const timeout = window.setTimeout(() => {
+      setForm((current) =>
+        current.descriptionMarkdown === previousDefaultDescription
+          ? { ...current, descriptionMarkdown: defaultDescriptionMarkdown }
+          : current,
+      );
     }, 0);
 
     return () => window.clearTimeout(timeout);
   }, [defaultDescriptionMarkdown, trade]);
+
+  useEffect(() => {
+    latestDescriptionRef.current = form.descriptionMarkdown;
+    if (!onAutoSaveDescription) return;
+
+    setAutoSaveStatus((current) =>
+      form.descriptionMarkdown === lastSavedDescriptionRef.current
+        ? current === "saving"
+          ? current
+          : current === "pending" || current === "error"
+            ? "saved"
+            : current
+        : current === "saving"
+          ? current
+          : "pending",
+    );
+  }, [form.descriptionMarkdown, onAutoSaveDescription]);
+
+  useEffect(() => {
+    if (!onAutoSaveDescription) return;
+
+    const interval = window.setInterval(() => {
+      const descriptionMarkdown = latestDescriptionRef.current;
+      if (
+        manualSaveInProgressRef.current ||
+        autoSavePromiseRef.current ||
+        descriptionMarkdown === lastSavedDescriptionRef.current
+      ) {
+        return;
+      }
+
+      setAutoSaveStatus("saving");
+      const promise = onAutoSaveDescription(descriptionMarkdown);
+      autoSavePromiseRef.current = promise;
+      void promise
+        .then(() => {
+          lastSavedDescriptionRef.current = descriptionMarkdown;
+          setAutoSaveStatus(
+            latestDescriptionRef.current === descriptionMarkdown
+              ? "saved"
+              : "pending",
+          );
+        })
+        .catch(() => setAutoSaveStatus("error"))
+        .finally(() => {
+          if (autoSavePromiseRef.current === promise) {
+            autoSavePromiseRef.current = null;
+          }
+        });
+    }, autoSaveIntervalMs);
+
+    return () => window.clearInterval(interval);
+  }, [autoSaveIntervalMs, onAutoSaveDescription]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -112,15 +197,27 @@ export function JournalTradeForm({
     const asset = marketOptions.find(([key]) => key === form.assetKey)?.[1];
     if (!asset) return;
 
-    await onSubmit({
-      kind: form.kind,
-      direction: form.kind === "idea" ? null : form.direction,
-      title: form.title,
-      descriptionMarkdown: form.descriptionMarkdown,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      asset,
-    });
+    manualSaveInProgressRef.current = true;
+    try {
+      await autoSavePromiseRef.current;
+    } catch {
+      // The complete manual save below retries the latest description.
+    }
+
+    try {
+      await onSubmit({
+        kind: form.kind,
+        direction: form.kind === "idea" ? null : form.direction,
+        title: form.title,
+        descriptionMarkdown: form.descriptionMarkdown,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        asset,
+      });
+      lastSavedDescriptionRef.current = form.descriptionMarkdown;
+    } finally {
+      manualSaveInProgressRef.current = false;
+    }
 
     if (!trade) {
       setForm({
@@ -228,15 +325,30 @@ export function JournalTradeForm({
           />
         </div>
       </div>
-      <MarkdownEditor
-        id="trade-description"
-        label="Description"
-        value={form.descriptionMarkdown}
-        onChange={(descriptionMarkdown) =>
-          setForm({ ...form, descriptionMarkdown })
-        }
-      />
-      <div className="flex flex-wrap gap-2">
+      <div className="journal-trade-description-editor-layout">
+        <MarkdownEditor
+          id="trade-description"
+          label="Description"
+          value={form.descriptionMarkdown}
+          onChange={(descriptionMarkdown) =>
+            setForm({ ...form, descriptionMarkdown })
+          }
+        />
+        {showDescriptionPreview ? (
+          <section
+            aria-label="Description preview"
+            className="journal-trade-description-preview"
+          >
+            <div className="journal-trade-description-preview-heading">
+              <span className="field-label">Preview</span>
+            </div>
+            <div className="journal-trade-description-preview-body">
+              <MarkdownView value={previewMarkdown} />
+            </div>
+          </section>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
         <button
           className="button-primary"
           disabled={saving || !marketOptions.length}
@@ -251,9 +363,26 @@ export function JournalTradeForm({
             Cancel
           </button>
         ) : null}
+        {onAutoSaveDescription ? (
+          <p className="journal-trade-autosave-status" role="status">
+            {formatAutoSaveStatus(autoSaveStatus, autoSaveIntervalMs)}
+          </p>
+        ) : null}
       </div>
     </form>
   );
+}
+
+function formatAutoSaveStatus(
+  status: AutoSaveStatus,
+  autoSaveIntervalMs: number,
+) {
+  if (status === "pending") return "Unsaved description changes";
+  if (status === "saving") return "Autosaving description…";
+  if (status === "saved") return "Description autosaved";
+  if (status === "error") return "Autosave failed — retrying";
+
+  return `Description autosaves every ${Math.round(autoSaveIntervalMs / 1_000)} seconds`;
 }
 
 export function getAssetKey(asset: JournalTradeAsset) {

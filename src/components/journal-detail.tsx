@@ -345,6 +345,23 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     }
   }
 
+  const autoSaveTradeDescription = useCallback(
+    async (descriptionMarkdown: string) => {
+      if (!trade?.id) return;
+      const response = await fetch(`/api/journal/trades/${trade.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ descriptionMarkdown }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to autosave description.");
+      }
+      setTrade(result.trade);
+    },
+    [trade],
+  );
+
   async function saveEntry(event: FormEvent) {
     event.preventDefault();
     if (!trade) return;
@@ -467,6 +484,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           Journal
         </Link>
         <div className="journal-detail-topbar-controls">
+          <JournalTradeDetailsMetric trade={trade} />
           {trade.kind === "trade" ? (
             <JournalPositionValueMetric
               error={filledOrdersState.error}
@@ -516,15 +534,19 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         <div className="alert alert-error">{error}</div>
       ) : null}
 
-      <section className="journal-detail-summary-grid">
+      <section
+        className={`journal-detail-summary-grid${editingTrade ? " journal-detail-summary-grid-editing" : ""}`}
+      >
         <div className="panel">
           {editingTrade ? (
             <JournalTradeForm
               trade={trade}
               markets={markets}
               saving={saving}
+              showDescriptionPreview
               submitLabel="Save trade"
               onCancel={() => setEditingTrade(false)}
+              onAutoSaveDescription={autoSaveTradeDescription}
               onSubmit={saveTrade}
             />
           ) : (
@@ -532,7 +554,6 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="panel-heading">
                   <h1>{trade.title}</h1>
-                  <p>{formatDateRange(trade)}</p>
                 </div>
                 <button
                   className="icon-button"
@@ -541,18 +562,6 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                 >
                   <Pencil size={16} aria-hidden="true" />
                 </button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className={trade.endDate ? "tag" : "tag tag-green"}>
-                  {trade.endDate ? "Closed" : "Open"}
-                </span>
-                {trade.kind === "idea" ? (
-                  <span className="tag">Trade idea</span>
-                ) : null}
-                {trade.kind === "trade" && trade.direction ? (
-                  <span className="tag capitalize">{trade.direction}</span>
-                ) : null}
-                <span className="tag">{trade.asset.label}</span>
               </div>
               <div className="journal-trade-description mt-5">
                 <MarkdownView value={trade.descriptionMarkdown} />
@@ -778,6 +787,30 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         </div>
       ) : null}
     </main>
+  );
+}
+
+function JournalTradeDetailsMetric({ trade }: { trade: JournalTrade }) {
+  return (
+    <section
+      aria-label="Trade details"
+      className="journal-detail-trade-widget"
+    >
+      <div className="journal-detail-trade-date">
+        <span>Trade date</span>
+        <strong>{formatDateRange(trade)}</strong>
+      </div>
+      <div className="journal-detail-trade-tags" aria-label="Trade tags">
+        <span className={trade.endDate ? "tag" : "tag tag-green"}>
+          {trade.endDate ? "Closed" : "Open"}
+        </span>
+        {trade.kind === "idea" ? <span className="tag">Trade idea</span> : null}
+        {trade.kind === "trade" && trade.direction ? (
+          <span className="tag capitalize">{trade.direction}</span>
+        ) : null}
+        <span className="tag">{trade.asset.label}</span>
+      </div>
+    </section>
   );
 }
 
