@@ -1,8 +1,48 @@
 import { roundCurrency } from "@/lib/portfolio-calculations";
 import type {
   HyperliquidFilledOrder,
+  JournalTradeDirection,
   JournalTradePnlSummary,
 } from "@/lib/types";
+
+export function calculateJournalTradeEntryPrice(
+  orders: HyperliquidFilledOrder[],
+  direction: JournalTradeDirection | null,
+) {
+  const openingDirection = direction ? `open ${direction}` : "open ";
+  const openingOrders = orders.filter((order) =>
+    order.direction
+      .split(",")
+      .some((orderDirection) =>
+        orderDirection.trim().toLocaleLowerCase().startsWith(openingDirection),
+      ),
+  );
+  const entryOrders = openingOrders.length
+    ? openingOrders
+    : direction
+      ? orders.filter(
+          (order) => order.side === (direction === "long" ? "Buy" : "Sell"),
+        )
+      : [];
+
+  let weightedPrice = 0;
+  let totalSize = 0;
+
+  for (const order of entryOrders) {
+    if (
+      !Number.isFinite(order.averagePrice) ||
+      !Number.isFinite(order.totalSize) ||
+      order.totalSize <= 0
+    ) {
+      continue;
+    }
+
+    weightedPrice += order.averagePrice * order.totalSize;
+    totalSize += order.totalSize;
+  }
+
+  return totalSize > 0 ? weightedPrice / totalSize : null;
+}
 
 export function calculateJournalTradePnlSummary(
   orders: HyperliquidFilledOrder[],

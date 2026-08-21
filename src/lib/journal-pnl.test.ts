@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateCumulativeRealizedPnlByOrder,
+  calculateJournalTradeEntryPrice,
   calculateJournalTradePnlSummary,
 } from "@/lib/journal-pnl";
 import type { HyperliquidFilledOrder } from "@/lib/types";
@@ -26,6 +27,64 @@ const baseOrder: HyperliquidFilledOrder = {
 };
 
 describe("journal PnL", () => {
+  it("size-weights entry prices from opening orders when there is no position", () => {
+    expect(
+      calculateJournalTradeEntryPrice(
+        [
+          { ...baseOrder, averagePrice: 100, totalSize: 1 },
+          {
+            ...baseOrder,
+            id: "order-2",
+            averagePrice: 110,
+            totalSize: 2,
+          },
+          {
+            ...baseOrder,
+            id: "exit",
+            side: "Sell",
+            direction: "Close Long",
+            averagePrice: 120,
+            totalSize: 3,
+          },
+          {
+            ...baseOrder,
+            id: "opposite-direction",
+            side: "Sell",
+            direction: "Open Short",
+            averagePrice: 80,
+            totalSize: 1,
+          },
+        ],
+        "long",
+      ),
+    ).toBeCloseTo(106.6666667);
+  });
+
+  it("uses the trade side as the entry side when spot orders lack open directions", () => {
+    expect(
+      calculateJournalTradeEntryPrice(
+        [
+          {
+            ...baseOrder,
+            side: "Sell",
+            direction: "Sell",
+            averagePrice: 20,
+            totalSize: 2,
+          },
+          {
+            ...baseOrder,
+            id: "exit",
+            side: "Buy",
+            direction: "Buy",
+            averagePrice: 15,
+            totalSize: 2,
+          },
+        ],
+        "short",
+      ),
+    ).toBe(20);
+  });
+
   it("calculates realized PnL through each transaction chronologically", () => {
     const totals = calculateCumulativeRealizedPnlByOrder([
       { ...baseOrder, id: "latest", lastTime: 3, closedPnl: -2.1 },

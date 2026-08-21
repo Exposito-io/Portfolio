@@ -333,7 +333,11 @@ export function JournalPanel() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="panel-heading">
             <h1>Journal</h1>
-            <p>{trades.length ? `${trades.length} saved ideas` : "Saved ideas"}</p>
+            <p>
+              {trades.length
+                ? `${trades.length} journal entries`
+                : "Journal entries"}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="tag tag-green">

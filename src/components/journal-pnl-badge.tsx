@@ -241,11 +241,17 @@ export function JournalPnlMetric({
           percent={calculatePnlPercent(summary.realizedPnlUsd, summary.notionalUsd)}
           value={summary.realizedPnlUsd}
         />
-        <PnlBreakdownItem
-          label="Unrealized PnL"
-          percent={calculatePnlPercent(summary.unrealizedPnlUsd, summary.notionalUsd)}
-          value={summary.unrealizedPnlUsd}
-        />
+        {isFiniteNumber(summary.positionValueUsd) &&
+        Math.abs(summary.positionValueUsd) > 0 ? (
+          <PnlBreakdownItem
+            label="Unrealized PnL"
+            percent={calculatePnlPercent(
+              summary.unrealizedPnlUsd,
+              summary.notionalUsd,
+            )}
+            value={summary.unrealizedPnlUsd}
+          />
+        ) : null}
         <PnlBreakdownItem
           label="Total PnL"
           percent={summary.pnlPercent}

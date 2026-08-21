@@ -9,7 +9,10 @@ import {
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
 import { getTrade } from "@/lib/journal";
-import { calculateJournalTradePnlSummary } from "@/lib/journal-pnl";
+import {
+  calculateJournalTradeEntryPrice,
+  calculateJournalTradePnlSummary,
+} from "@/lib/journal-pnl";
 import { getDb } from "@/lib/mongodb";
 import type { HyperliquidFilledOrder, SourceError } from "@/lib/types";
 
@@ -113,7 +116,9 @@ export async function GET(_request: Request, context: RouteContext) {
         unrealizedPnlUsd,
         positionValueUsd,
         trade.endDate !== null,
-        positionSize > 0 ? entryPriceWeightedSize / positionSize : null,
+        positionSize > 0
+          ? entryPriceWeightedSize / positionSize
+          : calculateJournalTradeEntryPrice(orders, trade.direction),
       ),
       sourceErrors,
       accountsCount: accounts.length,
