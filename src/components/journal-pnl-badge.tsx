@@ -395,10 +395,13 @@ export function JournalPositionValueMetric({
     );
   }
 
-  const portfolioPercent = calculatePortfolioPercent(
-    summary.positionValueUsd,
-    portfolioInvestmentsUsd,
-  );
+  const hasPosition = Math.abs(summary.positionValueUsd) > 0;
+  const portfolioPercent = hasPosition
+    ? calculatePortfolioPercent(
+        summary.positionValueUsd,
+        portfolioInvestmentsUsd,
+      )
+    : null;
   const widgetTone = "journal-pnl-metric-neutral";
 
   return (
@@ -410,13 +413,17 @@ export function JournalPositionValueMetric({
         <span>Position value</span>
         <strong>{formatCurrency(summary.positionValueUsd)}</strong>
       </div>
-      <div
-        className="journal-pnl-metric-percent"
-        title={portfolioError || undefined}
-      >
-        <span>Of portfolio</span>
-        <b>{portfolioLoading ? "Loading" : formatPortfolioPercent(portfolioPercent)}</b>
-      </div>
+      {hasPosition ? (
+        <div
+          className="journal-pnl-metric-percent"
+          title={portfolioError || undefined}
+        >
+          <span>Of portfolio</span>
+          <b>
+            {portfolioLoading ? "Loading" : formatPortfolioPercent(portfolioPercent)}
+          </b>
+        </div>
+      ) : null}
     </section>
   );
 }

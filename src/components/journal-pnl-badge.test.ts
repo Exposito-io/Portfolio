@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   JournalClosingPriceMetric,
   JournalPnlMetric,
+  JournalPositionValueMetric,
 } from "@/components/journal-pnl-badge";
 import type { JournalTradePnlSummary } from "@/lib/types";
 
@@ -57,5 +58,32 @@ describe("JournalClosingPriceMetric", () => {
 
     expect(markup).toContain("Avg exit price");
     expect(markup).toContain("$110.00");
+  });
+});
+
+describe("JournalPositionValueMetric", () => {
+  it("hides the portfolio percentage when there is no position", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalPositionValueMetric, {
+        portfolioInvestmentsUsd: 1_000,
+        summary,
+      }),
+    );
+
+    expect(markup).toContain("Position value");
+    expect(markup).toContain("$0.00");
+    expect(markup).not.toContain("Of portfolio");
+  });
+
+  it("shows the portfolio percentage when a position exists", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalPositionValueMetric, {
+        portfolioInvestmentsUsd: 1_000,
+        summary: { ...summary, positionValueUsd: 100 },
+      }),
+    );
+
+    expect(markup).toContain("Of portfolio");
+    expect(markup).toContain("10.0%");
   });
 });
