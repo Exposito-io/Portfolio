@@ -10,6 +10,7 @@ import {
 } from "@/lib/hyperliquid";
 import { getTrade } from "@/lib/journal";
 import {
+  calculateJournalTradeClosingPrice,
   calculateJournalTradeEntryPrice,
   calculateJournalTradePnlSummary,
 } from "@/lib/journal-pnl";
@@ -119,6 +120,9 @@ export async function GET(_request: Request, context: RouteContext) {
         positionSize > 0
           ? entryPriceWeightedSize / positionSize
           : calculateJournalTradeEntryPrice(orders, trade.direction),
+        positionSize > 0
+          ? null
+          : calculateJournalTradeClosingPrice(orders, trade.direction),
       ),
       sourceErrors,
       accountsCount: accounts.length,

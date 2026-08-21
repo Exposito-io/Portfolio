@@ -136,6 +136,7 @@ export type JournalTradePnlSummary = {
   realizedPnlUsd: number | null;
   unrealizedPnlUsd: number | null;
   entryPriceUsd: number | null;
+  closingPriceUsd: number | null;
   positionValueUsd: number | null;
   orderCount: number;
   fillCount: number;

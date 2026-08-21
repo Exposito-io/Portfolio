@@ -232,25 +232,34 @@ export function JournalPnlMetric({
       : summary.pnlUsd < 0
         ? "journal-pnl-metric-negative"
         : "";
+  const hasPosition =
+    isFiniteNumber(summary.positionValueUsd) &&
+    Math.abs(summary.positionValueUsd) > 0;
 
   return (
     <section className={`journal-pnl-metric ${tone}`} title={formatPnlTitle(summary)}>
-      <div className="journal-pnl-breakdown">
-        <PnlBreakdownItem
-          label="Transactions PnL"
-          percent={calculatePnlPercent(summary.realizedPnlUsd, summary.notionalUsd)}
-          value={summary.realizedPnlUsd}
-        />
-        {isFiniteNumber(summary.positionValueUsd) &&
-        Math.abs(summary.positionValueUsd) > 0 ? (
-          <PnlBreakdownItem
-            label="Unrealized PnL"
-            percent={calculatePnlPercent(
-              summary.unrealizedPnlUsd,
-              summary.notionalUsd,
-            )}
-            value={summary.unrealizedPnlUsd}
-          />
+      <div
+        className={`journal-pnl-breakdown${hasPosition ? "" : " journal-pnl-breakdown-single"}`}
+      >
+        {hasPosition ? (
+          <>
+            <PnlBreakdownItem
+              label="Transactions PnL"
+              percent={calculatePnlPercent(
+                summary.realizedPnlUsd,
+                summary.notionalUsd,
+              )}
+              value={summary.realizedPnlUsd}
+            />
+            <PnlBreakdownItem
+              label="Unrealized PnL"
+              percent={calculatePnlPercent(
+                summary.unrealizedPnlUsd,
+                summary.notionalUsd,
+              )}
+              value={summary.unrealizedPnlUsd}
+            />
+          </>
         ) : null}
         <PnlBreakdownItem
           label="Total PnL"
@@ -285,6 +294,23 @@ export function JournalEntryPriceMetric({
       value={
         summary && isFiniteNumber(summary.entryPriceUsd)
           ? formatAssetPrice(summary.entryPriceUsd)
+          : "N/A"
+      }
+    />
+  );
+}
+
+export function JournalClosingPriceMetric({
+  summary,
+}: {
+  summary: JournalTradePnlSummary;
+}) {
+  return (
+    <MetricShell
+      label="Avg exit price"
+      value={
+        isFiniteNumber(summary.closingPriceUsd)
+          ? formatAssetPrice(summary.closingPriceUsd)
           : "N/A"
       }
     />

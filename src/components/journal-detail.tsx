@@ -28,6 +28,7 @@ import {
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
 import { JournalTagInput } from "@/components/journal-tag-input";
 import {
+  JournalClosingPriceMetric,
   JournalMarketMetric,
   JournalEntryPriceMetric,
   JournalFundingMetric,
@@ -105,6 +106,10 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const filledOrdersState = useJournalFilledOrders(
     trade?.kind === "trade" ? trade.id : null,
   );
+  const filledOrdersSummary = filledOrdersState.data?.summary;
+  const isFlatTrade =
+    filledOrdersSummary !== undefined &&
+    Math.abs(filledOrdersSummary.positionValueUsd ?? 0) === 0;
   const entryOrderTotals = useMemo(
     () =>
       groupOrdersByDate(
@@ -571,16 +576,21 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         </div>
         <aside className="journal-detail-metrics" aria-label="Trade metrics">
           {trade.kind === "trade" ? (
-            <div className="journal-detail-position-metrics">
+            <div
+              className={`journal-detail-position-metrics${isFlatTrade ? " journal-detail-position-metrics-flat" : ""}`}
+            >
               <JournalEntryPriceMetric
                 error={filledOrdersState.error}
                 loading={filledOrdersState.loading}
-                summary={filledOrdersState.data?.summary}
+                summary={filledOrdersSummary}
               />
+              {isFlatTrade ? (
+                <JournalClosingPriceMetric summary={filledOrdersSummary} />
+              ) : null}
               <JournalPnlMetric
                 error={filledOrdersState.error}
                 loading={filledOrdersState.loading}
-                summary={filledOrdersState.data?.summary}
+                summary={filledOrdersSummary}
               />
             </div>
           ) : null}

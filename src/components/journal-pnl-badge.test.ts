@@ -2,7 +2,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { JournalPnlMetric } from "@/components/journal-pnl-badge";
+import {
+  JournalClosingPriceMetric,
+  JournalPnlMetric,
+} from "@/components/journal-pnl-badge";
 import type { JournalTradePnlSummary } from "@/lib/types";
 
 const summary: JournalTradePnlSummary = {
@@ -11,6 +14,7 @@ const summary: JournalTradePnlSummary = {
   realizedPnlUsd: 25,
   unrealizedPnlUsd: null,
   entryPriceUsd: 100,
+  closingPriceUsd: 110,
   positionValueUsd: 0,
   orderCount: 2,
   fillCount: 2,
@@ -18,17 +22,17 @@ const summary: JournalTradePnlSummary = {
 };
 
 describe("JournalPnlMetric", () => {
-  it("hides unrealized PnL when there is no position", () => {
+  it("shows only total PnL when there is no position", () => {
     const markup = renderToStaticMarkup(
       createElement(JournalPnlMetric, { summary }),
     );
 
-    expect(markup).toContain("Transactions PnL");
     expect(markup).toContain("Total PnL");
+    expect(markup).not.toContain("Transactions PnL");
     expect(markup).not.toContain("Unrealized PnL");
   });
 
-  it("shows unrealized PnL when a position exists", () => {
+  it("shows the full PnL breakdown when a position exists", () => {
     const markup = renderToStaticMarkup(
       createElement(JournalPnlMetric, {
         summary: {
@@ -39,6 +43,19 @@ describe("JournalPnlMetric", () => {
       }),
     );
 
+    expect(markup).toContain("Transactions PnL");
     expect(markup).toContain("Unrealized PnL");
+    expect(markup).toContain("Total PnL");
+  });
+});
+
+describe("JournalClosingPriceMetric", () => {
+  it("displays the calculated average exit price", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalClosingPriceMetric, { summary }),
+    );
+
+    expect(markup).toContain("Avg exit price");
+    expect(markup).toContain("$110.00");
   });
 });

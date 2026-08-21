@@ -872,6 +872,14 @@ textarea {
   gap: 1rem;
 }
 
+.journal-detail-position-metrics-flat {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.journal-detail-position-metrics-flat > :last-child {
+  grid-column: 1 / -1;
+}
+
 .journal-entry-actions {
   display: inline-flex;
   gap: 0.5rem;
@@ -1102,8 +1110,22 @@ textarea {
     grid-template-columns: minmax(9rem, 0.55fr) minmax(0, 1.45fr);
   }
 
+  .journal-detail-position-metrics-flat {
+    grid-template-columns:
+      repeat(2, minmax(8.5rem, 0.55fr))
+      minmax(0, 1.45fr);
+  }
+
+  .journal-detail-position-metrics-flat > :last-child {
+    grid-column: auto;
+  }
+
   .journal-detail-position-metrics .journal-pnl-breakdown {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .journal-detail-position-metrics .journal-pnl-breakdown-single {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .journal-market-changes {

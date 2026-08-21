@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateCumulativeRealizedPnlByOrder,
+  calculateJournalTradeClosingPrice,
   calculateJournalTradeEntryPrice,
   calculateJournalTradePnlSummary,
 } from "@/lib/journal-pnl";
@@ -85,6 +86,58 @@ describe("journal PnL", () => {
     ).toBe(20);
   });
 
+  it("size-weights closing prices from exit orders", () => {
+    expect(
+      calculateJournalTradeClosingPrice(
+        [
+          {
+            ...baseOrder,
+            id: "exit-1",
+            side: "Sell",
+            direction: "Close Long",
+            averagePrice: 120,
+            totalSize: 1,
+          },
+          {
+            ...baseOrder,
+            id: "exit-2",
+            side: "Sell",
+            direction: "Close Long",
+            averagePrice: 135,
+            totalSize: 2,
+          },
+          { ...baseOrder, averagePrice: 100, totalSize: 3 },
+        ],
+        "long",
+      ),
+    ).toBe(130);
+  });
+
+  it("uses the opposite trade side for spot closing orders", () => {
+    expect(
+      calculateJournalTradeClosingPrice(
+        [
+          {
+            ...baseOrder,
+            side: "Buy",
+            direction: "Buy",
+            averagePrice: 15,
+            totalSize: 2,
+          },
+          {
+            ...baseOrder,
+            id: "exit",
+            side: "Sell",
+            direction: "Sell",
+            averagePrice: 20,
+            totalSize: 2,
+          },
+        ],
+        "long",
+      ),
+    ).toBe(20);
+  });
+
   it("calculates realized PnL through each transaction chronologically", () => {
     const totals = calculateCumulativeRealizedPnlByOrder([
       { ...baseOrder, id: "latest", lastTime: 3, closedPnl: -2.1 },
@@ -117,6 +170,7 @@ describe("journal PnL", () => {
       realizedPnlUsd: 10.25,
       unrealizedPnlUsd: null,
       entryPriceUsd: null,
+      closingPriceUsd: null,
       positionValueUsd: 0,
       orderCount: 2,
       fillCount: 5,
@@ -135,6 +189,7 @@ describe("journal PnL", () => {
       realizedPnlUsd: null,
       unrealizedPnlUsd: null,
       entryPriceUsd: null,
+      closingPriceUsd: null,
       positionValueUsd: 0,
       orderCount: 1,
       fillCount: 1,

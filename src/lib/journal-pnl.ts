@@ -9,26 +9,49 @@ export function calculateJournalTradeEntryPrice(
   orders: HyperliquidFilledOrder[],
   direction: JournalTradeDirection | null,
 ) {
-  const openingDirection = direction ? `open ${direction}` : "open ";
-  const openingOrders = orders.filter((order) =>
+  return calculateJournalTradeOrderPrice(orders, direction, "open");
+}
+
+export function calculateJournalTradeClosingPrice(
+  orders: HyperliquidFilledOrder[],
+  direction: JournalTradeDirection | null,
+) {
+  return calculateJournalTradeOrderPrice(orders, direction, "close");
+}
+
+function calculateJournalTradeOrderPrice(
+  orders: HyperliquidFilledOrder[],
+  direction: JournalTradeDirection | null,
+  orderKind: "open" | "close",
+) {
+  const expectedDirection = direction ? `${orderKind} ${direction}` : `${orderKind} `;
+  const matchingOrders = orders.filter((order) =>
     order.direction
       .split(",")
       .some((orderDirection) =>
-        orderDirection.trim().toLocaleLowerCase().startsWith(openingDirection),
+        orderDirection.trim().toLocaleLowerCase().startsWith(expectedDirection),
       ),
   );
-  const entryOrders = openingOrders.length
-    ? openingOrders
+  const pricedOrders = matchingOrders.length
+    ? matchingOrders
     : direction
       ? orders.filter(
-          (order) => order.side === (direction === "long" ? "Buy" : "Sell"),
+          (order) =>
+            order.side ===
+            (direction === "long"
+              ? orderKind === "open"
+                ? "Buy"
+                : "Sell"
+              : orderKind === "open"
+                ? "Sell"
+                : "Buy"),
         )
       : [];
 
   let weightedPrice = 0;
   let totalSize = 0;
 
-  for (const order of entryOrders) {
+  for (const order of pricedOrders) {
     if (
       !Number.isFinite(order.averagePrice) ||
       !Number.isFinite(order.totalSize) ||
@@ -50,6 +73,7 @@ export function calculateJournalTradePnlSummary(
   positionValueUsd: number | null = 0,
   isFinished = unrealizedPnlUsd === null,
   entryPriceUsd: number | null = null,
+  closingPriceUsd: number | null = null,
 ): JournalTradePnlSummary {
   const closedPnlOrders = orders.filter((order) => order.closedPnl !== null);
   const realizedPnlUsd = closedPnlOrders.length
@@ -76,6 +100,7 @@ export function calculateJournalTradePnlSummary(
     realizedPnlUsd,
     unrealizedPnlUsd,
     entryPriceUsd,
+    closingPriceUsd,
     positionValueUsd: positionValueUsd ?? 0,
     orderCount: orders.length,
     fillCount: orders.reduce((sum, order) => sum + order.fillCount, 0),
