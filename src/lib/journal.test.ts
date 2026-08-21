@@ -212,6 +212,42 @@ describe("journal trades", () => {
     ).rejects.toBeInstanceOf(ZodError);
   });
 
+  it("closes a trade without adding an entry when the note is blank", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      title: "SOL breakout",
+      descriptionMarkdown: "",
+      startDate: "2026-07-10",
+      asset,
+    });
+
+    const closed = await closeTrade(db, trade.id, {
+      date: "2026-07-12",
+      tags: ["post-mortem"],
+      descriptionMarkdown: "   ",
+    });
+
+    expect(closed?.endDate).toBe("2026-07-12T04:00:00.000Z");
+    expect(closed?.entries).toEqual([]);
+  });
+
+  it("still requires text for a regular journal entry", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      title: "SOL breakout",
+      descriptionMarkdown: "",
+      startDate: "2026-07-10",
+      asset,
+    });
+
+    await expect(
+      createEntry(db, trade.id, {
+        date: "2026-07-11",
+        descriptionMarkdown: "   ",
+      }),
+    ).rejects.toBeInstanceOf(ZodError);
+  });
+
   it("sorts entries on the same day by their saved time", async () => {
     const db = fakeDb();
     const trade = await createTrade(db, {

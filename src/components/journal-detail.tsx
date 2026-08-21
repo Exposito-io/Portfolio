@@ -752,8 +752,8 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                 </div>
                 <MarkdownEditor
                   id="entry-description"
-                  label="Entry"
-                  required
+                  label={closingTrade ? "Journal entry (optional)" : "Entry"}
+                  required={!closingTrade}
                   enableImageUpload
                   value={entryForm.descriptionMarkdown}
                   onChange={(descriptionMarkdown) =>

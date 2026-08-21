@@ -83,6 +83,10 @@ const entryInputSchema = z.object({
   }),
 });
 
+const closeTradeInputSchema = entryInputSchema.extend({
+  descriptionMarkdown: markdownSchema,
+});
+
 const entryUpdateSchema = entryInputSchema.partial();
 
 type JournalEntryDocument = Omit<
@@ -283,7 +287,7 @@ export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
   const existing = await collection(db).findOne({ _id });
   if (!existing) return null;
 
-  const input = entryInputSchema.parse(payload);
+  const input = closeTradeInputSchema.parse(payload);
   const closeDate = parseInputDate(input.date, "start");
   if (closeDate.getTime() < toDate(existing.startDate).getTime()) {
     throw new z.ZodError([
@@ -297,21 +301,23 @@ export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
   }
 
   const now = new Date();
-  const entry: JournalEntryDocument = {
-    _id: new ObjectId(),
-    date: closeDate,
-    tags: input.tags,
-    descriptionMarkdown: input.descriptionMarkdown,
-    createdAt: now,
-    updatedAt: now,
-  };
-
   const result = await collection(db).findOneAndUpdate(
     { _id },
-    {
-      $push: { entries: entry },
-      $set: { endDate: closeDate, updatedAt: now },
-    },
+    input.descriptionMarkdown
+      ? {
+          $push: {
+            entries: {
+              _id: new ObjectId(),
+              date: closeDate,
+              tags: input.tags,
+              descriptionMarkdown: input.descriptionMarkdown,
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          $set: { endDate: closeDate, updatedAt: now },
+        }
+      : { $set: { endDate: closeDate, updatedAt: now } },
     { returnDocument: "after" },
   );
 
