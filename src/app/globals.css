@@ -373,9 +373,35 @@ textarea {
 
 .entry-order-total strong {
   color: #1f2523;
+  display: block;
   font-size: 1rem;
   font-weight: 900;
   line-height: 1.1;
+  margin-top: 0.18rem;
+  white-space: nowrap;
+}
+
+.entry-order-total-with-percent {
+  align-items: center;
+  gap: 0.55rem;
+  grid-template-columns: 1fr auto;
+  min-width: 15rem;
+}
+
+.entry-order-total-position-percent {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+}
+
+.entry-order-total-position-percent b {
+  color: #1f2523;
+  display: block;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-top: 0.18rem;
+  white-space: nowrap;
 }
 
 .entry-order-totals-loading {
@@ -388,7 +414,8 @@ textarea {
   border-left: 4px solid #1f7a68;
 }
 
-.entry-order-total-buy strong {
+.entry-order-total-buy strong,
+.entry-order-total-buy .entry-order-total-position-percent b {
   color: #1f7a68;
 }
 
@@ -396,7 +423,28 @@ textarea {
   border-left: 4px solid #9b3d30;
 }
 
-.entry-order-total-sell strong {
+.entry-order-total-sell strong,
+.entry-order-total-sell .entry-order-total-position-percent b {
+  color: #9b3d30;
+}
+
+.entry-order-total-pnl {
+  border-left: 4px solid #69706c;
+}
+
+.entry-order-total-pnl-positive {
+  border-left-color: #1f7a68;
+}
+
+.entry-order-total-pnl-positive strong {
+  color: #1f7a68;
+}
+
+.entry-order-total-pnl-negative {
+  border-left-color: #9b3d30;
+}
+
+.entry-order-total-pnl-negative strong {
   color: #9b3d30;
 }
 
