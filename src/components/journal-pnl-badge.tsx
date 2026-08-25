@@ -191,10 +191,12 @@ export function JournalPnlBadge({
 }
 
 export function JournalPnlMetric({
+  annualizedPercent,
   error,
   loading,
   summary,
 }: {
+  annualizedPercent?: number | null;
   error?: string;
   loading?: boolean;
   summary?: JournalTradePnlSummary | null;
@@ -262,6 +264,7 @@ export function JournalPnlMetric({
           </>
         ) : null}
         <PnlBreakdownItem
+          annualizedPercent={annualizedPercent}
           label="Total PnL"
           percent={summary.pnlPercent}
           value={summary.pnlUsd}
@@ -318,10 +321,12 @@ export function JournalClosingPriceMetric({
 }
 
 function PnlBreakdownItem({
+  annualizedPercent,
   label,
   percent,
   value,
 }: {
+  annualizedPercent?: number | null;
   label: string;
   percent: number | null;
   value: number | null;
@@ -339,7 +344,16 @@ function PnlBreakdownItem({
       <span>{label}</span>
       <b>{isFiniteNumber(value) ? formatSignedCurrency(value) : "N/A"}</b>
       <small className="journal-pnl-breakdown-percent">
-        {isFiniteNumber(percent) ? formatSignedPercent(percent) : "N/A"}
+        {isFiniteNumber(percent) ? (
+          <>
+            {formatSignedPercent(percent)}
+            {isFiniteNumber(annualizedPercent)
+              ? ` (${formatSignedPercent(annualizedPercent)} ann.)`
+              : null}
+          </>
+        ) : (
+          "N/A"
+        )}
       </small>
     </div>
   );

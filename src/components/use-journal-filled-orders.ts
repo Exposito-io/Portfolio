@@ -13,6 +13,8 @@ type FilledOrdersResponse = {
   summary: JournalTradePnlSummary;
   sourceErrors: SourceError[];
   accountsCount: number;
+  startTime: number;
+  endTime: number;
   timezone: string;
 };
 

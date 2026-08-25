@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateAnnualizedPnlPercent,
   calculateCumulativeRealizedPnlByOrder,
   calculateJournalTradeClosingPrice,
   calculateJournalTradeEntryPrice,
@@ -28,6 +29,17 @@ const baseOrder: HyperliquidFilledOrder = {
 };
 
 describe("journal PnL", () => {
+  it("annualizes PnL over the trade holding period", () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    expect(calculateAnnualizedPnlPercent(10, 0, 73 * dayMs)).toBeCloseTo(50);
+  });
+
+  it("does not annualize PnL without a valid holding period", () => {
+    expect(calculateAnnualizedPnlPercent(10, 1_000, 1_000)).toBeNull();
+    expect(calculateAnnualizedPnlPercent(null, 0, 1_000)).toBeNull();
+  });
+
   it("size-weights entry prices from opening orders when there is no position", () => {
     expect(
       calculateJournalTradeEntryPrice(

@@ -46,6 +46,7 @@ import {
   type JournalMarketSummary,
 } from "@/lib/journal-market";
 import type { JournalFundingSummary } from "@/lib/journal-funding";
+import { calculateAnnualizedPnlPercent } from "@/lib/journal-pnl";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import {
   formatJournalDateTimeKey,
@@ -107,6 +108,13 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     trade?.kind === "trade" ? trade.id : null,
   );
   const filledOrdersSummary = filledOrdersState.data?.summary;
+  const annualizedPnlPercent = filledOrdersState.data
+    ? calculateAnnualizedPnlPercent(
+        filledOrdersState.data.summary.pnlPercent,
+        filledOrdersState.data.startTime,
+        filledOrdersState.data.endTime,
+      )
+    : null;
   const isFlatTrade =
     filledOrdersSummary !== undefined &&
     Math.abs(filledOrdersSummary.positionValueUsd ?? 0) === 0;
@@ -588,6 +596,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
                 <JournalClosingPriceMetric summary={filledOrdersSummary} />
               ) : null}
               <JournalPnlMetric
+                annualizedPercent={annualizedPnlPercent}
                 error={filledOrdersState.error}
                 loading={filledOrdersState.loading}
                 summary={filledOrdersSummary}

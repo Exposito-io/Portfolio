@@ -5,6 +5,27 @@ import type {
   JournalTradePnlSummary,
 } from "@/lib/types";
 
+const ANNUAL_DURATION_MS = 365 * 24 * 60 * 60 * 1000;
+
+export function calculateAnnualizedPnlPercent(
+  pnlPercent: number | null,
+  startTime: number,
+  endTime: number,
+) {
+  const durationMs = endTime - startTime;
+
+  if (
+    pnlPercent === null ||
+    !Number.isFinite(pnlPercent) ||
+    !Number.isFinite(durationMs) ||
+    durationMs <= 0
+  ) {
+    return null;
+  }
+
+  return pnlPercent * (ANNUAL_DURATION_MS / durationMs);
+}
+
 export function calculateJournalTradeEntryPrice(
   orders: HyperliquidFilledOrder[],
   direction: JournalTradeDirection | null,

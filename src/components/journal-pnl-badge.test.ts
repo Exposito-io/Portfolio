@@ -25,10 +25,14 @@ const summary: JournalTradePnlSummary = {
 describe("JournalPnlMetric", () => {
   it("shows only total PnL when there is no position", () => {
     const markup = renderToStaticMarkup(
-      createElement(JournalPnlMetric, { summary }),
+      createElement(JournalPnlMetric, {
+        annualizedPercent: 25,
+        summary,
+      }),
     );
 
     expect(markup).toContain("Total PnL");
+    expect(markup).toContain("+5.00% (+25.00% ann.)");
     expect(markup).not.toContain("Transactions PnL");
     expect(markup).not.toContain("Unrealized PnL");
   });
