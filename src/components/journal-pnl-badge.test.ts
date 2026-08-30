@@ -13,10 +13,14 @@ const summary: JournalTradePnlSummary = {
   pnlUsd: 25,
   pnlPercent: 5,
   realizedPnlUsd: 25,
+  realizedPnlPercent: 5,
+  realizedPnlBasisUsd: 500,
   unrealizedPnlUsd: null,
+  unrealizedPnlPercent: null,
   entryPriceUsd: 100,
   closingPriceUsd: 110,
   positionValueUsd: 0,
+  positionCostBasisUsd: 0,
   orderCount: 2,
   fillCount: 2,
   notionalUsd: 500,
@@ -43,13 +47,17 @@ describe("JournalPnlMetric", () => {
         summary: {
           ...summary,
           unrealizedPnlUsd: 10,
+          unrealizedPnlPercent: 1,
           positionValueUsd: 1_000,
+          positionCostBasisUsd: 990,
         },
       }),
     );
 
     expect(markup).toContain("Transactions PnL");
+    expect(markup).toContain("+5.00%");
     expect(markup).toContain("Unrealized PnL");
+    expect(markup).toContain("+1.00%");
     expect(markup).toContain("Total PnL");
   });
 });

@@ -436,6 +436,7 @@ describe("Hyperliquid normalization", () => {
       entryPriceUsd: 1.234567,
       positionSize: 419044.27,
       positionValueUsd: 517419.87,
+      positionCostBasisUsd: 517338.23,
       unrealizedPnlUsd: 17443.21,
     });
   });
@@ -485,6 +486,7 @@ describe("Hyperliquid normalization", () => {
       entryPriceUsd: 1.75,
       positionSize: 400,
       positionValueUsd: 700,
+      positionCostBasisUsd: 700,
       unrealizedPnlUsd: 30,
     });
   });
@@ -574,8 +576,60 @@ describe("Hyperliquid normalization", () => {
         notionalUsd: 320,
         fee: 0.3,
         feeToken: "USDC",
+        realizedPnlBasisUsd: null,
         orderId: 42,
         fillCount: 2,
+      }),
+    ]);
+  });
+
+  it("calculates realized PnL cost basis for long and short closes", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          coin: "BTC",
+          px: "110",
+          sz: "1",
+          side: "A",
+          time: 1_800_000_000_000,
+          dir: "Close Long",
+          closedPnl: "10",
+          oid: 42,
+          tid: 1,
+        },
+        {
+          coin: "BTC",
+          px: "90",
+          sz: "1",
+          side: "B",
+          time: 1_800_000_001_000,
+          dir: "Close Short",
+          closedPnl: "10",
+          oid: 43,
+          tid: 2,
+        },
+      ],
+    });
+
+    const orders = await fetchHyperliquidFilledOrdersByTime(
+      {
+        account,
+        startTime: 1_799_999_000_000,
+        endTime: 1_800_001_000_000,
+        coinAliases: ["BTC"],
+      },
+      fetcher,
+    );
+
+    expect(orders).toEqual([
+      expect.objectContaining({
+        direction: "Close Short",
+        realizedPnlBasisUsd: 100,
+      }),
+      expect.objectContaining({
+        direction: "Close Long",
+        realizedPnlBasisUsd: 100,
       }),
     ]);
   });

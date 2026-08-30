@@ -95,6 +95,7 @@ export function calculateJournalTradePnlSummary(
   isFinished = unrealizedPnlUsd === null,
   entryPriceUsd: number | null = null,
   closingPriceUsd: number | null = null,
+  positionCostBasisUsd: number | null = 0,
 ): JournalTradePnlSummary {
   const closedPnlOrders = orders.filter((order) => order.closedPnl !== null);
   const realizedPnlUsd = closedPnlOrders.length
@@ -110,23 +111,60 @@ export function calculateJournalTradePnlSummary(
   const notionalUsd = roundCurrency(
     orders.reduce((sum, order) => sum + order.notionalUsd, 0),
   );
-  const pnlPercent =
-    pnlUsd === null || notionalUsd === 0 || !Number.isFinite(notionalUsd)
-      ? null
-      : Math.round((pnlUsd / notionalUsd) * 10000) / 100;
+  const realizedPnlBasisUsd = roundCurrency(
+    orders.reduce(
+      (sum, order) => sum + (order.realizedPnlBasisUsd ?? 0),
+      0,
+    ),
+  );
+  const normalizedPositionCostBasisUsd =
+    positionCostBasisUsd !== null &&
+    Number.isFinite(positionCostBasisUsd) &&
+    positionCostBasisUsd > 0
+      ? roundCurrency(positionCostBasisUsd)
+      : 0;
+  const pnlBasisUsd = isFinished
+    ? realizedPnlBasisUsd
+    : roundCurrency(realizedPnlBasisUsd + normalizedPositionCostBasisUsd);
+  const realizedPnlPercent = calculatePnlPercent(
+    realizedPnlUsd,
+    realizedPnlBasisUsd,
+  );
+  const unrealizedPnlPercent = calculatePnlPercent(
+    unrealizedPnlUsd,
+    normalizedPositionCostBasisUsd,
+  );
+  const pnlPercent = calculatePnlPercent(pnlUsd, pnlBasisUsd);
 
   return {
     pnlUsd,
     pnlPercent,
     realizedPnlUsd,
+    realizedPnlPercent,
+    realizedPnlBasisUsd,
     unrealizedPnlUsd,
+    unrealizedPnlPercent,
     entryPriceUsd,
     closingPriceUsd,
     positionValueUsd: positionValueUsd ?? 0,
+    positionCostBasisUsd: normalizedPositionCostBasisUsd,
     orderCount: orders.length,
     fillCount: orders.reduce((sum, order) => sum + order.fillCount, 0),
     notionalUsd,
   };
+}
+
+function calculatePnlPercent(value: number | null, basisUsd: number) {
+  if (
+    value === null ||
+    !Number.isFinite(value) ||
+    !Number.isFinite(basisUsd) ||
+    basisUsd <= 0
+  ) {
+    return null;
+  }
+
+  return Math.round((value / basisUsd) * 10_000) / 100;
 }
 
 export function calculateCumulativeRealizedPnlByOrder(

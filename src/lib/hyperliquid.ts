@@ -468,6 +468,7 @@ type HyperliquidOpenPositionSummary = {
   entryPriceUsd: number | null;
   positionSize: number;
   positionValueUsd: number;
+  positionCostBasisUsd: number;
   unrealizedPnlUsd: number;
 };
 
@@ -526,6 +527,7 @@ export async function fetchHyperliquidOpenPositionSummary(
         0,
       ),
     ),
+    positionCostBasisUsd: roundCurrency(entryPriceWeightedSize),
     unrealizedPnlUsd: roundCurrency(
       matchingPositions.reduce(
         (sum, position) => sum + (parseNullableNumber(position?.unrealizedPnl) ?? 0),
@@ -649,6 +651,9 @@ function normalizeFill(
   const orderId = fill.oid ?? null;
   const tradeId = fill.tid ?? `${time}:${orderId ?? "unknown"}`;
 
+  const notionalUsd = roundCurrency(price * size);
+  const closedPnl = parseNullableNumber(fill.closedPnl);
+
   return {
     id: `${account.id}:${tradeId}`,
     accountId: account.id,
@@ -658,10 +663,15 @@ function normalizeFill(
     direction: fill.dir ?? "",
     price,
     size,
-    notionalUsd: roundCurrency(price * size),
+    notionalUsd,
     fee: parseNullableNumber(fill.fee),
     feeToken: fill.feeToken ?? null,
-    closedPnl: parseNullableNumber(fill.closedPnl),
+    closedPnl,
+    realizedPnlBasisUsd: calculateRealizedPnlBasisUsd(
+      fill.dir,
+      notionalUsd,
+      closedPnl,
+    ),
     time,
     timeKey: new Date(time).toISOString(),
     hash: fill.hash ?? null,
@@ -686,6 +696,7 @@ function aggregateFillsToOrders(
       fee: number | null;
       feeTokens: Set<string>;
       closedPnl: number | null;
+      realizedPnlBasisUsd: number | null;
       firstTime: number;
       lastTime: number;
       orderId: number | null;
@@ -706,6 +717,7 @@ function aggregateFillsToOrders(
       fee: null,
       feeTokens: new Set<string>(),
       closedPnl: null,
+      realizedPnlBasisUsd: null,
       firstTime: fill.time,
       lastTime: fill.time,
       orderId: fill.orderId,
@@ -721,6 +733,10 @@ function aggregateFillsToOrders(
       fill.closedPnl === null
         ? group.closedPnl
         : (group.closedPnl ?? 0) + fill.closedPnl;
+    group.realizedPnlBasisUsd =
+      fill.realizedPnlBasisUsd === null
+        ? group.realizedPnlBasisUsd
+        : (group.realizedPnlBasisUsd ?? 0) + fill.realizedPnlBasisUsd;
     group.firstTime = Math.min(group.firstTime, fill.time);
     group.lastTime = Math.max(group.lastTime, fill.time);
     group.fillCount += 1;
@@ -747,12 +763,35 @@ function aggregateFillsToOrders(
         group.feeTokens.size === 1 ? [...group.feeTokens][0] : "Multiple",
       closedPnl:
         group.closedPnl === null ? null : roundCurrency(group.closedPnl),
+      realizedPnlBasisUsd:
+        group.realizedPnlBasisUsd === null
+          ? null
+          : roundCurrency(group.realizedPnlBasisUsd),
       firstTime: group.firstTime,
       lastTime: group.lastTime,
       orderId: group.orderId,
       fillCount: group.fillCount,
     }))
     .sort((a, b) => b.lastTime - a.lastTime);
+}
+
+function calculateRealizedPnlBasisUsd(
+  direction: string | undefined,
+  notionalUsd: number,
+  closedPnl: number | null,
+) {
+  if (closedPnl === null) return null;
+
+  const normalizedDirection = direction?.trim().toLocaleLowerCase();
+  const basis = normalizedDirection?.startsWith("close long")
+    ? notionalUsd - closedPnl
+    : normalizedDirection?.startsWith("close short")
+      ? notionalUsd + closedPnl
+      : null;
+
+  return basis !== null && Number.isFinite(basis) && basis > 0
+    ? roundCurrency(basis)
+    : null;
 }
 
 function toFillSide(side: string | undefined): HyperliquidFill["side"] {

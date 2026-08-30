@@ -58,6 +58,7 @@ export async function GET(_request: Request, context: RouteContext) {
     let entryPriceWeightedSize = 0;
     let positionSize = 0;
     let positionValueUsd = 0;
+    let positionCostBasisUsd = 0;
 
     for (const account of accounts) {
       try {
@@ -95,6 +96,7 @@ export async function GET(_request: Request, context: RouteContext) {
               positionSize += openPosition.positionSize;
             }
             positionValueUsd += openPosition.positionValueUsd;
+            positionCostBasisUsd += openPosition.positionCostBasisUsd;
           }
         } catch (error) {
           sourceErrors.push({
@@ -123,6 +125,7 @@ export async function GET(_request: Request, context: RouteContext) {
         positionSize > 0
           ? null
           : calculateJournalTradeClosingPrice(orders, trade.direction),
+        positionCostBasisUsd,
       ),
       sourceErrors,
       accountsCount: accounts.length,

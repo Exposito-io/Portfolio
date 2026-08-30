@@ -22,6 +22,7 @@ const baseOrder: HyperliquidFilledOrder = {
   fee: null,
   feeToken: null,
   closedPnl: null,
+  realizedPnlBasisUsd: null,
   firstTime: 1,
   lastTime: 1,
   orderId: 1,
@@ -164,14 +165,21 @@ describe("journal PnL", () => {
     });
   });
 
-  it("sums closed PnL, notional, orders, and fills", () => {
+  it("sums closed PnL, PnL basis, notional, orders, and fills", () => {
     expect(
       calculateJournalTradePnlSummary([
-        { ...baseOrder, id: "order-1", closedPnl: 12.345, fillCount: 2 },
+        {
+          ...baseOrder,
+          id: "order-1",
+          closedPnl: 12.345,
+          realizedPnlBasisUsd: 100,
+          fillCount: 2,
+        },
         {
           ...baseOrder,
           id: "order-2",
           closedPnl: -2.1,
+          realizedPnlBasisUsd: 200.5,
           notionalUsd: 200.5,
           fillCount: 3,
         },
@@ -180,10 +188,14 @@ describe("journal PnL", () => {
       pnlUsd: 10.25,
       pnlPercent: 3.41,
       realizedPnlUsd: 10.25,
+      realizedPnlPercent: 3.41,
+      realizedPnlBasisUsd: 300.5,
       unrealizedPnlUsd: null,
+      unrealizedPnlPercent: null,
       entryPriceUsd: null,
       closingPriceUsd: null,
       positionValueUsd: 0,
+      positionCostBasisUsd: 0,
       orderCount: 2,
       fillCount: 5,
       notionalUsd: 300.5,
@@ -199,10 +211,14 @@ describe("journal PnL", () => {
       pnlUsd: null,
       pnlPercent: null,
       realizedPnlUsd: null,
+      realizedPnlPercent: null,
+      realizedPnlBasisUsd: 0,
       unrealizedPnlUsd: null,
+      unrealizedPnlPercent: null,
       entryPriceUsd: null,
       closingPriceUsd: null,
       positionValueUsd: 0,
+      positionCostBasisUsd: 0,
       orderCount: 1,
       fillCount: 1,
       notionalUsd: 100,
@@ -212,32 +228,56 @@ describe("journal PnL", () => {
   it("adds unrealized PnL to trade PnL for unfinished trades", () => {
     expect(
       calculateJournalTradePnlSummary(
-        [{ ...baseOrder, id: "order-1", closedPnl: 12.34 }],
+        [
+          {
+            ...baseOrder,
+            id: "order-1",
+            closedPnl: 12.34,
+            realizedPnlBasisUsd: 100,
+          },
+        ],
         100.1,
         5000.5,
         false,
         98.7654,
+        null,
+        4900.4,
       ),
     ).toMatchObject({
       pnlUsd: 112.44,
-      pnlPercent: 112.44,
+      pnlPercent: 2.25,
       realizedPnlUsd: 12.34,
+      realizedPnlPercent: 12.34,
+      realizedPnlBasisUsd: 100,
       unrealizedPnlUsd: 100.1,
+      unrealizedPnlPercent: 2.04,
       entryPriceUsd: 98.7654,
       positionValueUsd: 5000.5,
+      positionCostBasisUsd: 4900.4,
     });
   });
 
   it("uses unrealized PnL when there is no realized trade PnL", () => {
     expect(
-      calculateJournalTradePnlSummary([baseOrder], -25.5, null, false),
+      calculateJournalTradePnlSummary(
+        [baseOrder],
+        -25.5,
+        974.5,
+        false,
+        null,
+        null,
+        1000,
+      ),
     ).toMatchObject({
       pnlUsd: -25.5,
-      pnlPercent: -25.5,
+      pnlPercent: -2.55,
       realizedPnlUsd: null,
+      realizedPnlPercent: null,
       unrealizedPnlUsd: -25.5,
+      unrealizedPnlPercent: -2.55,
       entryPriceUsd: null,
-      positionValueUsd: 0,
+      positionValueUsd: 974.5,
+      positionCostBasisUsd: 1000,
     });
   });
 
@@ -245,8 +285,18 @@ describe("journal PnL", () => {
     expect(
       calculateJournalTradePnlSummary(
         [
-          { ...baseOrder, id: "order-1", closedPnl: 12.34 },
-          { ...baseOrder, id: "order-2", closedPnl: -2.1 },
+          {
+            ...baseOrder,
+            id: "order-1",
+            closedPnl: 12.34,
+            realizedPnlBasisUsd: 100,
+          },
+          {
+            ...baseOrder,
+            id: "order-2",
+            closedPnl: -2.1,
+            realizedPnlBasisUsd: 100,
+          },
         ],
         100.1,
         5000.5,
@@ -256,6 +306,8 @@ describe("journal PnL", () => {
       pnlUsd: 10.24,
       pnlPercent: 5.12,
       realizedPnlUsd: 10.24,
+      realizedPnlPercent: 5.12,
+      unrealizedPnlPercent: null,
     });
   });
 });

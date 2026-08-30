@@ -915,6 +915,59 @@ textarea {
   gap: 1.5rem;
 }
 
+.journal-detail-tabs {
+  min-width: 0;
+}
+
+.journal-detail-tab-list {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+
+.journal-detail-tab {
+  border-bottom: 3px solid transparent;
+  color: #69706c;
+  flex: 0 0 auto;
+  font-size: 0.88rem;
+  font-weight: 800;
+  margin-bottom: -1px;
+  padding: 0.7rem 1rem 0.65rem;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.journal-detail-tab:hover {
+  color: #1f2523;
+}
+
+.journal-detail-tab[aria-selected="true"] {
+  border-bottom-color: #1f7a68;
+  color: #1f7a68;
+}
+
+.journal-detail-tab:focus-visible {
+  border-radius: 6px 6px 0 0;
+  outline: 2px solid #1f7a68;
+  outline-offset: -2px;
+}
+
+.journal-detail-tab-panel {
+  min-width: 0;
+  padding-top: 1.5rem;
+}
+
+.journal-detail-tab-panel:focus-visible {
+  outline: 2px solid #1f7a68;
+  outline-offset: 4px;
+}
+
+.journal-detail-news {
+  min-height: 5rem;
+}
+
 .journal-detail-position-metrics {
   display: grid;
   gap: 1rem;

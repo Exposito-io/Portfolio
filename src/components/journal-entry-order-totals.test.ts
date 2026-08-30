@@ -22,6 +22,7 @@ const baseOrder: HyperliquidFilledOrder = {
   fee: null,
   feeToken: null,
   closedPnl: null,
+  realizedPnlBasisUsd: null,
   firstTime: Date.parse("2026-08-20T16:00:00Z"),
   lastTime: Date.parse("2026-08-20T16:00:00Z"),
   orderId: 1,

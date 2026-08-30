@@ -247,18 +247,12 @@ export function JournalPnlMetric({
           <>
             <PnlBreakdownItem
               label="Transactions PnL"
-              percent={calculatePnlPercent(
-                summary.realizedPnlUsd,
-                summary.notionalUsd,
-              )}
+              percent={summary.realizedPnlPercent}
               value={summary.realizedPnlUsd}
             />
             <PnlBreakdownItem
               label="Unrealized PnL"
-              percent={calculatePnlPercent(
-                summary.unrealizedPnlUsd,
-                summary.notionalUsd,
-              )}
+              percent={summary.unrealizedPnlPercent}
               value={summary.unrealizedPnlUsd}
             />
           </>
@@ -357,14 +351,6 @@ function PnlBreakdownItem({
       </small>
     </div>
   );
-}
-
-function calculatePnlPercent(value: number | null, notionalUsd: number) {
-  if (!isFiniteNumber(value) || !isFiniteNumber(notionalUsd) || notionalUsd === 0) {
-    return null;
-  }
-
-  return Math.round((value / notionalUsd) * 10_000) / 100;
 }
 
 export function JournalPositionValueMetric({

@@ -26,6 +26,7 @@ import {
   groupOrdersByDate,
 } from "@/components/journal-entry-order-totals";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
+import { JournalDetailTabs } from "@/components/journal-detail-tabs";
 import { JournalTagInput } from "@/components/journal-tag-input";
 import {
   JournalClosingPriceMetric,
@@ -618,77 +619,88 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         </aside>
       </section>
 
-      <JournalChart
-        trade={trade}
-        markets={markets}
-        ordersState={filledOrdersState}
-        onTradeChange={setTrade}
+      <JournalDetailTabs
+        charts={
+          <JournalChart
+            trade={trade}
+            markets={markets}
+            ordersState={filledOrdersState}
+            onTradeChange={setTrade}
+          />
+        }
+        journal={
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>Entries</h2>
+              <p>
+                {trade.entries.length
+                  ? `${trade.entries.length} notes`
+                  : "Notes"}
+              </p>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {trade.entries.map((entry) => (
+                <article className="entry-row" key={entry.id}>
+                  <div className="entry-row-header">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <p className="entry-row-date">
+                        {formatEntryDateTime(entry)}
+                      </p>
+                      {entry.tags.map((tag) => (
+                        <span className="tag" key={tag}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <EntryOrderTotalsView
+                      loading={filledOrdersState.loading}
+                      totals={entryOrderTotals.get(
+                        getJournalDateKey(entry.date, PORTFOLIO_TIMEZONE),
+                      )}
+                    />
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        className="icon-button"
+                        aria-label={`Edit entry ${entry.date}`}
+                        onClick={() => beginEditEntry(entry)}
+                      >
+                        <Pencil size={16} aria-hidden="true" />
+                      </button>
+                      <button
+                        className="icon-button danger"
+                        aria-label={`Delete entry ${entry.date}`}
+                        onClick={() => removeEntry(entry)}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <MarkdownView value={entry.descriptionMarkdown} />
+                  </div>
+                </article>
+              ))}
+              {!trade.entries.length ? (
+                <div className="empty-state">
+                  <Plus size={28} aria-hidden="true" />
+                  <div>
+                    <h2>No entries yet</h2>
+                    <p>Add updates as the trade idea develops.</p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        }
+        transactions={
+          trade.kind === "trade" ? (
+            <JournalFilledOrders
+              trade={trade}
+              ordersState={filledOrdersState}
+            />
+          ) : null
+        }
       />
-
-      <section className="grid gap-6">
-        <div className="panel">
-          <div className="panel-heading">
-            <h2>Entries</h2>
-            <p>
-              {trade.entries.length ? `${trade.entries.length} notes` : "Notes"}
-            </p>
-          </div>
-          <div className="mt-4 grid gap-3">
-            {trade.entries.map((entry) => (
-              <article className="entry-row" key={entry.id}>
-                <div className="entry-row-header">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <p className="entry-row-date">{formatEntryDateTime(entry)}</p>
-                    {entry.tags.map((tag) => (
-                      <span className="tag" key={tag}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <EntryOrderTotalsView
-                    loading={filledOrdersState.loading}
-                    totals={entryOrderTotals.get(
-                      getJournalDateKey(entry.date, PORTFOLIO_TIMEZONE),
-                    )}
-                  />
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      className="icon-button"
-                      aria-label={`Edit entry ${entry.date}`}
-                      onClick={() => beginEditEntry(entry)}
-                    >
-                      <Pencil size={16} aria-hidden="true" />
-                    </button>
-                    <button
-                      className="icon-button danger"
-                      aria-label={`Delete entry ${entry.date}`}
-                      onClick={() => removeEntry(entry)}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-                <div className="min-w-0">
-                  <MarkdownView value={entry.descriptionMarkdown} />
-                </div>
-              </article>
-            ))}
-            {!trade.entries.length ? (
-              <div className="empty-state">
-                <Plus size={28} aria-hidden="true" />
-                <div>
-                  <h2>No entries yet</h2>
-                  <p>Add updates as the trade idea develops.</p>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
-
-      {trade.kind === "trade" ? (
-        <JournalFilledOrders trade={trade} ordersState={filledOrdersState} />
-      ) : null}
 
       {entryFormOpen ? (
         <div className="journal-modal-backdrop" onClick={closeEntryForm}>

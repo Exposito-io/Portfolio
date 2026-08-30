@@ -134,10 +134,14 @@ export type JournalTradePnlSummary = {
   pnlUsd: number | null;
   pnlPercent: number | null;
   realizedPnlUsd: number | null;
+  realizedPnlPercent: number | null;
+  realizedPnlBasisUsd: number;
   unrealizedPnlUsd: number | null;
+  unrealizedPnlPercent: number | null;
   entryPriceUsd: number | null;
   closingPriceUsd: number | null;
   positionValueUsd: number | null;
+  positionCostBasisUsd: number;
   orderCount: number;
   fillCount: number;
   notionalUsd: number;
@@ -172,6 +176,7 @@ export type HyperliquidFill = {
   fee: number | null;
   feeToken: string | null;
   closedPnl: number | null;
+  realizedPnlBasisUsd: number | null;
   time: number;
   timeKey: string;
   hash: string | null;
@@ -192,6 +197,7 @@ export type HyperliquidFilledOrder = {
   fee: number | null;
   feeToken: string | null;
   closedPnl: number | null;
+  realizedPnlBasisUsd: number | null;
   firstTime: number;
   lastTime: number;
   orderId: number | null;
