@@ -15,16 +15,20 @@ export function JournalDetailTabs({
   charts,
   journal,
   transactions,
+  news,
 }: {
   charts: ReactNode;
   journal: ReactNode;
   transactions: ReactNode;
+  news: ReactNode;
 }) {
   const id = useId();
   const [activeTab, setActiveTab] = useState<JournalDetailTab>("charts");
+  const [newsMounted, setNewsMounted] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function selectTab(tab: JournalDetailTab) {
+    if (tab === "news") setNewsMounted(true);
     setActiveTab(tab);
   }
 
@@ -117,7 +121,9 @@ export function JournalDetailTabs({
         id={`${id}-news-panel`}
         role="tabpanel"
         tabIndex={0}
-      />
+      >
+        {newsMounted ? news : null}
+      </div>
     </section>
   );
 }

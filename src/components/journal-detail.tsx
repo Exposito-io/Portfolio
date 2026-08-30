@@ -21,6 +21,7 @@ import {
 } from "@/components/journal-entry-dialog";
 import { groupOrdersByDate } from "@/components/journal-entry-order-totals";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
+import { JournalNews } from "@/components/journal-news";
 import type { TradeFormPayload } from "@/components/journal-trade-form";
 import { useJournalFilledOrders } from "@/components/use-journal-filled-orders";
 import {
@@ -466,6 +467,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
             />
           ) : null
         }
+        news={<JournalNews tradeId={trade.id} />}
       />
 
       {entryFormOpen ? (

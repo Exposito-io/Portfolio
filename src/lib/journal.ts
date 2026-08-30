@@ -107,6 +107,13 @@ type JournalTradeDocument = Omit<
   startDate: Date | string;
   endDate: Date | string | null;
   entries: JournalEntryDocument[];
+  newsFeeds?: Array<{
+    _id: ObjectId;
+    keywords: string;
+    normalizedKeywords: string;
+    createdAt: Date;
+  }>;
+  newsReadItemIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -176,6 +183,8 @@ export async function createTrade(db: Db, payload: unknown) {
     asset: normalizeAsset(input.asset),
     tradingViewCharts: input.tradingViewCharts ?? [],
     entries: [],
+    newsFeeds: [],
+    newsReadItemIds: [],
     createdAt: now,
     updatedAt: now,
   };

@@ -130,6 +130,30 @@ export type JournalTrade = {
   updatedAt: string;
 };
 
+export type JournalNewsFeed = {
+  id: string;
+  keywords: string;
+  createdAt: string;
+  unreadCount: number;
+  error?: string;
+};
+
+export type JournalNewsItem = {
+  id: string;
+  title: string;
+  link: string;
+  source: string;
+  publishedAt: string | null;
+  feedIds: string[];
+  feedKeywords: string[];
+};
+
+export type JournalNewsResponse = {
+  feeds: JournalNewsFeed[];
+  items: JournalNewsItem[];
+  fetchedAt: string;
+};
+
 export type JournalTradePnlSummary = {
   pnlUsd: number | null;
   pnlPercent: number | null;

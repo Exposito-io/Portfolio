@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@bgd-labs/aave-address-book": "^4.44.22",
+    "fast-xml-parser": "^5.11.1",
     "lightweight-charts": "^5.2.0",
     "lucide-react": "^1.25.0",
     "mongodb": "^7.5.0",
