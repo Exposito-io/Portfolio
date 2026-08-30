@@ -101,6 +101,37 @@ describe("JournalNews", () => {
     expect(screen.getByText("Shared story")).toBeInTheDocument();
   });
 
+  it("marks every story in the selected feed as read", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ news: sampleNews }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+
+    render(<JournalNews tradeId="trade-1" />);
+    await screen.findByText("Shared story");
+
+    await user.click(screen.getByRole("button", { name: /ETF flows 1/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Mark all as read (1)" }),
+    );
+
+    expect(screen.getByText("You’re caught up")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /All 1/i }));
+    expect(screen.getByText("Ethereum-only story")).toBeInTheDocument();
+    expect(screen.queryByText("Shared story")).not.toBeInTheDocument();
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/journal/trades/trade-1/news/read-all",
+    );
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      itemIds: ["a".repeat(64)],
+    });
+  });
+
   it("adds, refreshes, and removes keyword feeds without reloading the page", async () => {
     const addedNews: JournalNewsResponse = {
       ...sampleNews,

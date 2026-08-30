@@ -33,10 +33,23 @@ const feedInputSchema = z.object({
     ),
 });
 
+const newsItemIdSchema = z
+  .string()
+  .regex(/^[a-f0-9]{64}$/, "The news item identifier is invalid.");
+
 const readInputSchema = z.object({
-  itemId: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/, "The news item identifier is invalid."),
+  itemId: newsItemIdSchema,
+});
+
+const readManyInputSchema = z.object({
+  itemIds: z
+    .array(newsItemIdSchema)
+    .min(1, "At least one news item is required.")
+    .max(
+      JOURNAL_NEWS_READ_LIMIT,
+      `Cannot mark more than ${JOURNAL_NEWS_READ_LIMIT} items at once.`,
+    )
+    .transform((itemIds) => [...new Set(itemIds)]),
 });
 
 type NewsFeedDocument = {
@@ -264,16 +277,34 @@ export async function markJournalNewsItemRead(
   journalId: string,
   payload: unknown,
 ) {
+  const input = readInputSchema.parse(payload);
+  return persistJournalNewsReadItems(db, journalId, [input.itemId]);
+}
+
+export async function markJournalNewsItemsRead(
+  db: Db,
+  journalId: string,
+  payload: unknown,
+) {
+  const input = readManyInputSchema.parse(payload);
+  return persistJournalNewsReadItems(db, journalId, input.itemIds);
+}
+
+async function persistJournalNewsReadItems(
+  db: Db,
+  journalId: string,
+  itemIds: string[],
+) {
   const _id = toObjectId(journalId);
   if (!_id) return false;
 
-  const input = readInputSchema.parse(payload);
   const journal = await collection(db).findOne({ _id });
   if (!journal) return false;
 
+  const incomingIds = new Set(itemIds);
   const nextReadIds = [
-    ...(journal.newsReadItemIds ?? []).filter((id) => id !== input.itemId),
-    input.itemId,
+    ...(journal.newsReadItemIds ?? []).filter((id) => !incomingIds.has(id)),
+    ...incomingIds,
   ].slice(-JOURNAL_NEWS_READ_LIMIT);
 
   const result = await collection(db).updateOne(

@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Check,
+  CheckCheck,
   ExternalLink,
   Plus,
   RefreshCw,
@@ -34,6 +35,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
   const [removingFeedId, setRemovingFeedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -142,6 +144,45 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
     }
   }
 
+  async function markAllRead() {
+    const items = visibleItems;
+    if (items.length === 0) return;
+
+    const activeFeed = news?.feeds.find((feed) => feed.id === activeFeedId);
+    const viewName = activeFeed ? `the “${activeFeed.keywords}” feed` : "All news";
+    if (
+      !window.confirm(
+        `Mark all ${items.length} unread stories in ${viewName} as read?`,
+      )
+    ) {
+      return;
+    }
+
+    setMarkingAll(true);
+    setError("");
+    setNews((current) => removeItemsFromNews(current, items));
+
+    try {
+      const response = await fetch(
+        `/api/journal/trades/${tradeId}/news/read-all`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemIds: items.map((item) => item.id) }),
+        },
+      );
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to mark all stories as read.");
+      }
+    } catch (markError) {
+      setNews((current) => restoreItemsToNews(current, items));
+      setError(toErrorMessage(markError, "Unable to mark all stories as read."));
+    } finally {
+      setMarkingAll(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="journal-news-loading" role="status">
@@ -213,37 +254,50 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
       ) : null}
 
       {news?.feeds.length ? (
-        <div aria-label="News feed filters" className="journal-news-filters">
-          <button
-            aria-pressed={activeFeedId === "all"}
-            className="journal-news-filter"
-            onClick={() => setActiveFeedId("all")}
-            type="button"
-          >
-            All <span>{news.items.length}</span>
-          </button>
-          {news.feeds.map((feed) => (
-            <div className="journal-news-feed-filter" key={feed.id}>
-              <button
-                aria-pressed={activeFeedId === feed.id}
-                className="journal-news-filter"
-                onClick={() => setActiveFeedId(feed.id)}
-                type="button"
-              >
-                {feed.keywords} <span>{feed.unreadCount}</span>
-              </button>
-              <button
-                aria-label={`Remove ${feed.keywords} feed`}
-                className="journal-news-remove-feed"
-                disabled={removingFeedId === feed.id}
-                onClick={() => void removeFeed(feed)}
-                title={`Remove ${feed.keywords} feed`}
-                type="button"
-              >
-                <Trash2 aria-hidden="true" size={14} />
-              </button>
-            </div>
-          ))}
+        <div className="journal-news-filter-bar">
+          <div aria-label="News feed filters" className="journal-news-filters">
+            <button
+              aria-pressed={activeFeedId === "all"}
+              className="journal-news-filter"
+              onClick={() => setActiveFeedId("all")}
+              type="button"
+            >
+              All <span>{news.items.length}</span>
+            </button>
+            {news.feeds.map((feed) => (
+              <div className="journal-news-feed-filter" key={feed.id}>
+                <button
+                  aria-pressed={activeFeedId === feed.id}
+                  className="journal-news-filter"
+                  onClick={() => setActiveFeedId(feed.id)}
+                  type="button"
+                >
+                  {feed.keywords} <span>{feed.unreadCount}</span>
+                </button>
+                <button
+                  aria-label={`Remove ${feed.keywords} feed`}
+                  className="journal-news-remove-feed"
+                  disabled={removingFeedId === feed.id}
+                  onClick={() => void removeFeed(feed)}
+                  title={`Remove ${feed.keywords} feed`}
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          {visibleItems.length ? (
+            <button
+              className="journal-news-mark-all"
+              disabled={markingAll}
+              onClick={() => void markAllRead()}
+              type="button"
+            >
+              <CheckCheck aria-hidden="true" size={16} />
+              Mark all as read ({visibleItems.length})
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -358,6 +412,27 @@ function removeItemFromNews(
   };
 }
 
+function removeItemsFromNews(
+  news: JournalNewsResponse | null,
+  items: JournalNewsItem[],
+) {
+  if (!news) return news;
+  const itemIds = new Set(items.map((item) => item.id));
+  const feedAdjustments = countItemsByFeed(items);
+
+  return {
+    ...news,
+    feeds: news.feeds.map((feed) => ({
+      ...feed,
+      unreadCount: Math.max(
+        0,
+        feed.unreadCount - (feedAdjustments.get(feed.id) ?? 0),
+      ),
+    })),
+    items: news.items.filter((item) => !itemIds.has(item.id)),
+  };
+}
+
 function restoreItemToNews(
   news: JournalNewsResponse | null,
   item: JournalNewsItem,
@@ -370,6 +445,37 @@ function restoreItemToNews(
     feeds: adjustFeedCounts(news.feeds, item.feedIds, 1),
     items: [...news.items, item].sort(compareNewsItems),
   };
+}
+
+function restoreItemsToNews(
+  news: JournalNewsResponse | null,
+  items: JournalNewsItem[],
+) {
+  if (!news) return news;
+  const existingIds = new Set(news.items.map((item) => item.id));
+  const missingItems = items.filter((item) => !existingIds.has(item.id));
+  if (missingItems.length === 0) return news;
+
+  const feedAdjustments = countItemsByFeed(missingItems);
+  return {
+    ...news,
+    feeds: news.feeds.map((feed) => ({
+      ...feed,
+      unreadCount:
+        feed.unreadCount + (feedAdjustments.get(feed.id) ?? 0),
+    })),
+    items: [...news.items, ...missingItems].sort(compareNewsItems),
+  };
+}
+
+function countItemsByFeed(items: JournalNewsItem[]) {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    for (const feedId of item.feedIds) {
+      counts.set(feedId, (counts.get(feedId) ?? 0) + 1);
+    }
+  }
+  return counts;
 }
 
 function adjustFeedCounts(

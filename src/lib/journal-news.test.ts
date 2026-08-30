@@ -11,6 +11,7 @@ import {
   JOURNAL_NEWS_READ_LIMIT,
   JournalNewsHttpError,
   markJournalNewsItemRead,
+  markJournalNewsItemsRead,
   parseGoogleNewsRss,
   removeJournalNewsFeed,
   type NewsFetch,
@@ -185,6 +186,21 @@ describe("journal news persistence", () => {
     expect(store.newsReadItemIds[0]).toBe(existingIds[1]);
     expect(store.newsReadItemIds.at(-1)).toBe(newItemId);
     expect(store.newsReadItemIds.filter((id) => id === newItemId)).toHaveLength(1);
+  });
+
+  it("marks a deduplicated batch of items as read", async () => {
+    const journalId = new ObjectId();
+    const firstItemId = "a".repeat(64);
+    const secondItemId = "b".repeat(64);
+    const store: StoredDocument = { _id: journalId, newsReadItemIds: [] };
+    const db = fakeDb(store);
+
+    expect(
+      await markJournalNewsItemsRead(db, journalId.toString(), {
+        itemIds: [firstItemId, secondItemId, firstItemId],
+      }),
+    ).toBe(true);
+    expect(store.newsReadItemIds).toEqual([firstItemId, secondItemId]);
   });
 });
 
