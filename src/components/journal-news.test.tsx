@@ -167,6 +167,10 @@ describe("JournalNews", () => {
     render(<JournalNews tradeId="trade-1" />);
     await screen.findByText("Shared story");
 
+    expect(
+      screen.queryByLabelText("Search keywords or RSS URL"),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add feed" }));
     await user.type(
       screen.getByLabelText("Search keywords or RSS URL"),
       "Solana",
@@ -175,6 +179,9 @@ describe("JournalNews", () => {
     expect(
       await screen.findByRole("button", { name: /Solana 0/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Search keywords or RSS URL"),
+    ).not.toBeInTheDocument();
     expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({
       input: "Solana",
     });
@@ -256,6 +263,10 @@ describe("JournalNews", () => {
 
     render(<JournalNews tradeId="trade-1" />);
     await screen.findByText("Add your first news feed");
+    expect(
+      screen.queryByLabelText("Search keywords or RSS URL"),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add feed" }));
     await user.type(
       screen.getByLabelText("Search keywords or RSS URL"),
       feedUrl,

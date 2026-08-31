@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useRef, useState } from "react";
 import {
   Check,
   CheckCheck,
@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Rss,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { useJournalNews } from "@/components/journal-news-context";
@@ -46,8 +47,10 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [showAddFeed, setShowAddFeed] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [removingFeedId, setRemovingFeedId] = useState<string | null>(null);
+  const feedInputRef = useRef<HTMLInputElement>(null);
 
   const visibleItems = useMemo(() => {
     if (!news || activeFeedId === "all") return news?.items ?? [];
@@ -83,11 +86,21 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
       }
       setNews(payload.news);
       setFeedInput("");
+      setShowAddFeed(false);
     } catch (addError) {
       setError(toErrorMessage(addError, "Unable to add the news feed."));
     } finally {
       setAdding(false);
     }
+  }
+
+  function toggleAddFeed() {
+    if (showAddFeed) {
+      setShowAddFeed(false);
+      return;
+    }
+    setShowAddFeed(true);
+    window.requestAnimationFrame(() => feedInputRef.current?.focus());
   }
 
   async function removeFeed(feed: JournalNewsFeed) {
@@ -184,47 +197,8 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
 
   return (
     <section aria-label="News feeds" className="journal-news">
-      <form className="journal-news-add-form" onSubmit={addFeed}>
-        <label className="field-label" htmlFor="journal-news-input">
-          Search keywords or RSS URL
-        </label>
-        <div className="journal-news-add-controls">
-          <input
-            className="input"
-            disabled={adding}
-            id="journal-news-input"
-            maxLength={MAX_FEED_INPUT_LENGTH}
-            onChange={(event) => setFeedInput(event.target.value)}
-            placeholder="e.g. Ethereum ETF or https://example.com/feed.xml"
-            required
-            type="search"
-            value={feedInput}
-          />
-          <button className="button-primary" disabled={adding} type="submit">
-            <Plus aria-hidden="true" size={16} />
-            {adding ? "Adding…" : "Add feed"}
-          </button>
-        </div>
-      </form>
-
-      {error || loadError ? (
-        <div className="alert alert-error" role="alert">
-          {error || loadError}
-        </div>
-      ) : null}
-
-      {news?.feeds.some((feed) => feed.error) ? (
-        <div className="alert alert-warning" role="status">
-          Some feeds could not be refreshed:{" "}
-          {news.feeds
-            .filter((feed) => feed.error)
-            .map((feed) => feed.keywords)
-            .join(", ")}.
-        </div>
-      ) : null}
-
-      {news?.feeds.length ? (
-        <div className="journal-news-filter-bar">
+      <div className="journal-news-filter-bar">
+        {news?.feeds.length ? (
           <div aria-label="News feed filters" className="journal-news-filters">
             <button
               aria-pressed={activeFeedId === "all"}
@@ -261,32 +235,92 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
               </div>
             ))}
           </div>
-          <div className="journal-news-filter-actions">
-            {visibleItems.length ? (
-              <button
-                className="journal-news-mark-all"
-                disabled={markingAll}
-                onClick={() => void markAllRead()}
-                type="button"
-              >
-                <CheckCheck aria-hidden="true" size={16} />
-                Mark all as read ({visibleItems.length})
-              </button>
-            ) : null}
+        ) : null}
+        <div className="journal-news-filter-actions">
+          {visibleItems.length ? (
             <button
-              className="button-secondary"
-              disabled={refreshing}
-              onClick={() => void refreshNews()}
+              className="journal-news-mark-all"
+              disabled={markingAll}
+              onClick={() => void markAllRead()}
               type="button"
             >
-              <RefreshCw
-                aria-hidden="true"
-                className={refreshing ? "journal-news-spin" : undefined}
-                size={16}
-              />
-              {refreshing ? "Refreshing…" : "Refresh"}
+              <CheckCheck aria-hidden="true" size={16} />
+              Mark all as read ({visibleItems.length})
+            </button>
+          ) : null}
+          <button
+            aria-controls="journal-news-add-form"
+            aria-expanded={showAddFeed}
+            className="button-secondary"
+            onClick={toggleAddFeed}
+            type="button"
+          >
+            {showAddFeed ? (
+              <X aria-hidden="true" size={16} />
+            ) : (
+              <Plus aria-hidden="true" size={16} />
+            )}
+            {showAddFeed ? "Close" : "Add feed"}
+          </button>
+          <button
+            className="button-secondary"
+            disabled={refreshing || !news?.feeds.length}
+            onClick={() => void refreshNews()}
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={refreshing ? "journal-news-spin" : undefined}
+              size={16}
+            />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {showAddFeed ? (
+        <form
+          className="journal-news-add-form"
+          id="journal-news-add-form"
+          onSubmit={addFeed}
+        >
+          <label className="field-label" htmlFor="journal-news-input">
+            Search keywords or RSS URL
+          </label>
+          <div className="journal-news-add-controls">
+            <input
+              className="input"
+              disabled={adding}
+              id="journal-news-input"
+              maxLength={MAX_FEED_INPUT_LENGTH}
+              onChange={(event) => setFeedInput(event.target.value)}
+              placeholder="e.g. Ethereum ETF or https://example.com/feed.xml"
+              ref={feedInputRef}
+              required
+              type="search"
+              value={feedInput}
+            />
+            <button className="button-primary" disabled={adding} type="submit">
+              <Plus aria-hidden="true" size={16} />
+              {adding ? "Adding…" : "Add feed"}
             </button>
           </div>
+        </form>
+      ) : null}
+
+      {error || loadError ? (
+        <div className="alert alert-error" role="alert">
+          {error || loadError}
+        </div>
+      ) : null}
+
+      {news?.feeds.some((feed) => feed.error) ? (
+        <div className="alert alert-warning" role="status">
+          Some feeds could not be refreshed:{" "}
+          {news.feeds
+            .filter((feed) => feed.error)
+            .map((feed) => feed.keywords)
+            .join(", ")}.
         </div>
       ) : null}
 
@@ -295,7 +329,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
           <Rss aria-hidden="true" size={24} />
           <div>
             <h2>Add your first news feed</h2>
-            <p>Enter search keywords or paste a public RSS feed URL.</p>
+            <p>Use Add feed to follow keywords or a public RSS URL.</p>
           </div>
         </div>
       ) : visibleItems.length === 0 ? (

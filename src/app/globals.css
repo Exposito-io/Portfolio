@@ -1202,6 +1202,7 @@ textarea {
   display: flex;
   flex: 0 0 auto;
   gap: 0.65rem;
+  margin-left: auto;
 }
 
 .journal-news-feed-filter {
