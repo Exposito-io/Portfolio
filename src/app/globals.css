@@ -1045,6 +1045,7 @@ textarea {
 
 .journal-news-feed-filter .journal-news-filter {
   border-radius: 999px 0 0 999px;
+  max-width: min(28rem, calc(100vw - 7rem));
   padding-right: 0.55rem;
 }
 
@@ -1060,6 +1061,17 @@ textarea {
   padding: 0 0.3rem;
 }
 
+.journal-news-filter .journal-news-filter-label {
+  background: transparent;
+  display: block;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .journal-news-filter[aria-pressed="true"] {
   background: #123d34;
   color: #fff;
@@ -1067,6 +1079,10 @@ textarea {
 
 .journal-news-filter[aria-pressed="true"] span {
   background: rgba(255, 255, 255, 0.17);
+}
+
+.journal-news-filter[aria-pressed="true"] .journal-news-filter-label {
+  background: transparent;
 }
 
 .journal-news-remove-feed {

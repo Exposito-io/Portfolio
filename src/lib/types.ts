@@ -132,7 +132,9 @@ export type JournalTrade = {
 
 export type JournalNewsFeed = {
   id: string;
+  kind: "google" | "rss";
   keywords: string;
+  url?: string;
   createdAt: string;
   unreadCount: number;
   error?: string;

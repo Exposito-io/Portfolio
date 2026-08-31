@@ -139,6 +139,7 @@ describe("JournalNews", () => {
         ...sampleNews.feeds,
         {
           id: "feed-sol",
+          kind: "google",
           keywords: "Solana",
           createdAt: "2026-08-30T12:00:00.000Z",
           unreadCount: 0,
@@ -166,11 +167,17 @@ describe("JournalNews", () => {
     render(<JournalNews tradeId="trade-1" />);
     await screen.findByText("Shared story");
 
-    await user.type(screen.getByLabelText("Search keywords"), "Solana");
+    await user.type(
+      screen.getByLabelText("Search keywords or RSS URL"),
+      "Solana",
+    );
     await user.click(screen.getByRole("button", { name: "Add feed" }));
     expect(
       await screen.findByRole("button", { name: /Solana 0/i }),
     ).toBeInTheDocument();
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({
+      input: "Solana",
+    });
 
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() =>
@@ -196,6 +203,7 @@ describe("JournalNews", () => {
             feeds: [
               {
                 id: "feed-broken",
+                kind: "google",
                 keywords: "Broken feed",
                 createdAt: "2026-08-30T12:00:00.000Z",
                 unreadCount: 0,
@@ -218,18 +226,63 @@ describe("JournalNews", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("You’re caught up")).toBeInTheDocument();
   });
+
+  it("submits a detected RSS URL without converting it to keywords", async () => {
+    const feedUrl = "https://example.com/feed.xml";
+    const emptyNews: JournalNewsResponse = {
+      feeds: [],
+      items: [],
+      fetchedAt: "2026-08-30T22:00:00.000Z",
+    };
+    const rssNews: JournalNewsResponse = {
+      ...emptyNews,
+      feeds: [
+        {
+          id: "feed-rss",
+          kind: "rss",
+          keywords: "example.com/feed.xml",
+          url: feedUrl,
+          createdAt: "2026-08-30T12:00:00.000Z",
+          unreadCount: 0,
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ news: emptyNews }))
+      .mockResolvedValueOnce(jsonResponse({ news: rssNews }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<JournalNews tradeId="trade-1" />);
+    await screen.findByText("Add your first news feed");
+    await user.type(
+      screen.getByLabelText("Search keywords or RSS URL"),
+      feedUrl,
+    );
+    await user.click(screen.getByRole("button", { name: "Add feed" }));
+
+    expect(
+      await screen.findByRole("button", { name: /example.com\/feed.xml 0/i }),
+    ).toHaveAttribute("title", feedUrl);
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({
+      input: feedUrl,
+    });
+  });
 });
 
 const sampleNews: JournalNewsResponse = {
   feeds: [
     {
       id: "feed-eth",
+      kind: "google",
       keywords: "Ethereum",
       createdAt: "2026-08-30T12:00:00.000Z",
       unreadCount: 2,
     },
     {
       id: "feed-etf",
+      kind: "google",
       keywords: "ETF flows",
       createdAt: "2026-08-30T12:00:00.000Z",
       unreadCount: 1,

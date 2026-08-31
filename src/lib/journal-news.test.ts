@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   addJournalNewsFeed,
   buildGoogleNewsUrl,
+  fetchNewsFeed,
   getJournalNews,
   JOURNAL_NEWS_FEED_LIMIT,
   JOURNAL_NEWS_READ_LIMIT,
@@ -13,6 +14,7 @@ import {
   markJournalNewsItemRead,
   markJournalNewsItemsRead,
   parseGoogleNewsRss,
+  parseNewsFeed,
   removeJournalNewsFeed,
   type NewsFetch,
 } from "@/lib/journal-news";
@@ -61,8 +63,61 @@ describe("Google News RSS", () => {
     });
     expect(items[1]).toMatchObject({
       id: hash("https://news.google.com/articles/two"),
-      source: "Unknown source",
+      source: "news.google.com",
       publishedAt: null,
+    });
+  });
+
+  it("blocks redirects from a public feed URL to a private host", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(null, {
+        headers: { Location: "http://127.0.0.1/internal.xml" },
+        status: 302,
+      }),
+    ) as NewsFetch;
+
+    await expect(
+      fetchNewsFeed("https://8.8.8.8/feed.xml", fetchImpl),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("parses standard RSS and Atom feeds with feed-level source fallbacks", () => {
+    const rssItems = parseNewsFeed(
+      `<rss><channel>
+        <title>Example Journal</title>
+        <item>
+          <title>RSS story</title>
+          <link>/stories/rss</link>
+          <guid>rss-story</guid>
+          <pubDate>Sun, 30 Aug 2026 20:00:00 GMT</pubDate>
+        </item>
+      </channel></rss>`,
+      "https://example.com/feed.xml",
+    );
+    const atomItems = parseNewsFeed(
+      `<feed>
+        <title>Example Atom</title>
+        <entry>
+          <title>Atom story</title>
+          <link rel="alternate" href="/stories/atom" />
+          <id>atom-story</id>
+          <updated>2026-08-30T21:00:00Z</updated>
+          <author><name>Atom Author</name></author>
+        </entry>
+      </feed>`,
+      "https://example.com/atom.xml",
+    );
+
+    expect(rssItems[0]).toMatchObject({
+      link: "https://example.com/stories/rss",
+      source: "Example Journal",
+      publishedAt: "2026-08-30T20:00:00.000Z",
+    });
+    expect(atomItems[0]).toMatchObject({
+      link: "https://example.com/stories/atom",
+      source: "Atom Author",
+      publishedAt: "2026-08-30T21:00:00.000Z",
     });
   });
 
@@ -141,6 +196,66 @@ describe("journal news persistence", () => {
         emptyFetch,
       ),
     ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("stores and fetches a detected public RSS URL as-is", async () => {
+    const journalId = new ObjectId();
+    const store: StoredDocument = { _id: journalId };
+    const db = fakeDb(store);
+    const feedUrl = "https://8.8.8.8/feed.xml?topic=markets";
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      expect(String(input)).toBe(feedUrl);
+      return new Response(
+        `<rss><channel><title>Market Wire</title>${rssItem(
+          "market-story",
+          "Market story",
+          "2026-08-30T22:00:00Z",
+        )}</channel></rss>`,
+      );
+    }) as NewsFetch;
+
+    const news = await addJournalNewsFeed(
+      db,
+      journalId.toString(),
+      { input: `  ${feedUrl}  ` },
+      fetchImpl,
+    );
+
+    expect(store.newsFeeds?.[0]).toMatchObject({
+      kind: "rss",
+      url: feedUrl,
+      normalizedUrl: feedUrl,
+    });
+    expect(store.newsFeeds?.[0].createdAt).toBeInstanceOf(Date);
+    expect(news?.feeds[0]).toMatchObject({
+      kind: "rss",
+      keywords: "8.8.8.8/feed.xml",
+      url: feedUrl,
+      unreadCount: 1,
+    });
+    expect(news?.items[0].title).toBe("Market story");
+
+    await expect(
+      addJournalNewsFeed(
+        db,
+        journalId.toString(),
+        { input: `${feedUrl}#duplicate` },
+        fetchImpl,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("rejects RSS URLs that target private network addresses", async () => {
+    const journalId = new ObjectId();
+    const store: StoredDocument = { _id: journalId };
+    const db = fakeDb(store);
+
+    await expect(
+      addJournalNewsFeed(db, journalId.toString(), {
+        input: "http://127.0.0.1:3000/feed.xml",
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(store.newsFeeds).toBeUndefined();
   });
 
   it("enforces the feed limit and removes a selected feed", async () => {
@@ -261,6 +376,7 @@ function fakeDb(document: StoredDocument) {
 function feed(id: ObjectId, keywords: string) {
   return {
     _id: id,
+    kind: "google" as const,
     keywords,
     normalizedKeywords: keywords.toLocaleLowerCase(),
     createdAt: new Date("2026-08-30T12:00:00Z"),

@@ -26,11 +26,12 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",
 });
+const MAX_FEED_INPUT_LENGTH = 2_048;
 
 export function JournalNews({ tradeId }: { tradeId: string }) {
   const [news, setNews] = useState<JournalNewsResponse | null>(null);
   const [activeFeedId, setActiveFeedId] = useState("all");
-  const [keywords, setKeywords] = useState("");
+  const [feedInput, setFeedInput] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,14 +86,14 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
       const response = await fetch(`/api/journal/trades/${tradeId}/news/feeds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keywords }),
+        body: JSON.stringify({ input: feedInput }),
       });
       const payload = (await response.json()) as NewsPayload;
       if (!response.ok || !payload.news) {
         throw new Error(payload.error || "Unable to add the news feed.");
       }
       setNews(payload.news);
-      setKeywords("");
+      setFeedInput("");
     } catch (addError) {
       setError(toErrorMessage(addError, "Unable to add the news feed."));
     } finally {
@@ -187,7 +188,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
     return (
       <div className="journal-news-loading" role="status">
         <RefreshCw aria-hidden="true" className="journal-news-spin" size={18} />
-        Loading Google News…
+        Loading news…
       </div>
     );
   }
@@ -195,20 +196,20 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
   return (
     <section aria-label="News feeds" className="journal-news">
       <form className="journal-news-add-form" onSubmit={addFeed}>
-        <label className="field-label" htmlFor="journal-news-keywords">
-          Search keywords
+        <label className="field-label" htmlFor="journal-news-input">
+          Search keywords or RSS URL
         </label>
         <div className="journal-news-add-controls">
           <input
             className="input"
             disabled={adding}
-            id="journal-news-keywords"
-            maxLength={200}
-            onChange={(event) => setKeywords(event.target.value)}
-            placeholder="e.g. Ethereum ETF"
+            id="journal-news-input"
+            maxLength={MAX_FEED_INPUT_LENGTH}
+            onChange={(event) => setFeedInput(event.target.value)}
+            placeholder="e.g. Ethereum ETF or https://example.com/feed.xml"
             required
             type="search"
-            value={keywords}
+            value={feedInput}
           />
           <button className="button-primary" disabled={adding} type="submit">
             <Plus aria-hidden="true" size={16} />
@@ -250,9 +251,13 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
                   aria-pressed={activeFeedId === feed.id}
                   className="journal-news-filter"
                   onClick={() => setActiveFeedId(feed.id)}
+                  title={feed.url ?? feed.keywords}
                   type="button"
                 >
-                  {feed.keywords} <span>{feed.unreadCount}</span>
+                  <span className="journal-news-filter-label">
+                    {feed.keywords}
+                  </span>{" "}
+                  <span>{feed.unreadCount}</span>
                 </button>
                 <button
                   aria-label={`Remove ${feed.keywords} feed`}
@@ -301,7 +306,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
           <Rss aria-hidden="true" size={24} />
           <div>
             <h2>Add your first news feed</h2>
-            <p>Enter search keywords to follow them through Google News.</p>
+            <p>Enter search keywords or paste a public RSS feed URL.</p>
           </div>
         </div>
       ) : visibleItems.length === 0 ? (
