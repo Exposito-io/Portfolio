@@ -156,6 +156,17 @@ export type JournalNewsResponse = {
   fetchedAt: string;
 };
 
+export type OpenJournalNews = {
+  id: string;
+  title: string;
+  news: JournalNewsResponse;
+};
+
+export type OpenJournalNewsResponse = {
+  journals: OpenJournalNews[];
+  fetchedAt: string;
+};
+
 export type JournalTradePnlSummary = {
   pnlUsd: number | null;
   pnlPercent: number | null;

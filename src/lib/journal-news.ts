@@ -10,6 +10,7 @@ import type {
   JournalNewsFeed,
   JournalNewsItem,
   JournalNewsResponse,
+  OpenJournalNewsResponse,
 } from "@/lib/types";
 
 export const GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search";
@@ -68,6 +69,9 @@ type NewsFeedDocument = {
 
 type JournalNewsDocument = {
   _id: ObjectId;
+  title?: string;
+  endDate?: Date | string | null;
+  startDate?: Date | string;
   newsFeeds?: NewsFeedDocument[];
   newsReadItemIds?: string[];
 };
@@ -273,6 +277,38 @@ export async function getJournalNews(
   const journal = await collection(db).findOne({ _id });
   if (!journal) return null;
 
+  return getNewsForJournal(journal, fetchImpl);
+}
+
+export async function getOpenJournalsNews(
+  db: Db,
+  fetchImpl: NewsFetch = fetch,
+): Promise<OpenJournalNewsResponse> {
+  const journals = await collection(db)
+    .find({
+      $or: [{ endDate: null }, { endDate: { $exists: false } }],
+    })
+    .sort({ startDate: -1 })
+    .toArray();
+
+  const snapshots = await Promise.all(
+    journals.map(async (journal) => ({
+      id: journal._id.toString(),
+      title: journal.title?.trim() || "Untitled journal",
+      news: await getNewsForJournal(journal, fetchImpl),
+    })),
+  );
+
+  return {
+    journals: snapshots,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function getNewsForJournal(
+  journal: JournalNewsDocument,
+  fetchImpl: NewsFetch,
+) {
   const feeds = journal.newsFeeds ?? [];
   const readIds = new Set(journal.newsReadItemIds ?? []);
   const settledResults = await Promise.allSettled(

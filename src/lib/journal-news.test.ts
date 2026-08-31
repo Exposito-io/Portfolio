@@ -8,6 +8,7 @@ import {
   buildGoogleNewsUrl,
   fetchNewsFeed,
   getJournalNews,
+  getOpenJournalsNews,
   JOURNAL_NEWS_FEED_LIMIT,
   JOURNAL_NEWS_READ_LIMIT,
   JournalNewsHttpError,
@@ -316,6 +317,65 @@ describe("journal news persistence", () => {
       }),
     ).toBe(true);
     expect(store.newsReadItemIds).toEqual([firstItemId, secondItemId]);
+  });
+});
+
+describe("open journal news", () => {
+  it("loads only open-journal documents and keeps each journal snapshot separate", async () => {
+    const firstJournalId = new ObjectId();
+    const secondJournalId = new ObjectId();
+    const documents = [
+      {
+        _id: firstJournalId,
+        title: "Ethereum thesis",
+        endDate: null,
+        startDate: new Date("2026-08-30T00:00:00Z"),
+        newsFeeds: [feed(new ObjectId(), "Ethereum")],
+      },
+      {
+        _id: secondJournalId,
+        title: "ETF watch",
+        startDate: new Date("2026-08-29T00:00:00Z"),
+        newsFeeds: [feed(new ObjectId(), "Broken")],
+      },
+    ];
+    const find = vi.fn(() => ({
+      sort: vi.fn(() => ({
+        toArray: vi.fn(async () => documents),
+      })),
+    }));
+    const db = { collection: () => ({ find }) } as unknown as Db;
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      const query = new URL(String(input)).searchParams.get("q");
+      if (query === "Broken") throw new Error("Feed unavailable.");
+      return new Response(
+        `<rss><channel>${rssItem(
+          "shared",
+          "Shared story",
+          "2026-08-30T22:00:00Z",
+        )}</channel></rss>`,
+      );
+    }) as NewsFetch;
+
+    const result = await getOpenJournalsNews(db, fetchImpl);
+
+    expect(find).toHaveBeenCalledWith({
+      $or: [{ endDate: null }, { endDate: { $exists: false } }],
+    });
+    expect(result.journals).toHaveLength(2);
+    expect(result.journals[0]).toMatchObject({
+      id: firstJournalId.toString(),
+      title: "Ethereum thesis",
+      news: { items: [{ title: "Shared story" }] },
+    });
+    expect(result.journals[1]).toMatchObject({
+      id: secondJournalId.toString(),
+      title: "ETF watch",
+      news: {
+        items: [],
+        feeds: [{ keywords: "Broken", error: "Feed unavailable." }],
+      },
+    });
   });
 });
 
