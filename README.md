@@ -1,5 +1,24 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Authentication setup
+
+The application uses Google OAuth and denies access unless the Google account's
+verified email is included in `src/lib/auth-allowlist.ts`.
+
+1. Add the permitted addresses to `ALLOWED_EMAILS` in
+   `src/lib/auth-allowlist.ts`.
+2. Create a Google OAuth web client and add this authorized redirect URI:
+   `http://localhost:3000/api/auth/callback/google` for local development. Add
+   the equivalent HTTPS URI for each deployed domain.
+3. Copy `.env.example` to `.env.local`, fill in `AUTH_GOOGLE_ID` and
+   `AUTH_GOOGLE_SECRET`, and generate `AUTH_SECRET` with `npx auth secret`.
+
+When self-hosting behind a reverse proxy, set `AUTH_TRUST_HOST=true` only after
+ensuring the proxy supplies a safe `Host` header. Supported managed platforms
+such as Vercel configure this automatically.
+
+Keep the OAuth credentials and `AUTH_SECRET` out of source control.
+
 ## Getting Started
 
 First, run the development server:

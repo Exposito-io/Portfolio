@@ -1,8 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Newspaper, NotebookText, Settings } from "lucide-react";
+import { LogOut, Newspaper, NotebookText, Settings } from "lucide-react";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+import { auth, signOut } from "@/auth";
+
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+
+  async function handleSignOut() {
+    "use server";
+    await signOut({ redirectTo: "/sign-in" });
+  }
+
   return (
     <div className="min-h-screen bg-[#f6f4ef] text-[#1f2523]">
       <header className="border-b border-black/10 bg-white/85 backdrop-blur">
@@ -32,6 +41,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Settings size={16} aria-hidden="true" />
               Settings
             </Link>
+            <form action={handleSignOut} className="ml-auto sm:ml-1">
+              <button
+                className="nav-link"
+                type="submit"
+                title={session?.user?.email ?? "Sign out"}
+              >
+                <LogOut size={16} aria-hidden="true" />
+                Sign out
+              </button>
+            </form>
           </nav>
         </div>
       </header>
