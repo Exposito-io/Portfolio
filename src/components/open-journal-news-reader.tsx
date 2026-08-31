@@ -272,7 +272,7 @@ export function OpenJournalNewsReader() {
               id="open-journal-news-panel"
               role="tabpanel"
             >
-              {feedOptions.length ? (
+              {activeJournalId !== ALL_JOURNALS && feedOptions.length ? (
                 <div aria-label="Feed filters" className="open-journal-news-feeds">
                   <button
                     aria-pressed={activeFeedId === ALL_FEEDS}

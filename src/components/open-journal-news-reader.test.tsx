@@ -27,10 +27,16 @@ describe("OpenJournalNewsReader", () => {
       "aria-selected",
       "true",
     );
+    expect(
+      screen.queryByRole("button", { name: "All feeds 2" }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Ethereum thesis 1" }));
     expect(screen.getByText("Shared story")).toBeInTheDocument();
     expect(screen.queryByText("Bitcoin-only story")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "All feeds 1" }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Bitcoin trade 2" }));
     await user.click(screen.getByRole("button", { name: "Macro 1" }));
