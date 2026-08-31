@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { createAccount, listAccounts } from "@/lib/accounts";
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { getDb } from "@/lib/mongodb";
 
 export async function GET() {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const accounts = await listAccounts(await getDb());
     return NextResponse.json({ accounts });
@@ -14,6 +18,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const account = await createAccount(await getDb(), await request.json());
     return NextResponse.json({ account }, { status: 201 });

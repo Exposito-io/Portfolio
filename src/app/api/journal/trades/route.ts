@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { createTrade, listTrades } from "@/lib/journal";
 import { getDb } from "@/lib/mongodb";
 
 export async function GET() {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const trades = await listTrades(await getDb());
     return NextResponse.json({ trades });
@@ -14,6 +18,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const trade = await createTrade(await getDb(), await request.json());
     return NextResponse.json({ trade }, { status: 201 });

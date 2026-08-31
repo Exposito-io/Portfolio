@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { isValidDateKey } from "@/lib/date";
 import { getDb } from "@/lib/mongodb";
 import { getPortfolio } from "@/lib/portfolio-service";
 
 export async function GET(request: Request) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const url = new URL(request.url);
     const date = url.searchParams.get("date") || undefined;

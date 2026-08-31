@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Readable } from "node:stream";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { findJournalImage } from "@/lib/journal-images";
 import { getDb } from "@/lib/mongodb";
 
@@ -11,6 +12,9 @@ type RouteContext = {
 };
 
 export async function GET(_request: Request, context: RouteContext) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const { id } = await context.params;
     const image = await findJournalImage(await getDb(), id);

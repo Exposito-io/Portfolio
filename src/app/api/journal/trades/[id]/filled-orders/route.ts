@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { listAccounts } from "@/lib/accounts";
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getZonedJournalDateMs } from "@/lib/date";
 import {
@@ -24,6 +25,9 @@ type RouteContext = {
 };
 
 export async function GET(_request: Request, context: RouteContext) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const { id } = await context.params;
     const db = await getDb();

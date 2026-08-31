@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { getDb } from "@/lib/mongodb";
 import { getSettings, updateSettings } from "@/lib/settings";
 
 export async function GET() {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     return NextResponse.json({ settings: await getSettings(await getDb()) });
   } catch (error) {
@@ -13,6 +17,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const settings = await updateSettings(await getDb(), await request.json());
     return NextResponse.json({ settings });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import {
   fetchHyperliquidCurrentFundingRate,
   fetchHyperliquidFundingHistory,
@@ -9,6 +10,9 @@ import { calculateJournalFundingSummary } from "@/lib/journal-funding";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function GET(request: Request) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const searchParams = new URL(request.url).searchParams;
     const coin = searchParams.get("coin")?.trim();

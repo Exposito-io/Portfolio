@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import {
   fetchHyperliquidCandles,
   HYPERLIQUID_CANDLE_INTERVALS,
@@ -7,6 +8,9 @@ import {
 } from "@/lib/hyperliquid";
 
 export async function GET(request: Request) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const url = new URL(request.url);
     const coin = url.searchParams.get("coin")?.trim();

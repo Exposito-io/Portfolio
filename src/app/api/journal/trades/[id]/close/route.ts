@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { closeTrade } from "@/lib/journal";
 import { getDb } from "@/lib/mongodb";
 
@@ -9,6 +10,9 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const { id } = await context.params;
     const trade = await closeTrade(await getDb(), id, await request.json());

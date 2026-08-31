@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { markJournalNewsItemsRead } from "@/lib/journal-news";
 import { getDb } from "@/lib/mongodb";
 
@@ -11,6 +12,9 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const { id } = await context.params;
     const marked = await markJournalNewsItemsRead(

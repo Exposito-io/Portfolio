@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { deleteTrade, getTrade, updateTrade } from "@/lib/journal";
 import { getDb } from "@/lib/mongodb";
 
@@ -11,6 +12,9 @@ type RouteContext = {
 };
 
 export async function GET(_request: Request, context: RouteContext) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const { id } = await context.params;
     const trade = await getTrade(await getDb(), id);
@@ -26,6 +30,9 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const { id } = await context.params;
     const trade = await updateTrade(await getDb(), id, await request.json());
@@ -41,6 +48,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const { id } = await context.params;
     const deleted = await deleteTrade(await getDb(), id);

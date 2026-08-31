@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { getApiAuthorizationError } from "@/lib/authorization";
 import { saveJournalImage } from "@/lib/journal-images";
 import { getDb } from "@/lib/mongodb";
 
 export async function POST(request: Request) {
+  const authorizationError = await getApiAuthorizationError();
+  if (authorizationError) return authorizationError;
+
   try {
     const formData = await request.formData();
     const file = formData.get("image");

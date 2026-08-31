@@ -1,14 +1,21 @@
 import Link from "next/link";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { LogOut, Newspaper, NotebookText, Settings } from "lucide-react";
 
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
+import {
+  getAllowedSession,
+  requireAllowedSession,
+} from "@/lib/authorization";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const session = await getAllowedSession();
+  if (!session) redirect("/sign-in");
 
   async function handleSignOut() {
     "use server";
+    await requireAllowedSession();
     await signOut({ redirectTo: "/sign-in" });
   }
 
