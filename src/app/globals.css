@@ -915,6 +915,189 @@ textarea {
   gap: 1.5rem;
 }
 
+.journal-latest-news {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #1f7a68;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.06);
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 0.9rem;
+}
+
+.journal-latest-news-header,
+.journal-latest-news-footer {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.journal-latest-news-header > div:first-child > span {
+  color: #69706c;
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.journal-latest-news-header h2 {
+  color: #1f2523;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.15;
+  margin-top: 0.1rem;
+}
+
+.journal-latest-news-controls {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+}
+
+.journal-latest-news-controls > span {
+  color: #69706c;
+  font-size: 0.7rem;
+  font-weight: 800;
+  min-width: 2.6rem;
+  text-align: center;
+}
+
+.journal-latest-news-controls button {
+  align-items: center;
+  background: #f1eee7;
+  border-radius: 999px;
+  color: #4f5753;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.journal-latest-news-controls button:hover:not(:disabled) {
+  background: #e5e0d5;
+  color: #123d34;
+}
+
+.journal-latest-news-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.journal-latest-news-controls button:focus-visible,
+.journal-latest-news-mark-read:focus-visible,
+.journal-latest-news-title:focus-visible {
+  outline: 2px solid #1f7a68;
+  outline-offset: 2px;
+}
+
+.journal-latest-news-body {
+  align-content: start;
+  display: grid;
+  gap: 0.6rem;
+  min-height: 8.75rem;
+  min-width: 0;
+}
+
+.journal-latest-news-title {
+  color: #1f2523;
+  display: -webkit-box;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.35;
+  overflow: hidden;
+  text-decoration: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.journal-latest-news-title:hover {
+  color: #1f7a68;
+  text-decoration: underline;
+}
+
+.journal-latest-news-title svg {
+  display: inline;
+  margin-left: 0.3rem;
+  vertical-align: -0.1rem;
+}
+
+.journal-latest-news-meta {
+  align-items: center;
+  color: #69706c;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  gap: 0.35rem;
+}
+
+.journal-latest-news-feeds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.journal-latest-news-feeds span {
+  background: #e8f2ee;
+  border-radius: 999px;
+  color: #316558;
+  font-size: 0.68rem;
+  font-weight: 800;
+  max-width: 14rem;
+  overflow: hidden;
+  padding: 0.28rem 0.48rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journal-latest-news-mark-read {
+  align-items: center;
+  border: 1px solid rgba(31, 122, 104, 0.25);
+  border-radius: 7px;
+  color: #316558;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  font-weight: 900;
+  gap: 0.35rem;
+  justify-content: center;
+  min-height: 2.1rem;
+  padding: 0.38rem 0.65rem;
+}
+
+.journal-latest-news-mark-read:hover:not(:disabled) {
+  background: #e8f2ee;
+}
+
+.journal-latest-news-mark-read:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.journal-latest-news-state,
+.journal-latest-news-empty {
+  align-items: center;
+  align-self: stretch;
+  color: #69706c;
+  display: flex;
+  font-size: 0.82rem;
+  gap: 0.5rem;
+  justify-content: center;
+  min-height: 8rem;
+  text-align: center;
+}
+
+.journal-latest-news-error {
+  color: #9b3d30;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
 .journal-detail-tabs {
   min-width: 0;
 }
@@ -1480,6 +1663,15 @@ textarea {
 
   .journal-news-mark-read {
     justify-content: center;
+    width: 100%;
+  }
+
+  .journal-latest-news-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .journal-latest-news-mark-read {
     width: 100%;
   }
 }

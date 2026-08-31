@@ -22,6 +22,7 @@ import {
 import { groupOrdersByDate } from "@/components/journal-entry-order-totals";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
 import { JournalNews } from "@/components/journal-news";
+import { JournalNewsProvider } from "@/components/journal-news-context";
 import type { TradeFormPayload } from "@/components/journal-trade-form";
 import { useJournalFilledOrders } from "@/components/use-journal-filled-orders";
 import {
@@ -423,52 +424,54 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         <div className="alert alert-error">{error}</div>
       ) : null}
 
-      <JournalDetailSummary
-        trade={trade}
-        markets={markets}
-        editing={editingTrade}
-        saving={saving}
-        ordersState={filledOrdersState}
-        marketError={marketError}
-        marketLoading={marketLoading}
-        marketSummary={marketSummary}
-        fundingError={fundingError}
-        fundingLoading={fundingLoading}
-        fundingSummary={fundingSummary}
-        onAutoSaveDescription={autoSaveTradeDescription}
-        onCancelEdit={() => setEditingTrade(false)}
-        onEdit={() => setEditingTrade(true)}
-        onSave={saveTrade}
-      />
+      <JournalNewsProvider key={trade.id} tradeId={trade.id}>
+        <JournalDetailSummary
+          trade={trade}
+          markets={markets}
+          editing={editingTrade}
+          saving={saving}
+          ordersState={filledOrdersState}
+          marketError={marketError}
+          marketLoading={marketLoading}
+          marketSummary={marketSummary}
+          fundingError={fundingError}
+          fundingLoading={fundingLoading}
+          fundingSummary={fundingSummary}
+          onAutoSaveDescription={autoSaveTradeDescription}
+          onCancelEdit={() => setEditingTrade(false)}
+          onEdit={() => setEditingTrade(true)}
+          onSave={saveTrade}
+        />
 
-      <JournalDetailTabs
-        charts={
-          <JournalChart
-            trade={trade}
-            markets={markets}
-            ordersState={filledOrdersState}
-            onTradeChange={setTrade}
-          />
-        }
-        journal={
-          <JournalDetailEntries
-            entries={trade.entries}
-            orderTotals={entryOrderTotals}
-            ordersLoading={filledOrdersState.loading}
-            onDelete={removeEntry}
-            onEdit={beginEditEntry}
-          />
-        }
-        transactions={
-          trade.kind === "trade" ? (
-            <JournalFilledOrders
+        <JournalDetailTabs
+          charts={
+            <JournalChart
               trade={trade}
               ordersState={filledOrdersState}
+              markets={markets}
+              onTradeChange={setTrade}
             />
-          ) : null
-        }
-        news={<JournalNews tradeId={trade.id} />}
-      />
+          }
+          journal={
+            <JournalDetailEntries
+              entries={trade.entries}
+              orderTotals={entryOrderTotals}
+              ordersLoading={filledOrdersState.loading}
+              onDelete={removeEntry}
+              onEdit={beginEditEntry}
+            />
+          }
+          transactions={
+            trade.kind === "trade" ? (
+              <JournalFilledOrders
+                trade={trade}
+                ordersState={filledOrdersState}
+              />
+            ) : null
+          }
+          news={<JournalNews tradeId={trade.id} />}
+        />
+      </JournalNewsProvider>
 
       {entryFormOpen ? (
         <JournalEntryDialog

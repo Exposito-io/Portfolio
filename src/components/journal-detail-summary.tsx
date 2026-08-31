@@ -2,6 +2,7 @@
 
 import { Pencil } from "lucide-react";
 
+import { JournalLatestNews } from "@/components/journal-latest-news";
 import {
   JournalClosingPriceMetric,
   JournalEntryPriceMetric,
@@ -134,6 +135,7 @@ export function JournalDetailSummary({
             summary={fundingSummary}
           />
         ) : null}
+        <JournalLatestNews tradeId={trade.id} />
       </aside>
     </section>
   );

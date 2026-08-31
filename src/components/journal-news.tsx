@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import {
   Check,
   CheckCheck,
@@ -11,11 +11,16 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { useJournalNews } from "@/components/journal-news-context";
 import type {
   JournalNewsFeed,
   JournalNewsItem,
   JournalNewsResponse,
 } from "@/lib/types";
+import {
+  removeJournalNewsItem,
+  restoreJournalNewsItem,
+} from "@/lib/journal-news-state";
 
 type NewsPayload = {
   news?: JournalNewsResponse;
@@ -29,36 +34,20 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 const MAX_FEED_INPUT_LENGTH = 2_048;
 
 export function JournalNews({ tradeId }: { tradeId: string }) {
-  const [news, setNews] = useState<JournalNewsResponse | null>(null);
+  const {
+    error: loadError,
+    loading,
+    news,
+    refreshNews: refreshSharedNews,
+    setNews,
+  } = useJournalNews(tradeId);
   const [activeFeedId, setActiveFeedId] = useState("all");
   const [feedInput, setFeedInput] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [removingFeedId, setRemovingFeedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadNews() {
-      setLoading(true);
-      setError("");
-      try {
-        setNews(await requestNews(tradeId, controller.signal));
-      } catch (loadError) {
-        if (!controller.signal.aborted) {
-          setError(toErrorMessage(loadError, "Unable to load news."));
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-
-    void loadNews();
-    return () => controller.abort();
-  }, [tradeId]);
 
   const visibleItems = useMemo(() => {
     if (!news || activeFeedId === "all") return news?.items ?? [];
@@ -69,7 +58,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
     setRefreshing(true);
     setError("");
     try {
-      setNews(await requestNews(tradeId));
+      await refreshSharedNews();
     } catch (refreshError) {
       setError(toErrorMessage(refreshError, "Unable to refresh news."));
     } finally {
@@ -127,7 +116,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
 
   async function markRead(item: JournalNewsItem) {
     setError("");
-    setNews((current) => removeItemFromNews(current, item));
+    setNews((current) => removeJournalNewsItem(current, item));
 
     try {
       const response = await fetch(`/api/journal/trades/${tradeId}/news/read`, {
@@ -140,7 +129,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
         throw new Error(payload.error || "Unable to mark the story as read.");
       }
     } catch (markError) {
-      setNews((current) => restoreItemToNews(current, item));
+      setNews((current) => restoreJournalNewsItem(current, item));
       setError(toErrorMessage(markError, "Unable to mark the story as read."));
     }
   }
@@ -218,9 +207,9 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
         </div>
       </form>
 
-      {error ? (
+      {error || loadError ? (
         <div className="alert alert-error" role="alert">
-          {error}
+          {error || loadError}
         </div>
       ) : null}
 
@@ -364,15 +353,6 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
   );
 }
 
-async function requestNews(tradeId: string, signal?: AbortSignal) {
-  const response = await fetch(`/api/journal/trades/${tradeId}/news`, { signal });
-  const payload = (await response.json()) as NewsPayload;
-  if (!response.ok || !payload.news) {
-    throw new Error(payload.error || "Unable to load news.");
-  }
-  return payload.news;
-}
-
 function removeFeedFromNews(
   news: JournalNewsResponse | null,
   feedId: string,
@@ -400,18 +380,6 @@ function removeFeedFromNews(
   };
 }
 
-function removeItemFromNews(
-  news: JournalNewsResponse | null,
-  item: JournalNewsItem,
-) {
-  if (!news) return news;
-  return {
-    ...news,
-    feeds: adjustFeedCounts(news.feeds, item.feedIds, -1),
-    items: news.items.filter((candidate) => candidate.id !== item.id),
-  };
-}
-
 function removeItemsFromNews(
   news: JournalNewsResponse | null,
   items: JournalNewsItem[],
@@ -430,20 +398,6 @@ function removeItemsFromNews(
       ),
     })),
     items: news.items.filter((item) => !itemIds.has(item.id)),
-  };
-}
-
-function restoreItemToNews(
-  news: JournalNewsResponse | null,
-  item: JournalNewsItem,
-) {
-  if (!news || news.items.some((candidate) => candidate.id === item.id)) {
-    return news;
-  }
-  return {
-    ...news,
-    feeds: adjustFeedCounts(news.feeds, item.feedIds, 1),
-    items: [...news.items, item].sort(compareNewsItems),
   };
 }
 
@@ -476,19 +430,6 @@ function countItemsByFeed(items: JournalNewsItem[]) {
     }
   }
   return counts;
-}
-
-function adjustFeedCounts(
-  feeds: JournalNewsFeed[],
-  feedIds: string[],
-  adjustment: number,
-) {
-  const affectedFeeds = new Set(feedIds);
-  return feeds.map((feed) =>
-    affectedFeeds.has(feed.id)
-      ? { ...feed, unreadCount: Math.max(0, feed.unreadCount + adjustment) }
-      : feed,
-  );
 }
 
 function compareNewsItems(left: JournalNewsItem, right: JournalNewsItem) {
