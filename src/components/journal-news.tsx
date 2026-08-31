@@ -193,27 +193,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
   }
 
   return (
-    <section className="journal-news" aria-labelledby="journal-news-heading">
-      <div className="journal-news-header">
-        <div>
-          <h2 id="journal-news-heading">Google News</h2>
-          <p>Follow search keywords related to this journal.</p>
-        </div>
-        <button
-          className="button-secondary"
-          disabled={refreshing || !news?.feeds.length}
-          onClick={() => void refreshNews()}
-          type="button"
-        >
-          <RefreshCw
-            aria-hidden="true"
-            className={refreshing ? "journal-news-spin" : undefined}
-            size={16}
-          />
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
-      </div>
-
+    <section aria-label="News feeds" className="journal-news">
       <form className="journal-news-add-form" onSubmit={addFeed}>
         <label className="field-label" htmlFor="journal-news-keywords">
           Search keywords
@@ -287,17 +267,32 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
               </div>
             ))}
           </div>
-          {visibleItems.length ? (
+          <div className="journal-news-filter-actions">
+            {visibleItems.length ? (
+              <button
+                className="journal-news-mark-all"
+                disabled={markingAll}
+                onClick={() => void markAllRead()}
+                type="button"
+              >
+                <CheckCheck aria-hidden="true" size={16} />
+                Mark all as read ({visibleItems.length})
+              </button>
+            ) : null}
             <button
-              className="journal-news-mark-all"
-              disabled={markingAll}
-              onClick={() => void markAllRead()}
+              className="button-secondary"
+              disabled={refreshing}
+              onClick={() => void refreshNews()}
               type="button"
             >
-              <CheckCheck aria-hidden="true" size={16} />
-              Mark all as read ({visibleItems.length})
+              <RefreshCw
+                aria-hidden="true"
+                className={refreshing ? "journal-news-spin" : undefined}
+                size={16}
+              />
+              {refreshing ? "Refreshing…" : "Refresh"}
             </button>
-          ) : null}
+          </div>
         </div>
       ) : null}
 
