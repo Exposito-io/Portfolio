@@ -1470,9 +1470,14 @@ textarea {
 
 .open-journal-news-heading {
   align-items: flex-start;
-  display: flex;
+  display: grid;
   gap: 1rem;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.open-journal-news-refresh {
+  align-self: start;
+  justify-self: end;
 }
 
 .open-journal-news-tabs {
@@ -1842,14 +1847,6 @@ textarea {
     width: 100%;
   }
 
-  .open-journal-news-heading {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .open-journal-news-heading .button-secondary {
-    width: 100%;
-  }
 }
 
 @media (min-width: 640px) {

@@ -105,6 +105,11 @@ describe("OpenJournalNewsReader", () => {
     render(<OpenJournalNewsReader />);
 
     const allTab = await screen.findByRole("tab", { name: "All 2" });
+    const refreshButton = screen.getByRole("button", { name: "Refresh news" });
+    expect(refreshButton.textContent).toBe("");
+    expect(
+      screen.queryByText("Unread stories from all your open journals."),
+    ).not.toBeInTheDocument();
     allTab.focus();
     await user.keyboard("{ArrowRight}");
     expect(screen.getByRole("tab", { name: "Ethereum thesis 1" })).toHaveFocus();
@@ -113,7 +118,7 @@ describe("OpenJournalNewsReader", () => {
       "true",
     );
 
-    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(refreshButton);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 });

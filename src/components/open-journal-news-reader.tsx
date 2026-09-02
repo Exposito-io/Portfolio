@@ -190,20 +190,20 @@ export function OpenJournalNewsReader() {
         <div className="open-journal-news-heading">
           <div className="panel-heading">
             <h1 id="news-page-title">News</h1>
-            <p>Unread stories from all your open journals.</p>
           </div>
           <button
-            className="button-secondary"
+            aria-label="Refresh news"
+            className="icon-button open-journal-news-refresh"
             disabled={refreshing}
             onClick={() => void loadNews()}
+            title="Refresh news"
             type="button"
           >
             <RefreshCw
               aria-hidden="true"
               className={refreshing ? "journal-news-spin" : undefined}
-              size={16}
+              size={18}
             />
-            {refreshing ? "Refreshing…" : "Refresh"}
           </button>
         </div>
 
