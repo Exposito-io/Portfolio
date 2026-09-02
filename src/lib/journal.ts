@@ -175,7 +175,7 @@ export async function createTrade(db: Db, payload: unknown) {
   const trade: JournalTradeDocument = {
     _id: new ObjectId(),
     kind: input.kind,
-    direction: input.kind === "idea" ? null : input.direction,
+    direction: input.direction,
     title: input.title,
     descriptionMarkdown: input.descriptionMarkdown,
     startDate: parseInputDate(input.startDate, "start"),
@@ -229,9 +229,7 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
   };
 
   if (input.kind !== undefined) update.kind = input.kind;
-  if (input.kind === "idea") {
-    update.direction = null;
-  } else if (input.direction !== undefined) {
+  if (input.direction !== undefined) {
     update.direction = input.direction;
   }
   if (input.title !== undefined) update.title = input.title;

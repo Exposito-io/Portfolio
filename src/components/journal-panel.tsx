@@ -288,7 +288,7 @@ export function JournalPanel() {
             {trade.kind === "idea" ? (
               <span className="tag">Trade idea</span>
             ) : null}
-            {trade.kind === "trade" && trade.direction ? (
+            {trade.direction ? (
               <span className="tag capitalize">{trade.direction}</span>
             ) : null}
             <span className="tag">{trade.asset.label}</span>

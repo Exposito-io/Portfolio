@@ -120,13 +120,14 @@ describe("journal trades", () => {
     expect((await updateTrade(db, trade.id, { direction: "long" }))?.direction)
       .toBe("long");
     expect((await updateTrade(db, trade.id, { kind: "idea" }))?.direction)
-      .toBeNull();
+      .toBe("long");
   });
 
   it("creates an open trade idea with a ticker and no trading PnL semantics", async () => {
     const db = fakeDb();
     const idea = await createTrade(db, {
       kind: "idea",
+      direction: "short",
       title: "ETH watchlist idea",
       descriptionMarkdown: "Wait for confirmation.",
       startDate: "2026-07-01",
@@ -135,6 +136,7 @@ describe("journal trades", () => {
 
     expect(idea).toMatchObject({
       kind: "idea",
+      direction: "short",
       endDate: null,
       asset: { coin: "ETH" },
     });
