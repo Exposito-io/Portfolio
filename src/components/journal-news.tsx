@@ -3,7 +3,6 @@
 import { type FormEvent, useMemo, useRef, useState } from "react";
 import {
   Check,
-  CheckCheck,
   ExternalLink,
   Plus,
   RefreshCw,
@@ -13,14 +12,19 @@ import {
 } from "lucide-react";
 
 import { useJournalNews } from "@/components/journal-news-context";
+import { JournalNewsReadMenu } from "@/components/journal-news-read-menu";
 import type {
   JournalNewsFeed,
   JournalNewsItem,
   JournalNewsResponse,
 } from "@/lib/types";
 import {
+  getJournalNewsItemsForReadRange,
+  type JournalNewsReadRange,
   removeJournalNewsItem,
+  removeJournalNewsItems,
   restoreJournalNewsItem,
+  restoreJournalNewsItems,
 } from "@/lib/journal-news-state";
 
 type NewsPayload = {
@@ -48,7 +52,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [showAddFeed, setShowAddFeed] = useState(false);
-  const [markingAll, setMarkingAll] = useState(false);
+  const [markingItems, setMarkingItems] = useState(false);
   const [removingFeedId, setRemovingFeedId] = useState<string | null>(null);
   const feedInputRef = useRef<HTMLInputElement>(null);
 
@@ -147,23 +151,29 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
     }
   }
 
-  async function markAllRead() {
-    const items = visibleItems;
+  async function markItemsRead(range: JournalNewsReadRange) {
+    const items = getJournalNewsItemsForReadRange(visibleItems, range);
     if (items.length === 0) return;
 
     const activeFeed = news?.feeds.find((feed) => feed.id === activeFeedId);
     const viewName = activeFeed ? `the “${activeFeed.keywords}” feed` : "All news";
+    const rangeDescription =
+      range === "all"
+        ? "all"
+        : range === "day"
+          ? "all stories older than 1 day"
+          : "all stories older than 1 week";
     if (
       !window.confirm(
-        `Mark all ${items.length} unread stories in ${viewName} as read?`,
+        `Mark ${rangeDescription} (${items.length}) in ${viewName} as read?`,
       )
     ) {
       return;
     }
 
-    setMarkingAll(true);
+    setMarkingItems(true);
     setError("");
-    setNews((current) => removeItemsFromNews(current, items));
+    setNews((current) => removeJournalNewsItems(current, items));
 
     try {
       const response = await fetch(
@@ -179,10 +189,10 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
         throw new Error(payload.error || "Unable to mark all stories as read.");
       }
     } catch (markError) {
-      setNews((current) => restoreItemsToNews(current, items));
-      setError(toErrorMessage(markError, "Unable to mark all stories as read."));
+      setNews((current) => restoreJournalNewsItems(current, items));
+      setError(toErrorMessage(markError, "Unable to mark stories as read."));
     } finally {
-      setMarkingAll(false);
+      setMarkingItems(false);
     }
   }
 
@@ -237,17 +247,14 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
           </div>
         ) : null}
         <div className="journal-news-filter-actions">
-          {visibleItems.length ? (
-            <button
-              className="journal-news-mark-all"
-              disabled={markingAll}
-              onClick={() => void markAllRead()}
-              type="button"
-            >
-              <CheckCheck aria-hidden="true" size={16} />
-              Mark all as read ({visibleItems.length})
-            </button>
-          ) : null}
+          <JournalNewsReadMenu
+            disabled={visibleItems.length === 0}
+            isOptionDisabled={(range) =>
+              getJournalNewsItemsForReadRange(visibleItems, range).length === 0
+            }
+            marking={markingItems}
+            onSelect={(range) => void markItemsRead(range)}
+          />
           <button
             aria-controls="journal-news-add-form"
             aria-expanded={showAddFeed}
@@ -412,64 +419,6 @@ function removeFeedFromNews(
     feeds: news.feeds.filter((feed) => feed.id !== feedId),
     items,
   };
-}
-
-function removeItemsFromNews(
-  news: JournalNewsResponse | null,
-  items: JournalNewsItem[],
-) {
-  if (!news) return news;
-  const itemIds = new Set(items.map((item) => item.id));
-  const feedAdjustments = countItemsByFeed(items);
-
-  return {
-    ...news,
-    feeds: news.feeds.map((feed) => ({
-      ...feed,
-      unreadCount: Math.max(
-        0,
-        feed.unreadCount - (feedAdjustments.get(feed.id) ?? 0),
-      ),
-    })),
-    items: news.items.filter((item) => !itemIds.has(item.id)),
-  };
-}
-
-function restoreItemsToNews(
-  news: JournalNewsResponse | null,
-  items: JournalNewsItem[],
-) {
-  if (!news) return news;
-  const existingIds = new Set(news.items.map((item) => item.id));
-  const missingItems = items.filter((item) => !existingIds.has(item.id));
-  if (missingItems.length === 0) return news;
-
-  const feedAdjustments = countItemsByFeed(missingItems);
-  return {
-    ...news,
-    feeds: news.feeds.map((feed) => ({
-      ...feed,
-      unreadCount:
-        feed.unreadCount + (feedAdjustments.get(feed.id) ?? 0),
-    })),
-    items: [...news.items, ...missingItems].sort(compareNewsItems),
-  };
-}
-
-function countItemsByFeed(items: JournalNewsItem[]) {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    for (const feedId of item.feedIds) {
-      counts.set(feedId, (counts.get(feedId) ?? 0) + 1);
-    }
-  }
-  return counts;
-}
-
-function compareNewsItems(left: JournalNewsItem, right: JournalNewsItem) {
-  const leftTime = left.publishedAt ? new Date(left.publishedAt).getTime() : 0;
-  const rightTime = right.publishedAt ? new Date(right.publishedAt).getTime() : 0;
-  return rightTime - leftTime || left.title.localeCompare(right.title);
 }
 
 function toErrorMessage(error: unknown, fallback: string) {

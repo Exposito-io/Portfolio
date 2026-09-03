@@ -3,7 +3,7 @@
 import "@testing-library/jest-dom/vitest";
 
 import { useEffect } from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -66,7 +66,12 @@ describe("JournalNews", () => {
     expect(screen.getByText("Shared story")).toBeInTheDocument();
     expect(screen.queryByText("Ethereum-only story")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /mark as read/i }));
+    await user.click(
+      within(screen.getByText("Shared story").closest("li") as HTMLLIElement).getByRole(
+        "button",
+        { name: "Mark as read" },
+      ),
+    );
     expect(screen.queryByText("Shared story")).not.toBeInTheDocument();
     expect(screen.getByText("You’re caught up")).toBeInTheDocument();
 
@@ -92,7 +97,9 @@ describe("JournalNews", () => {
     expect(storyRow).not.toBeNull();
 
     await user.click(
-      screen.getAllByRole("button", { name: /mark as read/i })[0],
+      within(storyRow as HTMLLIElement).getByRole("button", {
+        name: "Mark as read",
+      }),
     );
 
     expect(
@@ -114,9 +121,8 @@ describe("JournalNews", () => {
     await screen.findByText("Shared story");
 
     await user.click(screen.getByRole("button", { name: /ETF flows 1/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Mark all as read (1)" }),
-    );
+    await user.click(screen.getAllByRole("button", { name: "Mark as read" })[0]);
+    await user.click(screen.getByRole("menuitem", { name: "All articles" }));
 
     expect(screen.getByText("You’re caught up")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /All 1/i }));
@@ -129,6 +135,55 @@ describe("JournalNews", () => {
     );
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
       itemIds: ["a".repeat(64)],
+    });
+  });
+
+  it("marks only articles older than the selected age", async () => {
+    const recentDate = new Date(Date.now() - 12 * 60 * 60 * 1_000).toISOString();
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1_000).toISOString();
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1_000).toISOString();
+    const rangeNews: JournalNewsResponse = {
+      fetchedAt: new Date().toISOString(),
+      feeds: [
+        {
+          id: "feed-age",
+          kind: "google",
+          keywords: "Markets",
+          createdAt: eightDaysAgo,
+          unreadCount: 3,
+        },
+      ],
+      items: [
+        newsItem("d", "Recent story", recentDate, "feed-age", "Markets"),
+        newsItem("e", "Two-day-old story", twoDaysAgo, "feed-age", "Markets"),
+        newsItem("f", "Eight-day-old story", eightDaysAgo, "feed-age", "Markets"),
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ news: rangeNews }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+
+    render(<JournalNews tradeId="trade-1" />);
+    await screen.findByText("Recent story");
+
+    await user.click(screen.getAllByRole("button", { name: "Mark as read" })[0]);
+    expect(
+      screen.getByRole("menuitem", { name: "Older than 1 day" }),
+    ).toBeEnabled();
+    await user.click(
+      screen.getByRole("menuitem", { name: "Older than 1 day" }),
+    );
+
+    expect(screen.getByText("Recent story")).toBeInTheDocument();
+    expect(screen.queryByText("Two-day-old story")).not.toBeInTheDocument();
+    expect(screen.queryByText("Eight-day-old story")).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      itemIds: ["e".repeat(64), "f".repeat(64)],
     });
   });
 
@@ -327,4 +382,22 @@ function jsonResponse(body: unknown, status = 200) {
     headers: { "Content-Type": "application/json" },
     status,
   });
+}
+
+function newsItem(
+  id: string,
+  title: string,
+  publishedAt: string,
+  feedId: string,
+  feedKeyword: string,
+) {
+  return {
+    id: id.repeat(64),
+    title,
+    link: `https://example.com/${id}`,
+    source: "Example News",
+    publishedAt,
+    feedIds: [feedId],
+    feedKeywords: [feedKeyword],
+  };
 }

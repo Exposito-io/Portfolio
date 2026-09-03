@@ -98,6 +98,39 @@ describe("OpenJournalNewsReader", () => {
     expect(within(restoredRow as HTMLLIElement).queryByText("Ethereum thesis")).not.toBeInTheDocument();
   });
 
+  it("marks the selected age range read across matching journals", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ news: sampleNews }))
+      .mockImplementation(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<OpenJournalNewsReader />);
+
+    await screen.findByText("Shared story");
+    await user.click(screen.getAllByRole("button", { name: "Mark as read" })[0]);
+    await user.click(
+      screen.getByRole("menuitem", { name: "Older than 1 day" }),
+    );
+
+    expect(await screen.findByText("You’re caught up")).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls.slice(1).map(([url, request]) => [
+      url,
+      JSON.parse(request.body),
+    ])).toEqual([
+      [
+        "/api/journal/trades/journal-eth/news/read-all",
+        { itemIds: ["a".repeat(64)] },
+      ],
+      [
+        "/api/journal/trades/journal-btc/news/read-all",
+        { itemIds: ["a".repeat(64), "b".repeat(64)] },
+      ],
+    ]);
+  });
+
   it("refreshes manually and supports arrow-key journal tab navigation", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ news: sampleNews }));
     vi.stubGlobal("fetch", fetchMock);

@@ -11,9 +11,12 @@ import {
 } from "react";
 import { Check, ExternalLink, Newspaper, RefreshCw, Rss } from "lucide-react";
 
+import { JournalNewsReadMenu } from "@/components/journal-news-read-menu";
 import {
-  removeJournalNewsItem,
-  restoreJournalNewsItem,
+  getJournalNewsItemsForReadRange,
+  type JournalNewsReadRange,
+  removeJournalNewsItems,
+  restoreJournalNewsItems,
 } from "@/lib/journal-news-state";
 import type {
   JournalNewsItem,
@@ -46,6 +49,11 @@ type FeedOption = {
   error?: string;
 };
 
+type ReadTarget = {
+  item: JournalNewsItem;
+  journalId: string;
+};
+
 const ALL_JOURNALS = "all";
 const ALL_FEEDS = "all";
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -60,6 +68,7 @@ export function OpenJournalNewsReader() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [markingItems, setMarkingItems] = useState(false);
   const [markingItemIds, setMarkingItemIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -127,12 +136,12 @@ export function OpenJournalNewsReader() {
   }
 
   async function markRead(item: DisplayItem) {
-    const targets = item.journals;
+    const targets = getReadTargets(snapshot, [item]);
     if (!targets.length) return;
 
     setError("");
     setMarkingItemIds((current) => new Set(current).add(item.id));
-    setSnapshot((current) => updateJournals(current, targets, item, "remove"));
+    setSnapshot((current) => updateJournalReadTargets(current, targets, "remove"));
 
     const results = await Promise.allSettled(
       targets.map(async ({ journalId }) => {
@@ -157,7 +166,7 @@ export function OpenJournalNewsReader() {
     );
     if (failedTargets.length) {
       setSnapshot((current) =>
-        updateJournals(current, failedTargets, item, "restore"),
+        updateJournalReadTargets(current, failedTargets, "restore"),
       );
       setError(
         failedTargets.length === targets.length
@@ -171,6 +180,83 @@ export function OpenJournalNewsReader() {
       next.delete(item.id);
       return next;
     });
+  }
+
+  async function markItemsRead(range: JournalNewsReadRange) {
+    const items = getJournalNewsItemsForReadRange(visibleItems, range);
+    const targets = getReadTargets(snapshot, items);
+    if (!targets.length) return;
+
+    const activeJournal = journalTabs.find(
+      (journal) => journal.id === activeJournalId,
+    );
+    const activeFeed = feedOptions.find((feed) => feed.id === activeFeedId);
+    const scopeName = activeFeed
+      ? `the “${activeFeed.label}” feed`
+      : activeJournal
+        ? `“${activeJournal.title}”`
+        : "all open journals";
+    const rangeDescription =
+      range === "all"
+        ? "all"
+        : range === "day"
+          ? "all articles older than 1 day"
+          : "all articles older than 1 week";
+    if (
+      !window.confirm(
+        `Mark ${rangeDescription} (${items.length}) in ${scopeName} as read?`,
+      )
+    ) {
+      return;
+    }
+
+    setMarkingItems(true);
+    setError("");
+    setSnapshot((current) => updateJournalReadTargets(current, targets, "remove"));
+
+    const targetsByJournal = groupReadTargetsByJournal(targets);
+    const journalTargets = [...targetsByJournal.entries()];
+    const results = await Promise.allSettled(
+      journalTargets.map(async ([journalId, journalItems]) => {
+        const response = await fetch(
+          `/api/journal/trades/${journalId}/news/read-all`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              itemIds: journalItems.map((item) => item.id),
+            }),
+          },
+        );
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to mark stories as read.");
+        }
+        return journalId;
+      }),
+    );
+
+    const failedJournalIds = new Set(
+      journalTargets.flatMap(([journalId], index) =>
+        results[index].status === "rejected" ? [journalId] : [],
+      ),
+    );
+    if (failedJournalIds.size) {
+      setSnapshot((current) =>
+        updateJournalReadTargets(
+          current,
+          targets.filter((target) => failedJournalIds.has(target.journalId)),
+          "restore",
+        ),
+      );
+      setError(
+        failedJournalIds.size === journalTargets.length
+          ? "Unable to mark stories as read."
+          : "Stories were marked read in some journals, but not all of them.",
+      );
+    }
+
+    setMarkingItems(false);
   }
 
   if (loading) {
@@ -191,20 +277,30 @@ export function OpenJournalNewsReader() {
           <div className="panel-heading">
             <h1 id="news-page-title">News</h1>
           </div>
-          <button
-            aria-label="Refresh news"
-            className="icon-button open-journal-news-refresh"
-            disabled={refreshing}
-            onClick={() => void loadNews()}
-            title="Refresh news"
-            type="button"
-          >
-            <RefreshCw
-              aria-hidden="true"
-              className={refreshing ? "journal-news-spin" : undefined}
-              size={18}
+          <div className="open-journal-news-actions">
+            <JournalNewsReadMenu
+              disabled={visibleItems.length === 0}
+              isOptionDisabled={(range) =>
+                getJournalNewsItemsForReadRange(visibleItems, range).length === 0
+              }
+              marking={markingItems}
+              onSelect={(range) => void markItemsRead(range)}
             />
-          </button>
+            <button
+              aria-label="Refresh news"
+              className="icon-button open-journal-news-refresh"
+              disabled={refreshing}
+              onClick={() => void loadNews()}
+              title="Refresh news"
+              type="button"
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={refreshing ? "journal-news-spin" : undefined}
+                size={18}
+              />
+            </button>
+          </div>
         </div>
 
         {error ? (
@@ -439,35 +535,57 @@ function mergeItems(
   return [...itemsById.values()].sort(compareItems);
 }
 
-function updateJournals(
+function getReadTargets(
   snapshot: OpenJournalNewsResponse | null,
-  targets: DisplayAssociation[],
-  item: JournalNewsItem,
+  items: DisplayItem[],
+) {
+  if (!snapshot) return [];
+  const journalIdsByItemId = new Map(
+    items.map((item) => [
+      item.id,
+      new Set(item.journals.map((journal) => journal.journalId)),
+    ]),
+  );
+  return snapshot.journals.flatMap((journal): ReadTarget[] =>
+    journal.news.items.flatMap((item) =>
+      journalIdsByItemId.get(item.id)?.has(journal.id)
+        ? [{ item, journalId: journal.id }]
+        : [],
+    ),
+  );
+}
+
+function updateJournalReadTargets(
+  snapshot: OpenJournalNewsResponse | null,
+  targets: ReadTarget[],
   action: "remove" | "restore",
 ) {
   if (!snapshot) return snapshot;
-  const targetsById = new Map(
-    targets.map((target) => [target.journalId, target]),
-  );
+  const targetsByJournal = groupReadTargetsByJournal(targets);
   return {
     ...snapshot,
     journals: snapshot.journals.map((journal) => {
-      const target = targetsById.get(journal.id);
-      if (!target) return journal;
-      const journalItem = {
-        ...item,
-        feedIds: target.feedIds,
-        feedKeywords: target.feedKeywords,
-      };
+      const journalItems = targetsByJournal.get(journal.id);
+      if (!journalItems) return journal;
       return {
         ...journal,
         news:
           action === "remove"
-            ? removeJournalNewsItem(journal.news, journalItem) ?? journal.news
-            : restoreJournalNewsItem(journal.news, journalItem) ?? journal.news,
+            ? removeJournalNewsItems(journal.news, journalItems) ?? journal.news
+            : restoreJournalNewsItems(journal.news, journalItems) ?? journal.news,
       };
     }),
   };
+}
+
+function groupReadTargetsByJournal(targets: ReadTarget[]) {
+  const targetsByJournal = new Map<string, JournalNewsItem[]>();
+  for (const target of targets) {
+    const items = targetsByJournal.get(target.journalId) ?? [];
+    if (!items.some((item) => item.id === target.item.id)) items.push(target.item);
+    targetsByJournal.set(target.journalId, items);
+  }
+  return targetsByJournal;
 }
 
 function compareItems(left: JournalNewsItem, right: JournalNewsItem) {

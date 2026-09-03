@@ -1241,6 +1241,74 @@ textarea {
   margin-left: auto;
 }
 
+.journal-news-read-menu {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.journal-news-read-menu-toggle {
+  align-items: center;
+  border: 1px solid rgba(31, 122, 104, 0.28);
+  border-radius: 8px;
+  color: #1f6658;
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  min-height: 2.35rem;
+  padding: 0 0.7rem;
+}
+
+.journal-news-read-menu-toggle:hover:not(:disabled),
+.journal-news-read-menu-toggle[aria-expanded="true"] {
+  background: #e6efe9;
+}
+
+.journal-news-read-menu-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.journal-news-read-menu-toggle:focus-visible {
+  outline: 2px solid #1f7a68;
+  outline-offset: 2px;
+}
+
+.journal-news-read-menu-options {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.14);
+  min-width: 11.5rem;
+  padding: 0.35rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 20;
+}
+
+.journal-news-read-menu-options button {
+  border-radius: 6px;
+  color: #26312d;
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  width: 100%;
+}
+
+.journal-news-read-menu-options button:hover:not(:disabled),
+.journal-news-read-menu-options button:focus-visible {
+  background: #f1eee7;
+  outline: none;
+}
+
+.journal-news-read-menu-options button:disabled {
+  color: #9aa09d;
+  cursor: not-allowed;
+}
+
 .journal-news-feed-filter {
   align-items: stretch;
   display: inline-flex;
@@ -1320,7 +1388,6 @@ textarea {
 
 .journal-news-filter:focus-visible,
 .journal-news-remove-feed:focus-visible,
-.journal-news-mark-all:focus-visible,
 .journal-news-mark-read:focus-visible,
 .journal-news-item-title:focus-visible {
   outline: 2px solid #1f7a68;
@@ -1408,29 +1475,6 @@ textarea {
   padding: 0 0.7rem;
 }
 
-.journal-news-mark-all {
-  align-items: center;
-  border: 1px solid rgba(31, 122, 104, 0.28);
-  border-radius: 8px;
-  color: #1f6658;
-  display: inline-flex;
-  flex: 0 0 auto;
-  font-size: 0.8rem;
-  font-weight: 800;
-  gap: 0.35rem;
-  min-height: 2.35rem;
-  padding: 0 0.7rem;
-}
-
-.journal-news-mark-all:hover {
-  background: #e6efe9;
-}
-
-.journal-news-mark-all:disabled {
-  cursor: wait;
-  opacity: 0.6;
-}
-
 .journal-news-mark-read:hover {
   background: #e6efe9;
 }
@@ -1473,6 +1517,13 @@ textarea {
   display: grid;
   gap: 1rem;
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.open-journal-news-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-self: end;
 }
 
 .open-journal-news-refresh {
@@ -1828,7 +1879,8 @@ textarea {
   }
 
   .journal-news-filter-actions .button-secondary,
-  .journal-news-mark-all {
+  .journal-news-read-menu,
+  .journal-news-read-menu-toggle {
     justify-content: center;
     width: 100%;
   }
