@@ -12,8 +12,15 @@ import type {
   JournalNewsResponse,
   OpenJournalNewsResponse,
 } from "@/lib/types";
+import {
+  getCachedGoogleNews,
+  getJournalNewsReadItemIds,
+  JOURNAL_NEWS_RESPONSE_LIMIT,
+  saveJournalNewsReadReceipts,
+} from "@/lib/journal-news-cache";
 
 export const GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search";
+export const BING_NEWS_RSS_URL = "https://www.bing.com/news/search";
 export const JOURNAL_NEWS_FEED_LIMIT = 12;
 export const JOURNAL_NEWS_KEYWORDS_LIMIT = 200;
 export const JOURNAL_NEWS_URL_LIMIT = 2_048;
@@ -21,6 +28,7 @@ export const JOURNAL_NEWS_READ_LIMIT = 2_000;
 
 const MAX_RSS_BYTES = 2_000_000;
 const RSS_TIMEOUT_MS = 10_000;
+const BING_NEWS_FALLBACK_ENABLED = false;
 
 const feedInputSchema = z
   .object({
@@ -112,6 +120,17 @@ function collection(db: Db): Collection<JournalNewsDocument> {
 export function buildGoogleNewsUrl(keywords: string) {
   const url = new URL(GOOGLE_NEWS_RSS_URL);
   url.searchParams.set("q", normalizeKeywords(keywords));
+  url.searchParams.set("hl", "en-US");
+  url.searchParams.set("gl", "US");
+  url.searchParams.set("ceid", "US:en");
+  return url.toString();
+}
+
+export function buildBingNewsUrl(keywords: string) {
+  const url = new URL(BING_NEWS_RSS_URL);
+  url.searchParams.set("q", normalizeKeywords(keywords));
+  url.searchParams.set("format", "rss");
+  url.searchParams.set("setlang", "en-US");
   return url.toString();
 }
 
@@ -156,6 +175,8 @@ export function parseNewsFeed(
     const source =
       textValue(
         item.source ??
+          item["News:Source"] ??
+          item["news:source"] ??
           item["dc:creator"] ??
           author?.name ??
           author?.["atom:name"],
@@ -207,8 +228,16 @@ export function parseGoogleNewsRss(xml: string): ParsedNewsItem[] {
 export async function fetchGoogleNewsFeed(
   keywords: string,
   fetchImpl: NewsFetch = fetch,
+  enableBingFallback = BING_NEWS_FALLBACK_ENABLED,
 ) {
-  return fetchNewsFeed(buildGoogleNewsUrl(keywords), fetchImpl, false);
+  const googleItems = await fetchNewsFeed(
+    buildGoogleNewsUrl(keywords),
+    fetchImpl,
+    false,
+  );
+  if (googleItems.length > 0 || !enableBingFallback) return googleItems;
+
+  return fetchNewsFeed(buildBingNewsUrl(keywords), fetchImpl, false);
 }
 
 export async function fetchNewsFeed(
@@ -277,7 +306,7 @@ export async function getJournalNews(
   const journal = await collection(db).findOne({ _id });
   if (!journal) return null;
 
-  return getNewsForJournal(journal, fetchImpl);
+  return getNewsForJournal(db, journal, fetchImpl);
 }
 
 export async function getOpenJournalsNews(
@@ -295,7 +324,7 @@ export async function getOpenJournalsNews(
     journals.map(async (journal) => ({
       id: journal._id.toString(),
       title: journal.title?.trim() || "Untitled journal",
-      news: await getNewsForJournal(journal, fetchImpl),
+      news: await getNewsForJournal(db, journal, fetchImpl),
     })),
   );
 
@@ -306,18 +335,32 @@ export async function getOpenJournalsNews(
 }
 
 async function getNewsForJournal(
+  db: Db,
   journal: JournalNewsDocument,
   fetchImpl: NewsFetch,
 ) {
   const feeds = journal.newsFeeds ?? [];
-  const readIds = new Set(journal.newsReadItemIds ?? []);
+  const readIds = new Set([
+    ...(journal.newsReadItemIds ?? []),
+    ...(await getJournalNewsReadItemIds(db, journal._id)),
+  ]);
   const settledResults = await Promise.allSettled(
-    feeds.map(async (feed): Promise<FeedResult> => ({
-      feed,
-      items: feed.url
-        ? await fetchNewsFeed(feed.url, fetchImpl)
-        : await fetchGoogleNewsFeed(feed.keywords ?? "", fetchImpl),
-    })),
+    feeds.map(async (feed): Promise<FeedResult> => {
+      if (feed.url) {
+        return {
+          feed,
+          items: await fetchNewsFeed(feed.url, fetchImpl),
+        };
+      }
+
+      const cached = await getCachedGoogleNews(
+        db,
+        feed.keywords ?? "",
+        readIds,
+        () => fetchGoogleNewsFeed(feed.keywords ?? "", fetchImpl),
+      );
+      return { feed, ...cached };
+    }),
   );
 
   const results = settledResults.map((result, index): FeedResult => {
@@ -440,18 +483,8 @@ async function persistJournalNewsReadItems(
 
   const journal = await collection(db).findOne({ _id });
   if (!journal) return false;
-
-  const incomingIds = new Set(itemIds);
-  const nextReadIds = [
-    ...(journal.newsReadItemIds ?? []).filter((id) => !incomingIds.has(id)),
-    ...incomingIds,
-  ].slice(-JOURNAL_NEWS_READ_LIMIT);
-
-  const result = await collection(db).updateOne(
-    { _id },
-    { $set: { newsReadItemIds: nextReadIds } },
-  );
-  return result.matchedCount === 1;
+  await saveJournalNewsReadReceipts(db, journal._id, itemIds);
+  return true;
 }
 
 function aggregateNews(
@@ -459,16 +492,13 @@ function aggregateNews(
   readIds: Set<string>,
 ): JournalNewsResponse {
   const itemsById = new Map<string, JournalNewsItem>();
-  const unreadCounts = new Map<string, number>();
 
   for (const result of results) {
     const feedId = result.feed._id.toString();
     const label = feedLabel(result.feed);
-    let unreadCount = 0;
 
     for (const item of result.items) {
       if (readIds.has(item.id)) continue;
-      unreadCount += 1;
 
       const existing = itemsById.get(item.id);
       if (existing) {
@@ -485,19 +515,25 @@ function aggregateNews(
         feedKeywords: [label],
       });
     }
-
-    unreadCounts.set(feedId, unreadCount);
   }
 
-  const items = [...itemsById.values()].sort((left, right) => {
-    const rightTime = right.publishedAt
-      ? new Date(right.publishedAt).getTime()
-      : Number.NEGATIVE_INFINITY;
-    const leftTime = left.publishedAt
-      ? new Date(left.publishedAt).getTime()
-      : Number.NEGATIVE_INFINITY;
-    return rightTime - leftTime || left.title.localeCompare(right.title);
-  });
+  const items = [...itemsById.values()]
+    .sort((left, right) => {
+      const rightTime = right.publishedAt
+        ? new Date(right.publishedAt).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const leftTime = left.publishedAt
+        ? new Date(left.publishedAt).getTime()
+        : Number.NEGATIVE_INFINITY;
+      return rightTime - leftTime || left.title.localeCompare(right.title);
+    })
+    .slice(0, JOURNAL_NEWS_RESPONSE_LIMIT);
+  const unreadCounts = new Map<string, number>();
+  for (const item of items) {
+    for (const feedId of item.feedIds) {
+      unreadCounts.set(feedId, (unreadCounts.get(feedId) ?? 0) + 1);
+    }
+  }
 
   const feeds: JournalNewsFeed[] = results.map(({ feed, error }) => ({
     id: feed._id.toString(),

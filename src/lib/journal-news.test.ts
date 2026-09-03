@@ -5,8 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   addJournalNewsFeed,
+  buildBingNewsUrl,
   buildGoogleNewsUrl,
   fetchNewsFeed,
+  fetchGoogleNewsFeed,
   getJournalNews,
   getOpenJournalsNews,
   JOURNAL_NEWS_FEED_LIMIT,
@@ -19,6 +21,12 @@ import {
   removeJournalNewsFeed,
   type NewsFetch,
 } from "@/lib/journal-news";
+import {
+  getCachedGoogleNews,
+  getJournalNewsQueryKey,
+  JOURNAL_NEWS_CACHE_INTERVAL_MS,
+  JOURNAL_NEWS_RESPONSE_LIMIT,
+} from "@/lib/journal-news-cache";
 
 describe("Google News RSS", () => {
   it("encodes normalized keywords into the fixed Google News URL", () => {
@@ -28,6 +36,61 @@ describe("Google News RSS", () => {
       "https://news.google.com/rss/search",
     );
     expect(url.searchParams.get("q")).toBe("ethereum ETF & flows");
+    expect(url.searchParams.get("hl")).toBe("en-US");
+    expect(url.searchParams.get("gl")).toBe("US");
+    expect(url.searchParams.get("ceid")).toBe("US:en");
+  });
+
+  it("builds a normalized Bing News fallback URL", () => {
+    const url = new URL(buildBingNewsUrl("  Micron   Technology  "));
+
+    expect(url.origin + url.pathname).toBe(
+      "https://www.bing.com/news/search",
+    );
+    expect(url.searchParams.get("q")).toBe("Micron Technology");
+    expect(url.searchParams.get("format")).toBe("rss");
+    expect(url.searchParams.get("setlang")).toBe("en-US");
+  });
+
+  it("falls back to Bing News when Google returns an empty feed", async () => {
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      return new Response(
+        url.hostname === "news.google.com"
+          ? "<rss><channel><title>Google News</title></channel></rss>"
+          : `<rss xmlns:News="https://www.bing.com/news/search"><channel>
+              <item>
+                <title>Fallback story</title>
+                <link>https://www.bing.com/news/fallback-story</link>
+                <pubDate>Thu, 03 Sep 2026 12:00:00 GMT</pubDate>
+                <News:Source>Fallback Publisher</News:Source>
+              </item>
+            </channel></rss>`,
+      );
+    }) as NewsFetch;
+
+    const items = await fetchGoogleNewsFeed("Micron", fetchImpl, true);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(new URL(String(fetchImpl.mock.calls[1][0])).hostname).toBe(
+      "www.bing.com",
+    );
+    expect(items).toMatchObject([
+      { title: "Fallback story", source: "Fallback Publisher" },
+    ]);
+  });
+
+  it("keeps the Bing News fallback disabled by default", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        "<rss><channel><title>Google News</title></channel></rss>",
+      ),
+    ) as NewsFetch;
+
+    const items = await fetchGoogleNewsFeed("Micron", fetchImpl);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(items).toEqual([]);
   });
 
   it("parses, validates, and deduplicates Google News items", () => {
@@ -160,8 +223,179 @@ describe("Google News RSS", () => {
     expect(news?.feeds).toMatchObject([
       { keywords: "Ethereum", unreadCount: 1 },
       { keywords: "ETF flows", unreadCount: 2 },
-      { keywords: "Broken", unreadCount: 0, error: "Feed unavailable." },
+      {
+        keywords: "Broken",
+        unreadCount: 0,
+        error:
+          "Google News refresh failed: Feed unavailable. Showing saved results.",
+      },
     ]);
+  });
+});
+
+describe("Google News query cache", () => {
+  it("normalizes queries and contacts Google once per 30-minute window", async () => {
+    const { db, state } = fakeDbWithState([]);
+    const firstAttempt = new Date("2026-09-03T12:00:00Z");
+    const item = newsItem("micron-story", "Micron story", firstAttempt);
+    const fetchItems = vi
+      .fn<() => Promise<ReturnType<typeof newsItem>[]>>()
+      .mockResolvedValueOnce([item])
+      .mockResolvedValueOnce([]);
+
+    const first = await getCachedGoogleNews(
+      db,
+      "  Micron  ",
+      new Set(),
+      fetchItems,
+      { now: firstAttempt },
+    );
+    const cached = await getCachedGoogleNews(
+      db,
+      "micron",
+      new Set(),
+      fetchItems,
+      {
+        now: new Date(
+          firstAttempt.getTime() + JOURNAL_NEWS_CACHE_INTERVAL_MS - 1,
+        ),
+      },
+    );
+    const afterWindow = await getCachedGoogleNews(
+      db,
+      "MICRON",
+      new Set(),
+      fetchItems,
+      {
+        now: new Date(
+          firstAttempt.getTime() + JOURNAL_NEWS_CACHE_INTERVAL_MS,
+        ),
+      },
+    );
+
+    expect(fetchItems).toHaveBeenCalledTimes(2);
+    expect(first.items).toEqual([item]);
+    expect(cached.items).toEqual([item]);
+    expect(afterWindow).toMatchObject({
+      items: [item],
+      error: "Google News returned no stories; showing saved results.",
+    });
+    expect(state.queryCaches.size).toBe(1);
+    expect(state.articles.size).toBe(1);
+    const cache = state.queryCaches.get(getJournalNewsQueryKey("Micron"));
+    expect(cache?.lastAttemptAt).toBeInstanceOf(Date);
+    expect(cache?.nextAllowedAt).toBeInstanceOf(Date);
+    expect(state.articles.get(item.id)?.publishedAt).toBeInstanceOf(Date);
+    expect(state.articles.get(item.id)?.firstSeenAt).toBeInstanceOf(Date);
+    expect(state.articles.get(item.id)?.lastSeenAt).toBeInstanceOf(Date);
+  });
+
+  it("shares one in-flight refresh across concurrent callers", async () => {
+    const { db } = fakeDbWithState([]);
+    let resolveFetch: ((items: ReturnType<typeof newsItem>[]) => void) | null =
+      null;
+    const fetchItems = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof newsItem>[]>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const now = new Date("2026-09-03T12:00:00Z");
+
+    const requests = Promise.all([
+      getCachedGoogleNews(db, "Micron", new Set(), fetchItems, { now }),
+      getCachedGoogleNews(db, " micron ", new Set(), fetchItems, { now }),
+    ]);
+    await vi.waitFor(() => expect(fetchItems).toHaveBeenCalledTimes(1));
+    resolveFetch?.([newsItem("shared", "Shared story", now)]);
+    const results = await requests;
+
+    expect(fetchItems).toHaveBeenCalledTimes(1);
+    expect(results[0].items).toHaveLength(1);
+    expect(results[1].items).toEqual(results[0].items);
+  });
+
+  it("keeps every article while returning only the newest 500", async () => {
+    const { db, state } = fakeDbWithState([]);
+    const now = new Date("2026-09-03T12:00:00Z");
+    const items = Array.from(
+      { length: JOURNAL_NEWS_RESPONSE_LIMIT + 10 },
+      (_, index) =>
+        newsItem(
+          `story-${index}`,
+          `Story ${index}`,
+          new Date(now.getTime() - index * 1_000),
+        ),
+    );
+
+    const result = await getCachedGoogleNews(
+      db,
+      "Data center",
+      new Set(),
+      async () => items,
+      { now },
+    );
+
+    expect(state.articles.size).toBe(JOURNAL_NEWS_RESPONSE_LIMIT + 10);
+    expect(result.items).toHaveLength(JOURNAL_NEWS_RESPONSE_LIMIT);
+    expect(result.items[0].id).toBe(items[0].id);
+    expect(result.items.at(-1)?.id).toBe(
+      items[JOURNAL_NEWS_RESPONSE_LIMIT - 1].id,
+    );
+  });
+
+  it("globally deduplicates articles while retaining every query association", async () => {
+    const { db, state } = fakeDbWithState([]);
+    const now = new Date("2026-09-03T12:00:00Z");
+    const item = newsItem("shared-story", "Shared story", now);
+
+    await getCachedGoogleNews(db, "Micron", new Set(), async () => [item], {
+      now,
+    });
+    await getCachedGoogleNews(
+      db,
+      "Data center",
+      new Set(),
+      async () => [item],
+      { now },
+    );
+
+    expect(state.articles.size).toBe(1);
+    expect(state.articles.get(item.id)?.queryKeys).toEqual([
+      getJournalNewsQueryKey("Micron"),
+      getJournalNewsQueryKey("Data center"),
+    ]);
+  });
+
+  it("serves stored articles with a warning when a later refresh fails", async () => {
+    const { db } = fakeDbWithState([]);
+    const firstAttempt = new Date("2026-09-03T12:00:00Z");
+    const item = newsItem("stored-story", "Stored story", firstAttempt);
+    const fetchItems = vi
+      .fn<() => Promise<ReturnType<typeof newsItem>[]>>()
+      .mockResolvedValueOnce([item])
+      .mockRejectedValueOnce(new Error("Google unavailable."));
+
+    await getCachedGoogleNews(db, "Micron", new Set(), fetchItems, {
+      now: firstAttempt,
+    });
+    const stale = await getCachedGoogleNews(
+      db,
+      "Micron",
+      new Set(),
+      fetchItems,
+      {
+        now: new Date(
+          firstAttempt.getTime() + JOURNAL_NEWS_CACHE_INTERVAL_MS,
+        ),
+      },
+    );
+
+    expect(stale).toEqual({
+      items: [item],
+      error:
+        "Google News refresh failed: Google unavailable. Showing saved results.",
+    });
   });
 });
 
@@ -281,14 +515,14 @@ describe("journal news persistence", () => {
     expect(store.newsFeeds).toHaveLength(JOURNAL_NEWS_FEED_LIMIT - 1);
   });
 
-  it("marks items idempotently and caps retained read identifiers", async () => {
+  it("stores permanent read receipts without growing legacy read identifiers", async () => {
     const journalId = new ObjectId();
     const existingIds = Array.from(
       { length: JOURNAL_NEWS_READ_LIMIT },
       (_, index) => index.toString(16).padStart(64, "0"),
     );
     const store: StoredDocument = { _id: journalId, newsReadItemIds: existingIds };
-    const db = fakeDb(store);
+    const { db, state } = fakeDbWithState([store]);
     const newItemId = "f".repeat(64);
 
     expect(
@@ -298,10 +532,11 @@ describe("journal news persistence", () => {
       await markJournalNewsItemRead(db, journalId.toString(), { itemId: newItemId }),
     ).toBe(true);
 
-    expect(store.newsReadItemIds).toHaveLength(JOURNAL_NEWS_READ_LIMIT);
-    expect(store.newsReadItemIds[0]).toBe(existingIds[1]);
-    expect(store.newsReadItemIds.at(-1)).toBe(newItemId);
-    expect(store.newsReadItemIds.filter((id) => id === newItemId)).toHaveLength(1);
+    expect(store.newsReadItemIds).toEqual(existingIds);
+    expect([...state.readReceipts.values()]).toMatchObject([
+      { journalId, itemId: newItemId },
+    ]);
+    expect([...state.readReceipts.values()][0].readAt).toBeInstanceOf(Date);
   });
 
   it("marks a deduplicated batch of items as read", async () => {
@@ -309,14 +544,80 @@ describe("journal news persistence", () => {
     const firstItemId = "a".repeat(64);
     const secondItemId = "b".repeat(64);
     const store: StoredDocument = { _id: journalId, newsReadItemIds: [] };
-    const db = fakeDb(store);
+    const { db, state } = fakeDbWithState([store]);
 
     expect(
       await markJournalNewsItemsRead(db, journalId.toString(), {
         itemIds: [firstItemId, secondItemId, firstItemId],
       }),
     ).toBe(true);
-    expect(store.newsReadItemIds).toEqual([firstItemId, secondItemId]);
+    expect([...state.readReceipts.values()].map(({ itemId }) => itemId)).toEqual([
+      firstItemId,
+      secondItemId,
+    ]);
+    expect(store.newsReadItemIds).toEqual([]);
+  });
+
+  it("excludes permanently read cached stories on later requests", async () => {
+    const journalId = new ObjectId();
+    const storyId = hash("permanent-read-story");
+    const store: StoredDocument = {
+      _id: journalId,
+      newsFeeds: [feed(new ObjectId(), "Micron")],
+    };
+    const { db } = fakeDbWithState([store]);
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        `<rss><channel>${rssItem(
+          "permanent-read-story",
+          "Permanent read story",
+          "2026-09-03T12:00:00Z",
+        )}</channel></rss>`,
+      ),
+    ) as NewsFetch;
+
+    expect(
+      (await getJournalNews(db, journalId.toString(), fetchImpl))?.items,
+    ).toHaveLength(1);
+    expect(
+      await markJournalNewsItemRead(db, journalId.toString(), {
+        itemId: storyId,
+      }),
+    ).toBe(true);
+    expect(
+      (await getJournalNews(db, journalId.toString(), fetchImpl))?.items,
+    ).toEqual([]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps a journal response at the newest 500 deduplicated stories", async () => {
+    const journalId = new ObjectId();
+    const store: StoredDocument = {
+      _id: journalId,
+      newsFeeds: [
+        feed(new ObjectId(), "Micron"),
+        feed(new ObjectId(), "Data center"),
+      ],
+    };
+    const { db } = fakeDbWithState([store]);
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      const query = new URL(String(input)).searchParams.get("q") ?? "query";
+      const items = Array.from({ length: 300 }, (_, index) =>
+        rssItem(
+          `${query}-${index}`,
+          `${query} story ${index}`,
+          new Date(Date.UTC(2026, 8, 3, 12, 0, 0) - index * 1_000).toISOString(),
+        ),
+      ).join("");
+      return new Response(`<rss><channel>${items}</channel></rss>`);
+    }) as NewsFetch;
+
+    const news = await getJournalNews(db, journalId.toString(), fetchImpl);
+
+    expect(news?.items).toHaveLength(JOURNAL_NEWS_RESPONSE_LIMIT);
+    expect(
+      news?.feeds.reduce((total, feed) => total + feed.unreadCount, 0),
+    ).toBe(JOURNAL_NEWS_RESPONSE_LIMIT);
   });
 });
 
@@ -339,12 +640,7 @@ describe("open journal news", () => {
         newsFeeds: [feed(new ObjectId(), "Broken")],
       },
     ];
-    const find = vi.fn(() => ({
-      sort: vi.fn(() => ({
-        toArray: vi.fn(async () => documents),
-      })),
-    }));
-    const db = { collection: () => ({ find }) } as unknown as Db;
+    const { db, journalFind } = fakeDbWithState(documents);
     const fetchImpl = vi.fn(async (input: string | URL | Request) => {
       const query = new URL(String(input)).searchParams.get("q");
       if (query === "Broken") throw new Error("Feed unavailable.");
@@ -359,7 +655,7 @@ describe("open journal news", () => {
 
     const result = await getOpenJournalsNews(db, fetchImpl);
 
-    expect(find).toHaveBeenCalledWith({
+    expect(journalFind).toHaveBeenCalledWith({
       $or: [{ endDate: null }, { endDate: { $exists: false } }],
     });
     expect(result.journals).toHaveLength(2);
@@ -373,7 +669,13 @@ describe("open journal news", () => {
       title: "ETF watch",
       news: {
         items: [],
-        feeds: [{ keywords: "Broken", error: "Feed unavailable." }],
+        feeds: [
+          {
+            keywords: "Broken",
+            error:
+              "Google News refresh failed: Feed unavailable. Showing saved results.",
+          },
+        ],
       },
     });
   });
@@ -383,32 +685,91 @@ type StoredFeed = ReturnType<typeof feed>;
 
 type StoredDocument = {
   _id: ObjectId;
+  title?: string;
+  startDate?: Date;
+  endDate?: Date | null;
   newsFeeds?: StoredFeed[];
   newsReadItemIds?: string[];
   updatedAt?: Date;
 };
 
 function fakeDb(document: StoredDocument) {
-  const collection = {
+  return fakeDbWithState([document]).db;
+}
+
+type FakeQueryCache = {
+  _id: string;
+  nextAllowedAt: Date;
+  refreshToken?: string;
+  [key: string]: unknown;
+};
+
+type FakeArticle = {
+  _id: string;
+  title: string;
+  link: string;
+  source: string;
+  publishedAt: Date | null;
+  queryKeys: string[];
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+};
+
+type FakeReadReceipt = {
+  _id: string;
+  journalId: ObjectId;
+  itemId: string;
+  readAt: Date;
+};
+
+type FakeNewsDatabaseState = {
+  queryCaches: Map<string, FakeQueryCache>;
+  articles: Map<string, FakeArticle>;
+  readReceipts: Map<string, FakeReadReceipt>;
+};
+
+function fakeDbWithState(documents: StoredDocument[]) {
+  const state: FakeNewsDatabaseState = {
+    queryCaches: new Map(),
+    articles: new Map(),
+    readReceipts: new Map(),
+  };
+  const journalFind = vi.fn(() => ({
+    sort: () => ({
+      toArray: async () =>
+        documents
+          .filter((document) => document.endDate == null)
+          .sort(
+            (left, right) =>
+              (right.startDate?.getTime() ?? 0) -
+              (left.startDate?.getTime() ?? 0),
+          ),
+    }),
+  }));
+
+  const journalCollection = {
     async findOne(query: { _id: ObjectId }) {
-      return idsEqual(document._id, query._id) ? document : null;
+      return (
+        documents.find((document) => idsEqual(document._id, query._id)) ?? null
+      );
     },
+    find: journalFind,
     async updateOne(
       query: { _id: ObjectId; "newsFeeds._id"?: ObjectId },
       update: {
         $push?: { newsFeeds: StoredFeed };
         $pull?: { newsFeeds: { _id: ObjectId } };
-        $set?: { newsReadItemIds: string[] };
       },
     ) {
+      const document = documents.find((candidate) =>
+        idsEqual(candidate._id, query._id),
+      );
       const feedMatches = query["newsFeeds._id"]
-        ? document.newsFeeds?.some((candidate) =>
+        ? document?.newsFeeds?.some((candidate) =>
             idsEqual(candidate._id, query["newsFeeds._id"]),
           )
         : true;
-      if (!idsEqual(document._id, query._id) || !feedMatches) {
-        return { matchedCount: 0 };
-      }
+      if (!document || !feedMatches) return { matchedCount: 0 };
       if (update.$push?.newsFeeds) {
         document.newsFeeds = [
           ...(document.newsFeeds ?? []),
@@ -421,16 +782,162 @@ function fakeDb(document: StoredDocument) {
             !idsEqual(candidate._id, update.$pull?.newsFeeds._id),
         );
       }
-      if (update.$set?.newsReadItemIds) {
-        document.newsReadItemIds = update.$set.newsReadItemIds;
-      }
       return { matchedCount: 1 };
     },
   };
 
-  return {
-    collection: () => collection,
+  const queryCacheCollection = {
+    async findOne(query: { _id: string }) {
+      return state.queryCaches.get(query._id) ?? null;
+    },
+    async insertOne(document: FakeQueryCache) {
+      if (state.queryCaches.has(document._id)) {
+        throw Object.assign(new Error("duplicate key"), { code: 11_000 });
+      }
+      state.queryCaches.set(document._id, document);
+      return { acknowledged: true };
+    },
+    async updateOne(
+      query: {
+        _id: string;
+        nextAllowedAt?: { $lte: Date };
+        refreshToken?: string;
+      },
+      update: {
+        $set?: Partial<FakeQueryCache>;
+        $unset?: Record<string, string>;
+      },
+    ) {
+      const document = state.queryCaches.get(query._id);
+      const matches =
+        document &&
+        (!query.nextAllowedAt ||
+          document.nextAllowedAt.getTime() <=
+            query.nextAllowedAt.$lte.getTime()) &&
+        (!query.refreshToken || document.refreshToken === query.refreshToken);
+      if (!matches) return { matchedCount: 0 };
+      Object.assign(document, update.$set ?? {});
+      for (const key of Object.keys(update.$unset ?? {})) delete document[key];
+      return { matchedCount: 1 };
+    },
+  };
+
+  const articleCollection = {
+    async createIndex() {
+      return "queryKeys_1_publishedAt_-1";
+    },
+    async bulkWrite(
+      operations: Array<{
+        updateOne: {
+          filter: { _id: string };
+          update: {
+            $set: Partial<FakeArticle>;
+            $setOnInsert: Pick<FakeArticle, "firstSeenAt">;
+            $addToSet: { queryKeys: string };
+          };
+        };
+      }>,
+    ) {
+      for (const { updateOne } of operations) {
+        const existing = state.articles.get(updateOne.filter._id);
+        const article = existing ?? {
+          _id: updateOne.filter._id,
+          title: "",
+          link: "",
+          source: "",
+          publishedAt: null,
+          queryKeys: [],
+          firstSeenAt: updateOne.update.$setOnInsert.firstSeenAt,
+          lastSeenAt: updateOne.update.$setOnInsert.firstSeenAt,
+        };
+        Object.assign(article, updateOne.update.$set);
+        if (!article.queryKeys.includes(updateOne.update.$addToSet.queryKeys)) {
+          article.queryKeys.push(updateOne.update.$addToSet.queryKeys);
+        }
+        state.articles.set(article._id, article);
+      }
+      return { acknowledged: true };
+    },
+    find(query: {
+      queryKeys: string;
+      _id?: { $nin: string[] };
+    }) {
+      let limit = Number.POSITIVE_INFINITY;
+      const cursor = {
+        sort() {
+          return cursor;
+        },
+        limit(value: number) {
+          limit = value;
+          return cursor;
+        },
+        async toArray() {
+          return [...state.articles.values()]
+            .filter(
+              (article) =>
+                article.queryKeys.includes(query.queryKeys) &&
+                !query._id?.$nin.includes(article._id),
+            )
+            .sort((left, right) => {
+              const timeDifference =
+                (right.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY) -
+                (left.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY);
+              return timeDifference || left.title.localeCompare(right.title);
+            })
+            .slice(0, limit);
+        },
+      };
+      return cursor;
+    },
+  };
+
+  const readReceiptCollection = {
+    async createIndex() {
+      return "journalId_1_itemId_1";
+    },
+    find(query: { journalId: ObjectId }) {
+      return {
+        project() {
+          return {
+            async toArray() {
+              return [...state.readReceipts.values()].filter((receipt) =>
+                idsEqual(receipt.journalId, query.journalId),
+              );
+            },
+          };
+        },
+      };
+    },
+    async bulkWrite(
+      operations: Array<{
+        updateOne: {
+          filter: { _id: string };
+          update: { $set: FakeReadReceipt };
+        };
+      }>,
+    ) {
+      for (const { updateOne } of operations) {
+        state.readReceipts.set(updateOne.filter._id, {
+          _id: updateOne.filter._id,
+          ...updateOne.update.$set,
+        });
+      }
+      return { acknowledged: true };
+    },
+  };
+
+  const db = {
+    databaseName: `fake-${new ObjectId().toString()}`,
+    collection(name: string) {
+      if (name === "journalTrades") return journalCollection;
+      if (name === "journalNewsQueryCaches") return queryCacheCollection;
+      if (name === "journalNewsArticles") return articleCollection;
+      if (name === "journalNewsReadReceipts") return readReceiptCollection;
+      throw new Error(`Unexpected collection: ${name}`);
+    },
   } as unknown as Db;
+
+  return { db, journalFind, state };
 }
 
 function feed(id: ObjectId, keywords: string) {
@@ -440,6 +947,16 @@ function feed(id: ObjectId, keywords: string) {
     keywords,
     normalizedKeywords: keywords.toLocaleLowerCase(),
     createdAt: new Date("2026-08-30T12:00:00Z"),
+  };
+}
+
+function newsItem(id: string, title: string, publishedAt: Date) {
+  return {
+    id,
+    title,
+    link: `https://news.google.com/articles/${id}`,
+    source: "Publisher",
+    publishedAt: publishedAt.toISOString(),
   };
 }
 
