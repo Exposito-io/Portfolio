@@ -1,14 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
-  BookOpen,
   ChevronDown,
   ChevronRight,
-  Pencil,
   Plus,
-  Trash2,
   X,
 } from "lucide-react";
 
@@ -16,15 +12,17 @@ import {
   JournalTradeForm,
   type TradeFormPayload,
 } from "@/components/journal-trade-form";
-import { JournalPnlBadge } from "@/components/journal-pnl-badge";
-import { MarkdownView } from "@/components/markdown-editor";
+import {
+  JournalTradeCard,
+  type JournalCardMarketState,
+} from "@/components/journal-trade-card";
+import { calculateJournalMarketSummary } from "@/lib/journal-market";
 import type {
+  HyperliquidCandle,
   JournalTrade,
   JournalTradeAsset,
   JournalTradePnlSummary,
 } from "@/lib/types";
-import { formatJournalDateTimeKey } from "@/lib/date";
-import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 
 type TradePnlState = {
   summary: JournalTradePnlSummary | null;
@@ -38,12 +36,14 @@ export function JournalPanel() {
   const [journalDescriptionTemplate, setJournalDescriptionTemplate] = useState<
     string | null
   >(null);
-  const [editingTrade, setEditingTrade] = useState<JournalTrade | null>(null);
   const [tradeFormOpen, setTradeFormOpen] = useState(false);
   const [closedTradesOpen, setClosedTradesOpen] = useState(false);
   const [tradePnlById, setTradePnlById] = useState<Record<string, TradePnlState>>(
     {},
   );
+  const [marketByCoin, setMarketByCoin] = useState<
+    Record<string, JournalCardMarketState>
+  >({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -149,11 +149,83 @@ export function JournalPanel() {
   }, [trades]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const coins = Array.from(
+      new Set(trades.map((trade) => trade.asset.chartCoin).filter(Boolean)),
+    );
+
+    if (!coins.length) {
+      setMarketByCoin({});
+      return () => controller.abort();
+    }
+
+    setMarketByCoin(
+      Object.fromEntries(
+        coins.map((coin) => [
+          coin,
+          { candles: [], error: "", loading: true, summary: null },
+        ]),
+      ),
+    );
+
+    async function loadMarketsForCards() {
+      const marketEntries = await Promise.all(
+        coins.map(async (coin): Promise<[string, JournalCardMarketState]> => {
+          try {
+            const params = new URLSearchParams({
+              coin,
+              interval: "15m",
+              days: "31",
+            });
+            const response = await fetch(`/api/hyperliquid/candles?${params}`, {
+              signal: controller.signal,
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+              throw new Error(payload.error || "Unable to load market data.");
+            }
+
+            const candles = payload.candles as HyperliquidCandle[];
+            return [
+              coin,
+              {
+                candles,
+                error: "",
+                loading: false,
+                summary: calculateJournalMarketSummary(candles),
+              },
+            ];
+          } catch (marketError) {
+            return [
+              coin,
+              {
+                candles: [],
+                error:
+                  marketError instanceof Error
+                    ? marketError.message
+                    : "Unable to load market data.",
+                loading: false,
+                summary: null,
+              },
+            ];
+          }
+        }),
+      );
+
+      if (!controller.signal.aborted) {
+        setMarketByCoin(Object.fromEntries(marketEntries));
+      }
+    }
+
+    void loadMarketsForCards();
+    return () => controller.abort();
+  }, [trades]);
+
+  useEffect(() => {
     if (!tradeFormOpen) return;
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape" && !saving) {
-        setEditingTrade(null);
         setTradeFormOpen(false);
       }
     }
@@ -169,16 +241,15 @@ export function JournalPanel() {
     setError("");
     try {
       const response = await fetch(
-        editingTrade ? `/api/journal/trades/${editingTrade.id}` : "/api/journal/trades",
+        "/api/journal/trades",
         {
-          method: editingTrade ? "PATCH" : "POST",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         },
       );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save trade.");
-      setEditingTrade(null);
       setTradeFormOpen(false);
       await loadTrades(false);
     } catch (saveError) {
@@ -232,45 +303,13 @@ export function JournalPanel() {
     }
   }
 
-  async function removeTrade(trade: JournalTrade) {
-    if (!window.confirm(`Delete "${trade.title}"?`)) return;
-
-    setError("");
-    try {
-      const response = await fetch(`/api/journal/trades/${trade.id}`, {
-        method: "DELETE",
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Unable to delete trade.");
-      if (editingTrade?.id === trade.id) {
-        setEditingTrade(null);
-        setTradeFormOpen(false);
-      }
-      await loadTrades(false);
-    } catch (deleteError) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Unable to delete trade.",
-      );
-    }
-  }
-
   function openNewTradeForm() {
     setError("");
-    setEditingTrade(null);
-    setTradeFormOpen(true);
-  }
-
-  function openEditTradeForm(trade: JournalTrade) {
-    setError("");
-    setEditingTrade(trade);
     setTradeFormOpen(true);
   }
 
   function closeTradeForm() {
     if (saving) return;
-    setEditingTrade(null);
     setTradeFormOpen(false);
   }
 
@@ -279,76 +318,31 @@ export function JournalPanel() {
 
   function renderTrade(trade: JournalTrade) {
     return (
-      <article className="trade-row" key={trade.id}>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link className="trade-title" href={`/journal/${trade.id}`}>
-              {trade.title}
-            </Link>
-            {trade.kind === "idea" ? (
-              <span className="tag">Trade idea</span>
-            ) : null}
-            {trade.direction ? (
-              <span className="tag capitalize">{trade.direction}</span>
-            ) : null}
-            <span className="tag">{trade.asset.label}</span>
-            {trade.kind === "trade" ? (
-              <JournalPnlBadge
-                error={tradePnlById[trade.id]?.error}
-                loading={tradePnlById[trade.id]?.loading}
-                summary={tradePnlById[trade.id]?.summary}
-              />
-            ) : null}
-          </div>
-          <p className="mt-2 text-sm font-medium text-[#69706c]">
-            {formatDateRange(trade)}
-          </p>
-          <div className="mt-3 line-clamp-3 text-sm leading-6 text-[#4f5753]">
-            <MarkdownView value={trade.descriptionMarkdown} />
-          </div>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <button
-            className="icon-button"
-            aria-label={`Edit ${trade.title}`}
-            onClick={() => openEditTradeForm(trade)}
-          >
-            <Pencil size={16} aria-hidden="true" />
-          </button>
-          <button
-            className="icon-button danger"
-            aria-label={`Delete ${trade.title}`}
-            onClick={() => removeTrade(trade)}
-          >
-            <Trash2 size={16} aria-hidden="true" />
-          </button>
-        </div>
-      </article>
+      <JournalTradeCard
+        key={trade.id}
+        marketState={marketByCoin[trade.asset.chartCoin]}
+        pnlState={tradePnlById[trade.id]}
+        trade={trade}
+      />
     );
   }
 
   return (
-    <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <section className="panel">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="panel-heading">
+    <main className="journal-page w-full px-4 py-8 sm:px-6 lg:px-8">
+      <section className="journal-page-shell">
+        <div className="journal-page-header">
+          <div>
             <h1>Journal</h1>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="tag tag-green">
-              <BookOpen size={13} aria-hidden="true" />
-              {trades.filter((trade) => !trade.endDate).length} open
-            </span>
-            <button
-              className="button-primary"
-              disabled={journalDescriptionTemplate === null}
-              onClick={openNewTradeForm}
-              type="button"
-            >
-              <Plus size={16} aria-hidden="true" />
-              New journal item
-            </button>
-          </div>
+          <button
+            className="journal-new-button"
+            disabled={journalDescriptionTemplate === null}
+            onClick={openNewTradeForm}
+            type="button"
+          >
+            <Plus size={17} aria-hidden="true" />
+            New journal item
+          </button>
         </div>
 
         {error && !tradeFormOpen ? (
@@ -374,9 +368,11 @@ export function JournalPanel() {
             <div className="journal-trade-section">
               <div className="journal-trade-section-heading">
                 <h2>Open journal items</h2>
-                <span>{openTrades.length}</span>
+                <span aria-label={`${openTrades.length} open journal items`}>
+                  {openTrades.length}
+                </span>
               </div>
-              <div className="grid gap-3">
+              <div className="journal-card-grid">
                 {openTrades.map(renderTrade)}
                 {!openTrades.length ? (
                   <p className="py-3 text-sm text-[#69706c]">
@@ -402,10 +398,10 @@ export function JournalPanel() {
                     )}
                     Closed journal items
                   </span>
-                  <span className="tag">{closedTrades.length}</span>
+                  <span>{closedTrades.length}</span>
                 </button>
                 {closedTradesOpen ? (
-                  <div className="mt-3 grid gap-3">
+                  <div className="journal-card-grid mt-4">
                     {closedTrades.map(renderTrade)}
                   </div>
                 ) : null}
@@ -426,10 +422,8 @@ export function JournalPanel() {
           >
             <div className="journal-modal-header">
               <div>
-                <p>{editingTrade ? "Edit journal item" : "New journal item"}</p>
-                <h2 id="journal-trade-modal-title">
-                  {editingTrade ? editingTrade.title : "New journal item"}
-                </h2>
+                <p>Create journal item</p>
+                <h2 id="journal-trade-modal-title">New journal item</h2>
               </div>
               <button
                 aria-label="Close trade form"
@@ -445,12 +439,12 @@ export function JournalPanel() {
             <div className="journal-modal-body">
               {error ? <div className="alert alert-error">{error}</div> : null}
               <JournalTradeForm
-                key={editingTrade?.id ?? "new"}
-                trade={editingTrade}
+                key="new"
+                trade={null}
                 defaultDescriptionMarkdown={journalDescriptionTemplate ?? ""}
                 markets={markets}
                 saving={saving}
-                submitLabel={editingTrade ? "Save item" : "Add item"}
+                submitLabel="Add item"
                 onCancel={closeTradeForm}
                 onSubmit={saveTrade}
               />
@@ -460,10 +454,4 @@ export function JournalPanel() {
       ) : null}
     </main>
   );
-}
-
-function formatDateRange(trade: JournalTrade) {
-  return trade.endDate
-    ? `${formatJournalDateTimeKey(trade.startDate, PORTFOLIO_TIMEZONE)} to ${formatJournalDateTimeKey(trade.endDate, PORTFOLIO_TIMEZONE)}`
-    : formatJournalDateTimeKey(trade.startDate, PORTFOLIO_TIMEZONE);
 }
