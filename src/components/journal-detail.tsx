@@ -417,7 +417,6 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         portfolioInvestmentsUsd={portfolioInvestmentsUsd}
         portfolioLoading={portfolioLoading}
         onCloseTrade={beginCloseTrade}
-        onNewEntry={beginNewEntry}
       />
 
       {error && !entryFormOpen ? (
@@ -459,6 +458,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               ordersLoading={filledOrdersState.loading}
               onDelete={removeEntry}
               onEdit={beginEditEntry}
+              onNewEntry={beginNewEntry}
             />
           }
           transactions={

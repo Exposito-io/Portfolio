@@ -17,18 +17,26 @@ export function JournalDetailEntries({
   ordersLoading,
   onDelete,
   onEdit,
+  onNewEntry,
 }: {
   entries: JournalEntry[];
   orderTotals: Map<string, EntryOrderTotals>;
   ordersLoading: boolean;
   onDelete: (entry: JournalEntry) => void;
   onEdit: (entry: JournalEntry) => void;
+  onNewEntry: () => void;
 }) {
   return (
     <section className="panel">
-      <div className="panel-heading">
-        <h2>Entries</h2>
-        <p>{entries.length ? `${entries.length} notes` : "Notes"}</p>
+      <div className="panel-heading flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2>Entries</h2>
+          <p>{entries.length ? `${entries.length} notes` : "Notes"}</p>
+        </div>
+        <button className="button-primary" onClick={onNewEntry} type="button">
+          <Plus size={16} aria-hidden="true" />
+          New journal entry
+        </button>
       </div>
       <div className="mt-4 grid gap-3">
         {entries.map((entry) => (

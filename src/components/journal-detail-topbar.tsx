@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, EllipsisVertical, Plus } from "lucide-react";
+import { ArrowLeft, Check, EllipsisVertical } from "lucide-react";
 
 import { JournalPositionValueMetric } from "@/components/journal-pnl-badge";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
@@ -17,7 +17,6 @@ export function JournalDetailTopbar({
   portfolioInvestmentsUsd,
   portfolioLoading,
   onCloseTrade,
-  onNewEntry,
 }: {
   trade: JournalTrade;
   ordersState: FilledOrdersState;
@@ -25,7 +24,6 @@ export function JournalDetailTopbar({
   portfolioInvestmentsUsd: number | null;
   portfolioLoading: boolean;
   onCloseTrade: () => void;
-  onNewEntry: () => void;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -75,38 +73,28 @@ export function JournalDetailTopbar({
             summary={ordersState.data?.summary}
           />
         ) : null}
-        <div className="journal-entry-actions" ref={actionsRef}>
-          <button
-            className="button-primary"
-            onClick={onNewEntry}
-            type="button"
-          >
-            <Plus size={16} aria-hidden="true" />
-            New journal entry
-          </button>
-          {!trade.endDate ? (
-            <>
-              <button
-                aria-expanded={actionsOpen}
-                aria-haspopup="menu"
-                aria-label="More journal actions"
-                className="journal-entry-actions-toggle"
-                onClick={() => setActionsOpen((open) => !open)}
-                type="button"
-              >
-                <EllipsisVertical size={18} aria-hidden="true" />
-              </button>
-              {actionsOpen ? (
-                <div className="journal-entry-actions-menu" role="menu">
-                  <button onClick={closeTrade} role="menuitem" type="button">
-                    <Check size={16} aria-hidden="true" />
-                    {trade.kind === "idea" ? "Close idea" : "Close trade"}
-                  </button>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+        {!trade.endDate ? (
+          <div className="journal-entry-actions" ref={actionsRef}>
+            <button
+              aria-expanded={actionsOpen}
+              aria-haspopup="menu"
+              aria-label="More journal actions"
+              className="journal-entry-actions-toggle"
+              onClick={() => setActionsOpen((open) => !open)}
+              type="button"
+            >
+              <EllipsisVertical size={18} aria-hidden="true" />
+            </button>
+            {actionsOpen ? (
+              <div className="journal-entry-actions-menu" role="menu">
+                <button onClick={closeTrade} role="menuitem" type="button">
+                  <Check size={16} aria-hidden="true" />
+                  {trade.kind === "idea" ? "Close idea" : "Close trade"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
