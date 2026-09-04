@@ -22,6 +22,7 @@ import type {
   JournalTrade,
   JournalTradeAsset,
   JournalTradePnlSummary,
+  PortfolioResponse,
 } from "@/lib/types";
 
 type TradePnlState = {
@@ -44,6 +45,11 @@ export function JournalPanel() {
   const [marketByCoin, setMarketByCoin] = useState<
     Record<string, JournalCardMarketState>
   >({});
+  const [portfolioInvestmentsUsd, setPortfolioInvestmentsUsd] = useState<
+    number | null
+  >(null);
+  const [portfolioError, setPortfolioError] = useState("");
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -111,6 +117,42 @@ export function JournalPanel() {
     }
 
     void loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadPortfolioInvestments() {
+      setPortfolioLoading(true);
+      setPortfolioError("");
+      try {
+        const response = await fetch("/api/portfolio", {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as PortfolioResponse & {
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to load portfolio value.");
+        }
+        setPortfolioInvestmentsUsd(
+          payload.snapshot?.totals.totalInvestmentsUsd ?? null,
+        );
+      } catch (loadError) {
+        if (!controller.signal.aborted) {
+          setPortfolioError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load portfolio value.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setPortfolioLoading(false);
+      }
+    }
+
+    void loadPortfolioInvestments();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -322,6 +364,11 @@ export function JournalPanel() {
         key={trade.id}
         marketState={marketByCoin[trade.asset.chartCoin]}
         pnlState={tradePnlById[trade.id]}
+        portfolioState={{
+          error: portfolioError,
+          investmentsUsd: portfolioInvestmentsUsd,
+          loading: portfolioLoading,
+        }}
         trade={trade}
       />
     );

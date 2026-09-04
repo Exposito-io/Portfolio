@@ -12,6 +12,7 @@ import {
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { formatJournalDateTimeKey } from "@/lib/date";
 import type { JournalMarketSummary } from "@/lib/journal-market";
+import { calculatePortfolioPercent } from "@/lib/journal-portfolio";
 import type {
   HyperliquidCandle,
   JournalTrade,
@@ -32,12 +33,18 @@ type JournalTradeCardProps = {
     loading: boolean;
     summary: JournalTradePnlSummary | null;
   };
+  portfolioState?: {
+    error: string;
+    investmentsUsd: number | null;
+    loading: boolean;
+  };
   trade: JournalTrade;
 };
 
 export function JournalTradeCard({
   marketState,
   pnlState,
+  portfolioState,
   trade,
 }: JournalTradeCardProps) {
   const marketSummary = marketState?.summary;
@@ -100,6 +107,11 @@ export function JournalTradeCard({
         />
 
         <div className="journal-card-metrics">
+          <PositionValueCell
+            pnlState={pnlState}
+            portfolioState={portfolioState}
+            tradeKind={trade.kind}
+          />
           <PnlCell state={pnlState} tradeKind={trade.kind} />
           <PerformanceCell label="24h" value={marketSummary?.change24hPercent} />
           <PerformanceCell label="7d" value={marketSummary?.change7dPercent} />
@@ -107,6 +119,50 @@ export function JournalTradeCard({
         </div>
       </article>
     </Link>
+  );
+}
+
+function PositionValueCell({
+  pnlState,
+  portfolioState,
+  tradeKind,
+}: {
+  pnlState?: JournalTradeCardProps["pnlState"];
+  portfolioState?: JournalTradeCardProps["portfolioState"];
+  tradeKind: JournalTrade["kind"];
+}) {
+  const positionValue = pnlState?.summary?.positionValueUsd;
+  const unavailable =
+    tradeKind !== "trade" ||
+    pnlState?.error ||
+    !isFiniteNumber(positionValue);
+  const portfolioPercent = isFiniteNumber(positionValue)
+    ? calculatePortfolioPercent(positionValue, portfolioState?.investmentsUsd)
+    : null;
+
+  return (
+    <div
+      className="journal-card-metric journal-card-metric-position"
+      title={portfolioState?.error || pnlState?.error || undefined}
+    >
+      <span>Position value</span>
+      {pnlState?.loading && tradeKind === "trade" ? (
+        <strong>Loading</strong>
+      ) : unavailable ? (
+        <strong>N/A</strong>
+      ) : (
+        <>
+          <strong>{formatCurrency(positionValue)}</strong>
+          <small>
+            {portfolioState?.loading
+              ? "Loading share"
+              : isFiniteNumber(portfolioPercent)
+                ? `${formatUnsignedPercent(portfolioPercent)} of portfolio`
+                : "Portfolio share N/A"}
+          </small>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -345,12 +401,16 @@ function formatDateRange(trade: JournalTrade) {
 }
 
 function formatSignedCurrency(value: number) {
-  const formatted = new Intl.NumberFormat("en-US", {
+  const formatted = formatCurrency(Math.abs(value));
+  return value > 0 ? `+${formatted}` : value < 0 ? `-${formatted}` : formatted;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
     currency: "USD",
     maximumFractionDigits: Math.abs(value) >= 1000 ? 0 : 2,
     style: "currency",
-  }).format(Math.abs(value));
-  return value > 0 ? `+${formatted}` : value < 0 ? `-${formatted}` : formatted;
+  }).format(value);
 }
 
 function formatSignedPercent(value: number) {
@@ -359,6 +419,13 @@ function formatSignedPercent(value: number) {
     minimumFractionDigits: 2,
   })}%`;
   return value > 0 ? `+${formatted}` : value < 0 ? `-${formatted}` : formatted;
+}
+
+function formatUnsignedPercent(value: number) {
+  return `${value.toLocaleString("en-US", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })}%`;
 }
 
 function formatAssetPrice(value: number) {
