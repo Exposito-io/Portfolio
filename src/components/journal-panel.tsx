@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -17,6 +17,7 @@ import {
   type JournalCardMarketState,
 } from "@/components/journal-trade-card";
 import { calculateJournalMarketSummary } from "@/lib/journal-market";
+import { comparePositionValuesDescending } from "@/lib/journal-sort";
 import type {
   HyperliquidCandle,
   JournalTrade,
@@ -355,8 +356,15 @@ export function JournalPanel() {
     setTradeFormOpen(false);
   }
 
-  const openTrades = trades.filter((trade) => !trade.endDate);
-  const closedTrades = trades.filter((trade) => trade.endDate);
+  const tradesByPositionValue = useMemo(
+    () => [...trades].sort((left, right) => comparePositionValuesDescending(
+      tradePnlById[left.id]?.summary?.positionValueUsd,
+      tradePnlById[right.id]?.summary?.positionValueUsd,
+    )),
+    [tradePnlById, trades],
+  );
+  const openTrades = tradesByPositionValue.filter((trade) => !trade.endDate);
+  const closedTrades = tradesByPositionValue.filter((trade) => trade.endDate);
 
   function renderTrade(trade: JournalTrade) {
     return (
