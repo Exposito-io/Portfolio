@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { ObjectId, type Db } from "mongodb";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   addJournalNewsFeed,
@@ -26,9 +26,35 @@ import {
   getJournalNewsQueryKey,
   JOURNAL_NEWS_CACHE_INTERVAL_MS,
   JOURNAL_NEWS_RESPONSE_LIMIT,
+  JOURNAL_NEWS_MAX_AGE_MS,
 } from "@/lib/journal-news-cache";
 
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-03T12:00:00Z"));
+});
+
+afterEach(() => vi.useRealTimers());
+
 describe("Google News RSS", () => {
+  it("filters old and undated Google stories, including direct Google RSS URLs", async () => {
+    const xml = `<rss><channel>
+      ${rssItem("recent", "Recent", "2026-09-03T11:00:00Z")}
+      ${rssItem("boundary", "Boundary", "2026-09-01T12:00:00Z")}
+      ${rssItem("old", "Old", "2026-09-01T11:59:59Z")}
+      <item><title>Undated</title><link>https://example.com/undated</link></item>
+      <item><title>Invalid date</title><link>https://example.com/invalid</link><pubDate>invalid</pubDate></item>
+    </channel></rss>`;
+    const fetchImpl = async () => new Response(xml);
+
+    expect((await fetchGoogleNewsFeed("test", fetchImpl)).map((item) => item.title))
+      .toEqual(["Recent", "Boundary"]);
+    expect((await fetchNewsFeed(buildGoogleNewsUrl("test"), fetchImpl, false))
+      .map((item) => item.title)).toEqual(["Recent", "Boundary"]);
+    expect(await fetchNewsFeed("https://example.com/rss", fetchImpl, false))
+      .toHaveLength(5);
+  });
+
   it("encodes normalized keywords into the fixed Google News URL", () => {
     const url = new URL(buildGoogleNewsUrl("  ethereum   ETF & flows  "));
 
@@ -186,6 +212,7 @@ describe("Google News RSS", () => {
   });
 
   it("fetches feeds concurrently, deduplicates globally, and keeps partial results", async () => {
+    vi.setSystemTime(new Date("2026-08-31T12:00:00Z"));
     const journalId = new ObjectId();
     const ethereumFeedId = new ObjectId();
     const etfFeedId = new ObjectId();
@@ -234,6 +261,40 @@ describe("Google News RSS", () => {
 });
 
 describe("Google News query cache", () => {
+  it("stores only dated stories within 48 hours and counts only accepted stories", async () => {
+    const { db, state } = fakeDbWithState([]);
+    const now = new Date();
+    const boundary = newsItem("boundary", "Boundary", new Date(now.getTime() - JOURNAL_NEWS_MAX_AGE_MS));
+    const old = newsItem("old", "Old", new Date(now.getTime() - JOURNAL_NEWS_MAX_AGE_MS - 1));
+    const result = await getCachedGoogleNews(db, "test", new Set(), async () => [
+      boundary, old,
+      { ...old, id: "undated", publishedAt: null },
+      { ...old, id: "invalid", publishedAt: "invalid" },
+    ], { now });
+
+    expect(result.items).toEqual([boundary]);
+    expect([...state.articles.keys()]).toEqual([boundary.id]);
+    expect(state.queryCaches.get(getJournalNewsQueryKey("test"))?.lastResultCount).toBe(1);
+  });
+
+  it.each(["cached", "empty", "failed"])("hides expired saved stories on %s reads before database expiry runs", async (mode) => {
+    const { db, state } = fakeDbWithState([]);
+    const now = new Date();
+    const item = newsItem("expiring", "Expiring", new Date(now.getTime() - JOURNAL_NEWS_MAX_AGE_MS));
+    await getCachedGoogleNews(db, "test", new Set(), async () => [item], { now });
+    const fetchItems = vi.fn(async () => {
+      if (mode === "failed") throw new Error("Unavailable");
+      return [];
+    });
+    const result = await getCachedGoogleNews(db, "test", new Set(), fetchItems, {
+      now: new Date(now.getTime() + (mode === "cached" ? 1 : JOURNAL_NEWS_CACHE_INTERVAL_MS)),
+    });
+
+    expect(state.articles.size).toBe(1);
+    expect(result.items).toEqual([]);
+    expect(fetchItems).toHaveBeenCalledTimes(mode === "cached" ? 0 : 1);
+  });
+
   it("normalizes queries and contacts Google once per 30-minute window", async () => {
     const { db, state } = fakeDbWithState([]);
     const firstAttempt = new Date("2026-09-03T12:00:00Z");
@@ -623,6 +684,7 @@ describe("journal news persistence", () => {
 
 describe("open journal news", () => {
   it("loads only open-journal documents and keeps each journal snapshot separate", async () => {
+    vi.setSystemTime(new Date("2026-08-31T12:00:00Z"));
     const firstJournalId = new ObjectId();
     const secondJournalId = new ObjectId();
     const documents = [
@@ -860,6 +922,7 @@ function fakeDbWithState(documents: StoredDocument[]) {
     },
     find(query: {
       queryKeys: string;
+      publishedAt: { $gte: Date };
       _id?: { $nin: string[] };
     }) {
       let limit = Number.POSITIVE_INFINITY;
@@ -876,6 +939,8 @@ function fakeDbWithState(documents: StoredDocument[]) {
             .filter(
               (article) =>
                 article.queryKeys.includes(query.queryKeys) &&
+                article.publishedAt instanceof Date &&
+                article.publishedAt >= query.publishedAt.$gte &&
                 !query._id?.$nin.includes(article._id),
             )
             .sort((left, right) => {

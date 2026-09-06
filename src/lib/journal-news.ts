@@ -15,6 +15,7 @@ import type {
 import {
   getCachedGoogleNews,
   getJournalNewsReadItemIds,
+  isRecentGoogleNewsItem,
   JOURNAL_NEWS_RESPONSE_LIMIT,
   saveJournalNewsReadReceipts,
 } from "@/lib/journal-news-cache";
@@ -281,7 +282,10 @@ export async function fetchNewsFeed(
       }
 
       const xml = await readResponseText(response);
-      return parseNewsFeed(xml, currentUrl);
+      const items = parseNewsFeed(xml, currentUrl);
+      return isGoogleNewsFeedUrl(feedUrl) || isGoogleNewsFeedUrl(currentUrl)
+        ? items.filter((item) => isRecentGoogleNewsItem(item))
+        : items;
     }
 
     throw new Error("The RSS feed redirected too many times.");

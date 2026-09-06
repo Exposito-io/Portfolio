@@ -4,6 +4,16 @@ import { ObjectId, type Collection, type Db } from "mongodb";
 
 export const JOURNAL_NEWS_CACHE_INTERVAL_MS = 30 * 60 * 1_000;
 export const JOURNAL_NEWS_RESPONSE_LIMIT = 500;
+export const JOURNAL_NEWS_MAX_AGE_MS = 48 * 60 * 60 * 1_000;
+
+export function isRecentGoogleNewsItem(
+  item: { publishedAt: string | null },
+  now = new Date(),
+) {
+  if (!item.publishedAt) return false;
+  const publishedAt = new Date(item.publishedAt).getTime();
+  return publishedAt >= now.getTime() - JOURNAL_NEWS_MAX_AGE_MS;
+}
 
 export type CacheableNewsItem = {
   id: string;
@@ -124,6 +134,7 @@ export async function getCachedGoogleNews(
       queryKey,
       readItemIds,
       options.limit ?? JOURNAL_NEWS_RESPONSE_LIMIT,
+      now,
     ),
   ]);
 
@@ -186,7 +197,9 @@ async function refreshGoogleNewsQuery(
   }
 
   try {
-    const items = await fetchItems();
+    const items = (await fetchItems()).filter((item) =>
+      isRecentGoogleNewsItem(item, now),
+    );
     if (items.length > 0) {
       await saveArticles(db, queryKey, items, now);
       await queryCacheCollection(db).updateOne(
@@ -313,11 +326,13 @@ async function loadCachedArticles(
   queryKey: string,
   readItemIds: ReadonlySet<string>,
   limit: number,
+  now: Date,
 ) {
   const excludedIds = [...readItemIds];
   const articles = await articleCollection(db)
     .find({
       queryKeys: queryKey,
+      publishedAt: { $gte: new Date(now.getTime() - JOURNAL_NEWS_MAX_AGE_MS) },
       ...(excludedIds.length > 0 ? { _id: { $nin: excludedIds } } : {}),
     })
     .sort({ publishedAt: -1, title: 1 })
@@ -341,6 +356,10 @@ async function ensureJournalNewsCacheIndexes(db: Db) {
   if (!promise) {
     promise = Promise.all([
       articleCollection(db).createIndex({ queryKeys: 1, publishedAt: -1 }),
+      articleCollection(db).createIndex(
+        { publishedAt: 1 },
+        { expireAfterSeconds: JOURNAL_NEWS_MAX_AGE_MS / 1_000 },
+      ),
       readReceiptCollection(db).createIndex(
         { journalId: 1, itemId: 1 },
         { unique: true },
