@@ -2,9 +2,9 @@ import type { HyperliquidCandle } from "@/lib/types";
 
 export type JournalMarketSummary = {
   priceUsd: number;
-  change24hPercent: number;
-  change7dPercent: number;
-  change30dPercent: number;
+  change24hPercent: number | null;
+  change7dPercent: number | null;
+  change30dPercent: number | null;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -28,14 +28,7 @@ export function calculateJournalMarketSummary(
   const change24hPercent = calculateChange(validCandles, latest, 1);
   const change7dPercent = calculateChange(validCandles, latest, 7);
   const change30dPercent = calculateChange(validCandles, latest, 30);
-  if (
-    change24hPercent === null ||
-    change7dPercent === null ||
-    change30dPercent === null
-  ) {
-    return null;
-  }
-
+  // Newly listed markets can have a price before every return period is available.
   return {
     priceUsd: latest.close,
     change24hPercent,

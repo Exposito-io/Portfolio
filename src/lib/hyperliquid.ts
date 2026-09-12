@@ -232,10 +232,11 @@ export async function fetchHyperliquidAccount(
 export async function fetchHyperliquidMarkets(
   fetcher: typeof fetch = fetch,
 ): Promise<JournalTradeAsset[]> {
-  const [perpMeta, spotMeta, tradeXyzMeta] = await Promise.all([
+  const [perpMeta, spotMeta, tradeXyzMeta, ioMeta] = await Promise.all([
     fetchPerpMeta("", fetcher),
     fetchSpotMeta(fetcher),
     fetchPerpMeta("xyz", fetcher),
+    fetchPerpMeta("io", fetcher),
   ]);
 
   const perps = (perpMeta.universe ?? [])
@@ -268,7 +269,21 @@ export async function fetchHyperliquidMarkets(
       dex: "xyz",
     }));
 
-  return [...perps, ...spotMarkets, ...tradeXyz].sort((a, b) =>
+  const ioPerps = (ioMeta.universe ?? [])
+    .map((market) => market.name)
+    .filter(isPresent)
+    .map<JournalTradeAsset>((name) => {
+      const coin = name.includes(":") ? name : `io:${name}`;
+      return {
+        kind: "perp",
+        label: `${coin} perp`,
+        coin,
+        chartCoin: coin,
+        dex: "io",
+      };
+    });
+
+  return [...perps, ...spotMarkets, ...tradeXyz, ...ioPerps].sort((a, b) =>
     a.label.localeCompare(b.label),
   );
 }
@@ -488,7 +503,7 @@ export async function fetchHyperliquidOpenPositionSummary(
     return null;
   }
 
-  const dex = asset.kind === "trade-xyz" ? "xyz" : "";
+  const dex = asset.dex || (asset.kind === "trade-xyz" ? "xyz" : "");
   const state = await postInfo<HyperliquidClearinghouseState>(
     {
       type: "clearinghouseState",
@@ -571,7 +586,7 @@ async function fetchSpotClearinghouseState(
   );
 }
 
-async function fetchPerpMeta(dex: "" | "xyz", fetcher: typeof fetch) {
+async function fetchPerpMeta(dex: string, fetcher: typeof fetch) {
   return postInfo<HyperliquidPerpMeta>(
     {
       type: "meta",

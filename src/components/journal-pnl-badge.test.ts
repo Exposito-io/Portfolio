@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   JournalClosingPriceMetric,
+  JournalMarketMetric,
   JournalPnlMetric,
   JournalPositionValueMetric,
 } from "@/components/journal-pnl-badge";
@@ -25,6 +26,45 @@ const summary: JournalTradePnlSummary = {
   fillCount: 2,
   notionalUsd: 500,
 };
+
+describe("JournalMarketMetric", () => {
+  it("shows the price and available returns without inventing a 30d return", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalMarketMetric, {
+        summary: {
+          priceUsd: 1600,
+          change24hPercent: -2,
+          change7dPercent: 10,
+          change30dPercent: null,
+        },
+      }),
+    );
+
+    expect(markup).toContain("$1,600.00");
+    expect(markup).toContain("-2.0%");
+    expect(markup).toContain("+10.0%");
+    expect(markup).toContain("<span>30d</span><b>N/A</b>");
+    expect(markup).not.toContain("NaN");
+  });
+
+  it("shows a neutral price when even 24h history is unavailable", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalMarketMetric, {
+        summary: {
+          priceUsd: 1600,
+          change24hPercent: null,
+          change7dPercent: null,
+          change30dPercent: null,
+        },
+      }),
+    );
+
+    expect(markup).toContain("$1,600.00");
+    expect(markup.match(/<b>N\/A<\/b>/g)).toHaveLength(3);
+    expect(markup).not.toContain("metric-negative");
+    expect(markup).not.toContain("metric-positive");
+  });
+});
 
 describe("JournalPnlMetric", () => {
   it("shows only total PnL when there is no position", () => {

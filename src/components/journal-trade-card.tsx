@@ -333,7 +333,7 @@ function PnlCell({
   );
 }
 
-function PerformanceCell({ label, value }: { label: string; value?: number }) {
+function PerformanceCell({ label, value }: { label: string; value?: number | null }) {
   const tone = getTone(value);
 
   return (

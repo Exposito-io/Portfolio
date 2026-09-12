@@ -133,7 +133,7 @@ describe("Hyperliquid normalization", () => {
     });
   });
 
-  it("normalizes main perp, spot, and Trade XYZ markets", async () => {
+  it("normalizes main perp, spot, Trade XYZ, and io markets", async () => {
     const fetcher = vi
       .fn()
       .mockResolvedValueOnce({
@@ -157,10 +157,23 @@ describe("Hyperliquid normalization", () => {
         json: async () => ({
           universe: [{ name: "XYZ100" }],
         }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          universe: [{ name: "io:OAI" }, { name: "ANTH" }, {}],
+        }),
       });
 
     const markets = await fetchHyperliquidMarkets(fetcher);
 
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({ type: "meta", dex: "io" }),
+      }),
+    );
+    expect(markets).toHaveLength(6);
     expect(fetcher).toHaveBeenCalledWith(
       "https://api.hyperliquid.xyz/info",
       expect.objectContaining({
@@ -190,6 +203,20 @@ describe("Hyperliquid normalization", () => {
           coin: "XYZ100",
           chartCoin: "xyz:XYZ100",
           dex: "xyz",
+        },
+        {
+          kind: "perp",
+          label: "io:OAI perp",
+          coin: "io:OAI",
+          chartCoin: "io:OAI",
+          dex: "io",
+        },
+        {
+          kind: "perp",
+          label: "io:ANTH perp",
+          coin: "io:ANTH",
+          chartCoin: "io:ANTH",
+          dex: "io",
         },
       ]),
     );
@@ -439,6 +466,54 @@ describe("Hyperliquid normalization", () => {
       positionCostBasisUsd: 517338.23,
       unrealizedPnlUsd: 17443.21,
     });
+  });
+
+  it("loads io position PnL from its dex without matching another venue's ticker", async () => {
+    const asset = {
+      kind: "perp" as const,
+      label: "io:OAI perp",
+      coin: "io:OAI",
+      chartCoin: "io:OAI",
+      dex: "io",
+    };
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        assetPositions: [
+          {
+            position: {
+              coin: "io:OAI",
+              entryPx: "100",
+              szi: "2",
+              positionValue: "220",
+              unrealizedPnl: "20",
+            },
+          },
+          { position: { coin: "OAI", unrealizedPnl: "999" } },
+        ],
+      }),
+    });
+
+    expect(getHyperliquidCoinAliases(asset)).toEqual(["io:OAI"]);
+    await expect(
+      fetchHyperliquidOpenPositionSummary({ account, asset }, fetcher),
+    ).resolves.toEqual({
+      entryPriceUsd: 100,
+      positionSize: 2,
+      positionValueUsd: 220,
+      positionCostBasisUsd: 200,
+      unrealizedPnlUsd: 20,
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({
+          type: "clearinghouseState",
+          user: account.address,
+          dex: "io",
+        }),
+      }),
+    );
   });
 
   it("size-weights entry prices across matching position aliases", async () => {
