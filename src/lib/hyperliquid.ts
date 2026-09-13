@@ -420,15 +420,18 @@ export async function fetchHyperliquidUserFillsByTime(
     account: PortfolioAccount;
     startTime: number;
     endTime: number;
-    coinAliases: string[];
+    coinAliases?: string[];
   },
   fetcher: typeof fetch = fetch,
 ): Promise<HyperliquidFill[]> {
-  const aliases = new Set(coinAliases);
+  const aliases = coinAliases ? new Set(coinAliases) : null;
   const fills: HyperliquidFill[] = [];
+  const seenFillIds = new Set<string>();
   let nextStartTime = startTime;
 
-  for (let page = 0; page < 5 && nextStartTime <= endTime; page += 1) {
+  // Overlap the last timestamp: different fills can share a millisecond.
+  // Ten pages leave room for overlap within the API's 10,000-fill history cap.
+  for (let page = 0; page < 10 && nextStartTime <= endTime; page += 1) {
     const response = await postInfo<HyperliquidUserFillResponse>(
       {
         type: "userFillsByTime",
@@ -441,15 +444,22 @@ export async function fetchHyperliquidUserFillsByTime(
       `Hyperliquid fills for ${account.label}`,
     );
     const pageFills = response
-      .filter((fill) => fill.coin && aliases.has(fill.coin))
+      .filter((fill) => fill.coin && (!aliases || aliases.has(fill.coin)))
       .map((fill) => normalizeFill(fill, account));
 
-    fills.push(...pageFills);
+    for (const fill of pageFills) {
+      if (!seenFillIds.has(fill.id)) {
+        seenFillIds.add(fill.id);
+        fills.push(fill);
+      }
+    }
 
     if (response.length < 2000) break;
     const lastTime = Math.max(...response.map((fill) => Number(fill.time ?? 0)));
-    if (!Number.isFinite(lastTime) || lastTime < nextStartTime) break;
-    nextStartTime = lastTime + 1;
+    if (!Number.isFinite(lastTime) || lastTime <= nextStartTime || page === 9) {
+      throw new Error("Hyperliquid fill history could not be fully paginated. Please retry.");
+    }
+    nextStartTime = lastTime;
   }
 
   return fills.sort((a, b) => b.time - a.time);
@@ -465,7 +475,7 @@ export async function fetchHyperliquidFilledOrdersByTime(
     account: PortfolioAccount;
     startTime: number;
     endTime: number;
-    coinAliases: string[];
+    coinAliases?: string[];
   },
   fetcher: typeof fetch = fetch,
 ): Promise<HyperliquidFilledOrder[]> {
@@ -733,7 +743,7 @@ function aggregateFillsToOrders(
     };
 
     if (fill.direction) group.directions.add(fill.direction);
-    group.notionalUsd += fill.notionalUsd;
+    group.notionalUsd += fill.price * fill.size;
     group.totalSize += fill.size;
     group.fee = fill.fee === null ? group.fee : (group.fee ?? 0) + fill.fee;
     if (fill.feeToken) group.feeTokens.add(fill.feeToken);
@@ -763,7 +773,7 @@ function aggregateFillsToOrders(
       averagePrice:
         group.totalSize === 0
           ? 0
-          : roundCurrency(group.notionalUsd / group.totalSize),
+          : group.notionalUsd / group.totalSize,
       totalSize: group.totalSize,
       notionalUsd: roundCurrency(group.notionalUsd),
       fee: group.fee === null ? null : roundCurrency(group.fee),

@@ -22,7 +22,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f6f4ef] text-[#1f2523]">
       <header className="border-b border-black/10 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:flex-nowrap sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 lg:flex-nowrap sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
             <Image src="/logo.svg" alt="" width={36} height={36} priority />
             <span>

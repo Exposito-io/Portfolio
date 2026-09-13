@@ -27,6 +27,25 @@ const account: PortfolioAccount = {
 };
 
 describe("Hyperliquid normalization", () => {
+  it("loads all markets over multiple fill pages when no aliases are supplied", async () => {
+    const firstPage = Array.from({ length: 2000 }, (_, index) => ({
+      coin: index % 2 ? "@107" : "BTC", time: index + 1,
+      px: "0.0037295", sz: "2", side: "B", oid: index, tid: index,
+    }));
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => firstPage })
+      .mockResolvedValueOnce({ ok: true, json: async () => [
+        firstPage[1999],
+        { coin: "io:OAI", time: 2001, px: "123", sz: "1", oid: 2000, tid: 2000 },
+        { coin: "xyz:DRAM", time: 2002, px: "50", sz: "1", oid: 2001, tid: 2001 },
+      ] });
+    const orders = await fetchHyperliquidFilledOrdersByTime({ account, startTime: 0, endTime: 3000 }, fetcher);
+    expect(orders).toHaveLength(2002);
+    expect(new Set(orders.map((order) => order.coin))).toEqual(new Set(["BTC", "@107", "io:OAI", "xyz:DRAM"]));
+    expect(orders.at(-1)?.averagePrice).toBe(0.0037295);
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).startTime).toBe(2000);
+  });
+
   it("normalizes account value and open positions", async () => {
     const fetcher = vi
       .fn()
@@ -646,7 +665,7 @@ describe("Hyperliquid normalization", () => {
         id: "hl1:42:BTC:Buy",
         side: "Buy",
         direction: "Open Long",
-        averagePrice: 106.67,
+        averagePrice: 320 / 3,
         totalSize: 3,
         notionalUsd: 320,
         fee: 0.3,

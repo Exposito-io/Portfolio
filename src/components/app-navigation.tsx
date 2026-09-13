@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  ChartNoAxesCombined,
   LogOut,
   Menu,
   Newspaper,
@@ -29,7 +30,7 @@ export function AppNavigation({ email, signOutAction }: AppNavigationProps) {
         aria-controls="app-navigation-menu"
         aria-expanded={isOpen}
         aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
-        className="mobile-menu-button sm:hidden"
+        className="mobile-menu-button lg:hidden"
         onClick={() => setIsOpen((open) => !open)}
         type="button"
       >
@@ -41,7 +42,7 @@ export function AppNavigation({ email, signOutAction }: AppNavigationProps) {
       </button>
       <nav
         aria-label="Primary navigation"
-        className={`app-nav ${isOpen ? "app-nav-open" : ""} order-last w-full flex-col items-stretch gap-1 sm:order-none sm:w-auto sm:flex-row sm:items-center sm:gap-2`}
+        className={`app-nav ${isOpen ? "app-nav-open" : ""} order-last w-full flex-col items-stretch gap-1 lg:order-none lg:w-auto lg:flex-row lg:items-center lg:gap-2`}
         id="app-navigation-menu"
       >
         <Link className="nav-link" href="/" onClick={closeMenu}>
@@ -51,6 +52,10 @@ export function AppNavigation({ email, signOutAction }: AppNavigationProps) {
           <NotebookText size={16} aria-hidden="true" />
           Journal
         </Link>
+        <Link className="nav-link" href="/stats" onClick={closeMenu}>
+          <ChartNoAxesCombined size={16} aria-hidden="true" />
+          Stats
+        </Link>
         <Link className="nav-link" href="/news" onClick={closeMenu}>
           <Newspaper size={16} aria-hidden="true" />
           News
@@ -59,9 +64,9 @@ export function AppNavigation({ email, signOutAction }: AppNavigationProps) {
           <Settings size={16} aria-hidden="true" />
           Settings
         </Link>
-        <form action={signOutAction} className="w-full sm:ml-1 sm:w-auto">
+        <form action={signOutAction} className="w-full lg:ml-1 lg:w-auto">
           <button
-            className="nav-link w-full sm:w-auto"
+            className="nav-link w-full lg:w-auto"
             type="submit"
             title={email ?? "Sign out"}
           >
