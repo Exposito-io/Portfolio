@@ -1,4 +1,5 @@
 import { roundCurrency } from "@/lib/portfolio-calculations";
+import { getHyperliquidInfoClient } from "@/lib/hyperliquid-info";
 import type {
   HyperliquidCandle,
   HyperliquidFill,
@@ -232,10 +233,11 @@ export async function fetchHyperliquidAccount(
 export async function fetchHyperliquidMarkets(
   fetcher: typeof fetch = fetch,
 ): Promise<JournalTradeAsset[]> {
-  const [perpMeta, spotMeta, tradeXyzMeta] = await Promise.all([
+  const [perpMeta, spotMeta, tradeXyzMeta, ioMeta] = await Promise.all([
     fetchPerpMeta("", fetcher),
     fetchSpotMeta(fetcher),
     fetchPerpMeta("xyz", fetcher),
+    fetchPerpMeta("io", fetcher),
   ]);
 
   const perps = (perpMeta.universe ?? [])
@@ -268,7 +270,21 @@ export async function fetchHyperliquidMarkets(
       dex: "xyz",
     }));
 
-  return [...perps, ...spotMarkets, ...tradeXyz].sort((a, b) =>
+  const ioPerps = (ioMeta.universe ?? [])
+    .map((market) => market.name)
+    .filter(isPresent)
+    .map<JournalTradeAsset>((name) => {
+      const coin = name.includes(":") ? name : `io:${name}`;
+      return {
+        kind: "perp",
+        label: `${coin} perp`,
+        coin,
+        chartCoin: coin,
+        dex: "io",
+      };
+    });
+
+  return [...perps, ...spotMarkets, ...tradeXyz, ...ioPerps].sort((a, b) =>
     a.label.localeCompare(b.label),
   );
 }
@@ -298,6 +314,8 @@ export async function fetchHyperliquidCandles(
       },
     },
     fetcher,
+    "Hyperliquid candles",
+    JSON.stringify({ coin, interval, days }),
   );
 
   return response
@@ -488,7 +506,7 @@ export async function fetchHyperliquidOpenPositionSummary(
     return null;
   }
 
-  const dex = asset.kind === "trade-xyz" ? "xyz" : "";
+  const dex = asset.dex || (asset.kind === "trade-xyz" ? "xyz" : "");
   const state = await postInfo<HyperliquidClearinghouseState>(
     {
       type: "clearinghouseState",
@@ -571,7 +589,7 @@ async function fetchSpotClearinghouseState(
   );
 }
 
-async function fetchPerpMeta(dex: "" | "xyz", fetcher: typeof fetch) {
+async function fetchPerpMeta(dex: string, fetcher: typeof fetch) {
   return postInfo<HyperliquidPerpMeta>(
     {
       type: "meta",
@@ -596,19 +614,9 @@ async function postInfo<T>(
   body: Record<string, unknown>,
   fetcher: typeof fetch,
   label = "Hyperliquid info",
+  cacheKey?: string,
 ): Promise<T> {
-  const response = await fetcher("https://api.hyperliquid.xyz/info", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`${label} returned HTTP ${response.status}.`);
-  }
-
-  return (await response.json()) as T;
+  return getHyperliquidInfoClient(fetcher).request<T>(body, label, cacheKey);
 }
 
 async function fetchClearinghouseState(

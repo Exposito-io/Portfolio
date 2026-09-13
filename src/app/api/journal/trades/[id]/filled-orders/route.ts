@@ -10,6 +10,7 @@ import {
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
 import { getTrade } from "@/lib/journal";
+import { getHyperliquidSnapshotTime } from "@/lib/hyperliquid-info";
 import {
   calculateJournalTradeClosingPrice,
   calculateJournalTradeEntryPrice,
@@ -54,7 +55,7 @@ export async function GET(_request: Request, context: RouteContext) {
     );
     const endTime = trade.endDate
       ? getZonedJournalDateMs(trade.endDate, PORTFOLIO_TIMEZONE, "end")
-      : Date.now();
+      : getHyperliquidSnapshotTime();
     const coinAliases = getHyperliquidCoinAliases(trade.asset);
     const orders: HyperliquidFilledOrder[] = [];
     const sourceErrors: SourceError[] = [];

@@ -26,12 +26,9 @@ export function JournalMarketMetric({
     );
   }
 
-  const tone =
-    summary.change24hPercent > 0
-      ? "journal-pnl-metric-positive"
-      : summary.change24hPercent < 0
-        ? "journal-pnl-metric-negative"
-        : "";
+  const tone = isFiniteNumber(summary.change24hPercent)
+    ? getMetricTone(summary.change24hPercent)
+    : "";
 
   return (
     <section className={`journal-pnl-metric journal-market-metric ${tone}`}>
@@ -113,18 +110,19 @@ function getMetricTone(value: number) {
       : "";
 }
 
-function MarketChange({ label, value }: { label: string; value: number }) {
-  const tone =
-    value > 0
+function MarketChange({ label, value }: { label: string; value: number | null }) {
+  const tone = isFiniteNumber(value)
+    ? value > 0
       ? "journal-market-change-positive"
       : value < 0
         ? "journal-market-change-negative"
-        : "";
+        : ""
+    : "";
 
   return (
     <div className={`journal-pnl-metric-percent ${tone}`}>
       <span>{label}</span>
-      <b>{formatSignedPercent(value, 1)}</b>
+      <b>{isFiniteNumber(value) ? formatSignedPercent(value, 1) : "N/A"}</b>
     </div>
   );
 }

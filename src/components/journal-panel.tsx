@@ -54,6 +54,10 @@ export function JournalPanel() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const visibleTrades = useMemo(
+    () => trades.filter((trade) => !trade.endDate || closedTradesOpen),
+    [trades, closedTradesOpen],
+  );
 
   const loadTrades = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -160,14 +164,14 @@ export function JournalPanel() {
     const controller = new AbortController();
 
     const timeout = window.setTimeout(() => {
-      if (!trades.length) {
+      if (!visibleTrades.length) {
         setTradePnlById({});
         return;
       }
 
       setTradePnlById((current) =>
         Object.fromEntries(
-          trades.filter((trade) => trade.kind === "trade").map((trade) => [
+          visibleTrades.filter((trade) => trade.kind === "trade").map((trade) => [
             trade.id,
             current[trade.id] ?? {
               summary: null,
@@ -178,7 +182,7 @@ export function JournalPanel() {
         ),
       );
 
-      for (const trade of trades) {
+      for (const trade of visibleTrades) {
         if (trade.kind === "trade") {
           void loadTradePnl(trade.id, controller.signal);
         }
@@ -189,12 +193,12 @@ export function JournalPanel() {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [trades]);
+  }, [visibleTrades]);
 
   useEffect(() => {
     const controller = new AbortController();
     const coins = Array.from(
-      new Set(trades.map((trade) => trade.asset.chartCoin).filter(Boolean)),
+      new Set(visibleTrades.map((trade) => trade.asset.chartCoin).filter(Boolean)),
     );
 
     if (!coins.length) {
@@ -262,7 +266,7 @@ export function JournalPanel() {
 
     void loadMarketsForCards();
     return () => controller.abort();
-  }, [trades]);
+  }, [visibleTrades]);
 
   useEffect(() => {
     if (!tradeFormOpen) return;

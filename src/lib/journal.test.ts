@@ -22,6 +22,25 @@ const asset = {
 };
 
 describe("journal trades", () => {
+  it("preserves io market routing when saving and loading a journal trade", async () => {
+    const db = fakeDb();
+    const ioAsset = {
+      kind: "perp" as const,
+      label: "io:OAI perp",
+      coin: "io:OAI",
+      chartCoin: "io:OAI",
+      dex: "io",
+    };
+    const trade = await createTrade(db, {
+      title: "OpenAI setup",
+      startDate: "2026-09-08",
+      asset: ioAsset,
+    });
+
+    expect(trade.asset).toEqual(ioAsset);
+    expect((await getTrade(db, trade.id))?.asset).toEqual(ioAsset);
+  });
+
   it("creates, serializes, updates, and deletes trades and entries", async () => {
     const db = fakeDb();
     const trade = await createTrade(db, {

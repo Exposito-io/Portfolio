@@ -24,7 +24,35 @@ describe("journal market summary", () => {
     });
   });
 
-  it("returns null without a full 30 days of history", () => {
-    expect(calculateJournalMarketSummary([candle(1, 100, 101)])).toBeNull();
+  it("keeps the price when no return period has enough history", () => {
+    expect(calculateJournalMarketSummary([candle(1, 100, 101)])).toEqual({
+      priceUsd: 101,
+      change24hPercent: null,
+      change7dPercent: null,
+      change30dPercent: null,
+    });
+  });
+
+  it("keeps 24h and 7d returns for a newly listed market without 30d history", () => {
+    const day = 24 * 60 * 60 * 1000;
+    expect(calculateJournalMarketSummary([
+      candle(10 * day, 145, 150),
+      candle(0, 100, 101),
+      candle(3 * day, 125, 126),
+      candle(9 * day, 140, 141),
+    ])).toEqual({
+      priceUsd: 150,
+      change24hPercent: 7.14,
+      change7dPercent: 20,
+      change30dPercent: null,
+    });
+  });
+
+  it("returns null when no valid prices are available", () => {
+    expect(calculateJournalMarketSummary([])).toBeNull();
+    expect(calculateJournalMarketSummary([
+      candle(1, 0, 100),
+      candle(2, 100, Number.NaN),
+    ])).toBeNull();
   });
 });
