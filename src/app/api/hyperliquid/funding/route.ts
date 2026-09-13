@@ -6,6 +6,7 @@ import {
   fetchHyperliquidFundingHistory,
 } from "@/lib/hyperliquid";
 import { calculateJournalFundingSummary } from "@/lib/journal-funding";
+import { getHyperliquidSnapshotTime } from "@/lib/hyperliquid-info";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Coin is required." }, { status: 400 });
     }
 
-    const endTime = Date.now();
+    const endTime = getHyperliquidSnapshotTime();
     const [rates, currentHourlyRate] = await Promise.all([
       fetchHyperliquidFundingHistory({
         coin,

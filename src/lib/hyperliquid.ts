@@ -1,4 +1,5 @@
 import { roundCurrency } from "@/lib/portfolio-calculations";
+import { getHyperliquidInfoClient } from "@/lib/hyperliquid-info";
 import type {
   HyperliquidCandle,
   HyperliquidFill,
@@ -313,6 +314,8 @@ export async function fetchHyperliquidCandles(
       },
     },
     fetcher,
+    "Hyperliquid candles",
+    JSON.stringify({ coin, interval, days }),
   );
 
   return response
@@ -611,19 +614,9 @@ async function postInfo<T>(
   body: Record<string, unknown>,
   fetcher: typeof fetch,
   label = "Hyperliquid info",
+  cacheKey?: string,
 ): Promise<T> {
-  const response = await fetcher("https://api.hyperliquid.xyz/info", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`${label} returned HTTP ${response.status}.`);
-  }
-
-  return (await response.json()) as T;
+  return getHyperliquidInfoClient(fetcher).request<T>(body, label, cacheKey);
 }
 
 async function fetchClearinghouseState(
