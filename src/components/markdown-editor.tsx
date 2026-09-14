@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Bold, ImagePlus, Italic, Link as LinkIcon, List } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkHideComments } from "@/lib/markdown";
 
 type MarkdownEditorProps = {
   id: string;
@@ -175,7 +176,7 @@ export function MarkdownView({ value }: { value: string }) {
 
   return (
     <div className="markdown-view">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkHideComments]}>{value}</ReactMarkdown>
     </div>
   );
 }
