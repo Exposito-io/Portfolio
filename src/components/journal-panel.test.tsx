@@ -22,7 +22,7 @@ it("fetches closed trade history only after expanding the closed section", async
     ok: true,
     json: async () => url === "/api/journal/trades" ? { trades }
       : url === "/api/hyperliquid/markets" ? { markets: [] }
-        : url === "/api/settings" ? { settings: { journalDescriptionTemplate: "" } }
+        : url === "/api/settings" ? { settings: { journalDescriptionTemplates: [] } }
           : url.startsWith("/api/hyperliquid/candles") ? { candles: [] }
             : {},
   }));

@@ -14,8 +14,14 @@ export type PortfolioAccount = {
   updatedAt: string;
 };
 
+export type JournalDescriptionTemplate = {
+  id: string;
+  title: string;
+  descriptionMarkdown: string;
+};
+
 export type ApplicationSettings = {
-  journalDescriptionTemplate: string;
+  journalDescriptionTemplates: JournalDescriptionTemplate[];
   createdAt: string | null;
   updatedAt: string | null;
 };
