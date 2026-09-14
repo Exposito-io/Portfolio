@@ -4,7 +4,11 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Check, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
-import type { AccountSource, PortfolioAccount } from "@/lib/types";
+import type {
+  AccountSource,
+  JournalDescriptionTemplate,
+  PortfolioAccount,
+} from "@/lib/types";
 
 type FormState = {
   source: AccountSource;
@@ -29,7 +33,9 @@ export function SettingsPanel() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [journalDescriptionTemplate, setJournalDescriptionTemplate] = useState("");
+  const [templates, setTemplates] = useState<JournalDescriptionTemplate[]>([]);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [templateError, setTemplateError] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
 
@@ -45,7 +51,9 @@ export function SettingsPanel() {
       setAccounts(payload.accounts);
     } catch (loadError) {
       setError(
-        loadError instanceof Error ? loadError.message : "Unable to load accounts.",
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load accounts.",
       );
     } finally {
       setLoading(false);
@@ -66,11 +74,10 @@ export function SettingsPanel() {
         const response = await fetch("/api/settings");
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error);
-        setJournalDescriptionTemplate(
-          payload.settings?.journalDescriptionTemplate ?? "",
-        );
+        setTemplates(payload.settings.journalDescriptionTemplates);
+        setSettingsLoaded(true);
       } catch (loadError) {
-        setError(
+        setTemplateError(
           loadError instanceof Error
             ? loadError.message
             : "Unable to load settings.",
@@ -81,28 +88,43 @@ export function SettingsPanel() {
     void loadSettings();
   }, []);
 
-  async function saveJournalTemplate(event: FormEvent) {
+  async function saveJournalTemplates(event: FormEvent) {
     event.preventDefault();
     setSavingTemplate(true);
     setTemplateSaved(false);
-    setError("");
+    setTemplateError("");
     try {
       const response = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ journalDescriptionTemplate }),
+        body: JSON.stringify({ journalDescriptionTemplates: templates }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Unable to save settings.");
-      setJournalDescriptionTemplate(payload.settings.journalDescriptionTemplate);
+      if (!response.ok)
+        throw new Error(payload.error || "Unable to save settings.");
+      setTemplates(payload.settings.journalDescriptionTemplates);
       setTemplateSaved(true);
     } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : "Unable to save settings.",
+      setTemplateError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save settings.",
       );
     } finally {
       setSavingTemplate(false);
     }
+  }
+
+  function updateTemplate(
+    id: string,
+    changes: Partial<JournalDescriptionTemplate>,
+  ) {
+    setTemplates((current) =>
+      current.map((template) =>
+        template.id === id ? { ...template, ...changes } : template,
+      ),
+    );
+    setTemplateSaved(false);
   }
 
   async function saveAccount(event: FormEvent) {
@@ -125,7 +147,9 @@ export function SettingsPanel() {
       await loadAccounts();
     } catch (saveError) {
       setError(
-        saveError instanceof Error ? saveError.message : "Unable to save account.",
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save account.",
       );
     } finally {
       setSaving(false);
@@ -163,38 +187,125 @@ export function SettingsPanel() {
     <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[440px_1fr] lg:px-8">
       <section className="panel lg:col-span-2">
         <div className="panel-heading">
-          <h1>Journal defaults</h1>
-          <p>Set the Markdown added to the description of each new journal item.</p>
+          <h1>Journal templates</h1>
+          <p>
+            Create named Markdown templates to insert when creating or editing a
+            journal description.
+          </p>
         </div>
-        <form
-          className="mt-5 grid gap-4 lg:grid-cols-2"
-          onSubmit={saveJournalTemplate}
-        >
-          <MarkdownEditor
-            id="journal-description-template"
-            label="Journal description template"
-            value={journalDescriptionTemplate}
-            onChange={(value) => {
-              setJournalDescriptionTemplate(value);
-              setTemplateSaved(false);
-            }}
-          />
-          <div className="grid min-w-0 content-start gap-2">
-            <p className="field-label">Preview</p>
-            <div className="markdown-template-preview">
-              <MarkdownView value={journalDescriptionTemplate} />
-            </div>
+        {templateError ? (
+          <div className="alert alert-error" role="alert">
+            {templateError}
           </div>
-          <div className="flex items-center gap-3 lg:col-span-2">
-            <button className="button-primary" disabled={savingTemplate} type="submit">
-              <Save size={16} aria-hidden="true" />
-              {savingTemplate ? "Saving..." : "Save template"}
-            </button>
-            {templateSaved ? (
-              <span className="text-sm font-medium text-[#1f7a68]">Saved</span>
-            ) : null}
-          </div>
-        </form>
+        ) : null}
+        {!settingsLoaded ? (
+          <p className="mt-4 text-sm text-[#69706c]">
+            {templateError
+              ? "Templates could not be loaded. Reload the page to try again."
+              : "Loading templates..."}
+          </p>
+        ) : (
+          <form className="mt-5 grid gap-5" onSubmit={saveJournalTemplates}>
+            <fieldset className="grid min-w-0 gap-5" disabled={savingTemplate}>
+              {!templates.length ? (
+                <p className="text-sm text-[#69706c]">
+                  No templates yet. Add a template to get started.
+                </p>
+              ) : null}
+              {templates.map((template, index) => (
+                <div
+                  className="grid min-w-0 gap-4 rounded-xl border border-[#e2e5e2] p-4 lg:grid-cols-2"
+                  key={template.id}
+                >
+                  <div className="flex min-w-0 items-end gap-3 lg:col-span-2">
+                    <div className="grid min-w-0 flex-1 gap-2">
+                      <label
+                        className="field-label"
+                        htmlFor={`template-title-${template.id}`}
+                      >
+                        Template title {index + 1}
+                      </label>
+                      <input
+                        id={`template-title-${template.id}`}
+                        className="input"
+                        required
+                        maxLength={100}
+                        value={template.title}
+                        onChange={(event) =>
+                          updateTemplate(template.id, {
+                            title: event.target.value,
+                          })
+                        }
+                        placeholder="Breakout setup"
+                      />
+                    </div>
+                    <button
+                      className="button-secondary"
+                      type="button"
+                      aria-label={`Remove template ${index + 1}`}
+                      onClick={() => {
+                        setTemplates((current) =>
+                          current.filter((item) => item.id !== template.id),
+                        );
+                        setTemplateSaved(false);
+                      }}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                      Remove
+                    </button>
+                  </div>
+                  <MarkdownEditor
+                    id={`template-description-${template.id}`}
+                    label={`Description template ${index + 1}`}
+                    value={template.descriptionMarkdown}
+                    onChange={(descriptionMarkdown) =>
+                      updateTemplate(template.id, { descriptionMarkdown })
+                    }
+                  />
+                  <div className="grid min-w-0 content-start gap-2">
+                    <p className="field-label">Preview</p>
+                    <div className="markdown-template-preview">
+                      <MarkdownView value={template.descriptionMarkdown} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  className="button-secondary"
+                  disabled={templates.length >= 50}
+                  type="button"
+                  onClick={() => {
+                    setTemplates((current) => [
+                      ...current,
+                      {
+                        id: crypto.randomUUID(),
+                        title: "",
+                        descriptionMarkdown: "",
+                      },
+                    ]);
+                    setTemplateSaved(false);
+                  }}
+                >
+                  <Plus size={16} aria-hidden="true" />
+                  Add template
+                </button>
+                <button className="button-primary" type="submit">
+                  <Save size={16} aria-hidden="true" />
+                  {savingTemplate ? "Saving..." : "Save templates"}
+                </button>
+                {templateSaved ? (
+                  <span
+                    className="text-sm font-medium text-[#1f7a68]"
+                    role="status"
+                  >
+                    Saved
+                  </span>
+                ) : null}
+              </div>
+            </fieldset>
+          </form>
+        )}
       </section>
       <section className="panel h-fit">
         <div className="panel-heading">
@@ -214,7 +325,10 @@ export function SettingsPanel() {
               className="input"
               value={form.source}
               onChange={(event) =>
-                setForm({ ...form, source: event.target.value as AccountSource })
+                setForm({
+                  ...form,
+                  source: event.target.value as AccountSource,
+                })
               }
             >
               <option value="aave">Aave Ethereum</option>
@@ -230,7 +344,9 @@ export function SettingsPanel() {
               className="input"
               required
               value={form.label}
-              onChange={(event) => setForm({ ...form, label: event.target.value })}
+              onChange={(event) =>
+                setForm({ ...form, label: event.target.value })
+              }
               placeholder="Main wallet"
             />
           </div>
@@ -257,7 +373,9 @@ export function SettingsPanel() {
               id="notes"
               className="input min-h-24 resize-y"
               value={form.notes}
-              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              onChange={(event) =>
+                setForm({ ...form, notes: event.target.value })
+              }
               placeholder="Strategy, purpose, or reminders"
             />
           </div>

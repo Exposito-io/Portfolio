@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Save, X } from "lucide-react";
 
+import { JournalTemplatePicker } from "@/components/journal-template-picker";
 import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getDateTimeKey } from "@/lib/date";
@@ -42,12 +43,12 @@ type TradeFormState = {
 
 type AutoSaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
 
-function createEmptyForm(descriptionMarkdown = ""): TradeFormState {
+function createEmptyForm(): TradeFormState {
   return {
     kind: "trade",
     direction: "long",
     title: "",
-    descriptionMarkdown,
+    descriptionMarkdown: "",
     startDate: getDateTimeKey(new Date(), PORTFOLIO_TIMEZONE),
     endDate: "",
     assetKey: "",
@@ -78,7 +79,6 @@ export function JournalTradeForm({
   onAutoSaveDescription,
   autoSaveIntervalMs = 5_000,
   showDescriptionPreview = false,
-  defaultDescriptionMarkdown = "",
 }: {
   trade?: JournalTrade | null;
   markets: JournalTradeAsset[];
@@ -89,41 +89,21 @@ export function JournalTradeForm({
   onAutoSaveDescription?: (descriptionMarkdown: string) => Promise<void>;
   autoSaveIntervalMs?: number;
   showDescriptionPreview?: boolean;
-  defaultDescriptionMarkdown?: string;
 }) {
   const marketOptions = useMemo(
     () => markets.map((market) => [getAssetKey(market), market] as const),
     [markets],
   );
   const [form, setForm] = useState<TradeFormState>(() =>
-    trade ? createTradeForm(trade) : createEmptyForm(defaultDescriptionMarkdown),
+    trade ? createTradeForm(trade) : createEmptyForm(),
   );
   const previewMarkdown = useDeferredValue(form.descriptionMarkdown);
   const [autoSaveStatus, setAutoSaveStatus] =
     useState<AutoSaveStatus>("idle");
-  const previousDefaultDescriptionRef = useRef(defaultDescriptionMarkdown);
   const latestDescriptionRef = useRef(form.descriptionMarkdown);
   const lastSavedDescriptionRef = useRef(form.descriptionMarkdown);
   const autoSavePromiseRef = useRef<Promise<void> | null>(null);
   const manualSaveInProgressRef = useRef(false);
-
-  useEffect(() => {
-    const previousDefaultDescription = previousDefaultDescriptionRef.current;
-    previousDefaultDescriptionRef.current = defaultDescriptionMarkdown;
-    if (trade || previousDefaultDescription === defaultDescriptionMarkdown) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setForm((current) =>
-        current.descriptionMarkdown === previousDefaultDescription
-          ? { ...current, descriptionMarkdown: defaultDescriptionMarkdown }
-          : current,
-      );
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
-  }, [defaultDescriptionMarkdown, trade]);
 
   useEffect(() => {
     latestDescriptionRef.current = form.descriptionMarkdown;
@@ -221,7 +201,7 @@ export function JournalTradeForm({
 
     if (!trade) {
       setForm({
-        ...createEmptyForm(defaultDescriptionMarkdown),
+        ...createEmptyForm(),
         assetKey: marketOptions[0]?.[0] || "",
       });
     }
@@ -323,6 +303,13 @@ export function JournalTradeForm({
           />
         </div>
       </div>
+      <JournalTemplatePicker
+        descriptionMarkdown={form.descriptionMarkdown}
+        disabled={saving}
+        onInsert={(descriptionMarkdown) =>
+          setForm((current) => ({ ...current, descriptionMarkdown }))
+        }
+      />
       <div className="journal-trade-description-editor-layout">
         <MarkdownEditor
           id="trade-description"
