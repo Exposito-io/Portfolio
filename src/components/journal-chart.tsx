@@ -32,6 +32,7 @@ import {
 import { MarkdownView } from "@/components/markdown-editor";
 import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
+import { getMarkdownPreview } from "@/lib/markdown";
 import {
   formatJournalDateTimeKey,
   getJournalDateKey,
@@ -770,7 +771,7 @@ function TradingViewEmbed({ symbol }: { symbol: string }) {
 }
 
 function EntryMarkerTooltip({ marker }: { marker: ChartEntryMarker }) {
-  const image = getFirstMarkdownImage(marker.descriptionMarkdown);
+  const { image, text } = getMarkdownPreview(marker.descriptionMarkdown);
 
   return (
     <>
@@ -785,7 +786,7 @@ function EntryMarkerTooltip({ marker }: { marker: ChartEntryMarker }) {
         />
       ) : null}
       <small className="chart-marker-tooltip-note">
-        {toPlainText(marker.descriptionMarkdown)}
+        {text}
       </small>
     </>
   );
@@ -915,42 +916,4 @@ function formatCompactUsd(value: number) {
     notation: value >= 100_000 ? "compact" : "standard",
     style: "currency",
   }).format(value);
-}
-
-function getFirstMarkdownImage(markdown: string) {
-  const imageMatch = markdown.match(
-    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'))?\)/,
-  );
-  if (!imageMatch) return null;
-
-  const src = imageMatch[2].replace(/^<|>$/g, "");
-  if (!isSupportedImageSrc(src)) return null;
-
-  return {
-    alt: imageMatch[1] || "Journal entry image",
-    src,
-  };
-}
-
-function isSupportedImageSrc(src: string) {
-  return (
-    src.startsWith("/") ||
-    src.startsWith("data:image/") ||
-    /^https?:\/\//i.test(src)
-  );
-}
-
-function toPlainText(markdown: string) {
-  const text = markdown
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/_([^_]+)_/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[#>*-]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!text) return "No description.";
-  return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
