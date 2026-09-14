@@ -238,9 +238,10 @@ export function StatsPanel() {
           </>
         ) : null}
         <p className="mt-4 text-xs text-[#69706c]">
-          Hyperliquid provides only the most recent 10,000 fills per wallet.
-          Totals cover the returned history and may exclude older activity.
-          Repeated wallet addresses are counted once.
+          New fills refresh up to once per minute. Collected history is retained.
+          The first load is limited to the history Hyperliquid makes available,
+          so older activity may be missing. Repeated wallet addresses are counted
+          once.
         </p>
       </section>
     </main>

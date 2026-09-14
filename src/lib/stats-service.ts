@@ -1,4 +1,4 @@
-import { fetchHyperliquidFilledOrdersByTime } from "@/lib/hyperliquid";
+import type { FillHistoryQuery } from "@/lib/hyperliquid-fill-cache";
 import type { StatsResponse } from "@/lib/stats";
 import type {
   HyperliquidFilledOrder,
@@ -9,7 +9,7 @@ import type {
 export async function loadStats(
   accounts: PortfolioAccount[],
   endTime: number,
-  fetchOrders = fetchHyperliquidFilledOrdersByTime,
+  fetchOrders: (query: FillHistoryQuery) => Promise<HyperliquidFilledOrder[]>,
 ): Promise<StatsResponse> {
   // Settings permits repeated addresses. Count each wallet only once.
   const wallets = new Map<string, PortfolioAccount>();
@@ -38,7 +38,10 @@ export async function loadStats(
   );
   return {
     orders: orders.sort(
-      (a, b) => b.lastTime - a.lastTime || b.firstTime - a.firstTime || b.id.localeCompare(a.id),
+      (a, b) =>
+        b.lastTime - a.lastTime ||
+        b.firstTime - a.firstTime ||
+        b.id.localeCompare(a.id),
     ),
     accountsCount: wallets.size,
     sourceErrors,

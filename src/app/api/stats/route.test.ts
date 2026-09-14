@@ -36,7 +36,11 @@ describe("GET /api/stats", () => {
     const response = await GET();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(payload);
-    expect(loadStats).toHaveBeenCalledWith([], expect.any(Number));
+    expect(loadStats).toHaveBeenCalledWith(
+      [],
+      expect.any(Number),
+      expect.any(Function),
+    );
   });
 
   it("returns a server error when account loading fails", async () => {

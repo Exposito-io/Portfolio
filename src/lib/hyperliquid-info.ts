@@ -6,15 +6,32 @@ const MINUTE_MS = 60_000;
 const WEIGHT_BUDGET = 900;
 
 function requestWeight(body: Record<string, unknown>) {
-  if (body.type === "clearinghouseState" || body.type === "spotClearinghouseState") return 2;
+  if (
+    body.type === "clearinghouseState" ||
+    body.type === "spotClearinghouseState"
+  )
+    return 2;
   if (body.type === "userFillsByTime") return 120; // Up to 2,000 fills per page.
   if (body.type === "fundingHistory") return 45; // Up to 500 rates per page.
   if (body.type === "candleSnapshot") {
-    const req = body.req as { interval: string; startTime: number; endTime: number };
+    const req = body.req as {
+      interval: string;
+      startTime: number;
+      endTime: number;
+    };
     const match = /^(\d+)(m|h|d|w|M)$/.exec(req.interval);
-    const unitMs: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000, M: 2_419_200_000 };
+    const unitMs: Record<string, number> = {
+      m: 60_000,
+      h: 3_600_000,
+      d: 86_400_000,
+      w: 604_800_000,
+      M: 2_419_200_000,
+    };
     const intervalMs = match ? Number(match[1]) * unitMs[match[2]] : 0;
-    const count = intervalMs > 0 ? Math.max(0, Math.ceil((req.endTime - req.startTime) / intervalMs)) + 1 : 5000;
+    const count =
+      intervalMs > 0
+        ? Math.max(0, Math.ceil((req.endTime - req.startTime) / intervalMs)) + 1
+        : 5000;
     return 20 + Math.ceil(Math.min(5000, count) / 60);
   }
   return 20;
@@ -27,9 +44,12 @@ export function getHyperliquidSnapshotTime() {
 
 // One client per fetch implementation, shared by the server's route bundles.
 const shared = globalThis as typeof globalThis & {
-  portfolioHyperliquidRequestClients?: WeakMap<typeof fetch, HyperliquidInfoClient>;
+  portfolioHyperliquidRequestClients?: WeakMap<
+    typeof fetch,
+    HyperliquidInfoClient
+  >;
 };
-const clients = shared.portfolioHyperliquidRequestClients ??= new WeakMap();
+const clients = (shared.portfolioHyperliquidRequestClients ??= new WeakMap());
 
 export function getHyperliquidInfoClient(fetcher: typeof fetch) {
   let client = clients.get(fetcher);
@@ -45,7 +65,6 @@ export class HyperliquidInfoClient {
   private inFlight = new Map<string, Promise<unknown>>();
   private retryAt = 0;
   private reservations: Array<{ time: number; weight: number }> = [];
-  private queue: Promise<void> = Promise.resolve();
 
   constructor(private fetcher: typeof fetch) {}
 
@@ -64,21 +83,29 @@ export class HyperliquidInfoClient {
 
     if (now < this.retryAt) {
       if (cached && now < cached.staleUntil) return cached.value as T;
-      throw new Error(`${label} is rate limited. Try again in ${Math.ceil((this.retryAt - now) / 1000)} seconds.`);
+      throw new Error(
+        `${label} is rate limited. Try again in ${Math.ceil((this.retryAt - now) / 1000)} seconds.`,
+      );
     }
 
-    const request = this.load<T>(body, label, key).catch((error: unknown) => {
-      // Only slow-changing market catalogs may fall back to stale data.
-      if (cached && Date.now() < cached.staleUntil) return cached.value as T;
-      throw error;
-    }).finally(() => {
-      this.inFlight.delete(key);
-    });
+    const request = this.load<T>(body, label, key)
+      .catch((error: unknown) => {
+        // Only slow-changing market catalogs may fall back to stale data.
+        if (cached && Date.now() < cached.staleUntil) return cached.value as T;
+        throw error;
+      })
+      .finally(() => {
+        this.inFlight.delete(key);
+      });
     this.inFlight.set(key, request);
     return request;
   }
 
-  private async load<T>(body: Record<string, unknown>, label: string, key: string) {
+  private async load<T>(
+    body: Record<string, unknown>,
+    label: string,
+    key: string,
+  ) {
     await this.reserveBudget(requestWeight(body), label);
     const response = await this.fetcher("https://api.hyperliquid.xyz/info", {
       method: "POST",
@@ -93,14 +120,19 @@ export class HyperliquidInfoClient {
         const seconds = retryAfter ? Number(retryAfter) : NaN;
         const retryAt = Number.isFinite(seconds)
           ? Date.now() + seconds * 1000
-          : retryAfter ? Date.parse(retryAfter) : NaN;
-        this.retryAt = Math.max(this.retryAt, Date.now() + MINUTE_MS,
-          Number.isFinite(retryAt) ? retryAt : 0);
+          : retryAfter
+            ? Date.parse(retryAfter)
+            : NaN;
+        this.retryAt = Math.max(
+          this.retryAt,
+          Date.now() + MINUTE_MS,
+          Number.isFinite(retryAt) ? retryAt : 0,
+        );
       }
       throw new Error(`${label} returned HTTP ${response.status}.`);
     }
 
-    const value = await response.json() as T;
+    const value = (await response.json()) as T;
     const catalog = body.type === "meta" || body.type === "spotMeta";
     const ttl = catalog ? 15 * MINUTE_MS : 15_000;
     const now = Date.now();
@@ -120,22 +152,26 @@ export class HyperliquidInfoClient {
     return value;
   }
 
-  private reserveBudget(weight: number, label: string) {
-    const reservation = this.queue.then(async () => {
-      for (;;) {
-        const now = Date.now();
-        if (now < this.retryAt) throw new Error(`${label} is rate limited. Try again later.`);
-        this.reservations = this.reservations.filter((item) => item.time > now - MINUTE_MS);
-        const used = this.reservations.reduce((sum, item) => sum + item.weight, 0);
-        if (used + weight <= WEIGHT_BUDGET) {
-          this.reservations.push({ time: now, weight });
-          return;
-        }
-        const delay = this.reservations[0].time + MINUTE_MS - now;
-        await new Promise((resolve) => setTimeout(resolve, delay));
+  private async reserveBudget(weight: number, label: string) {
+    // Reservations are synchronous until the wait. Small live-position
+    // requests can use remaining budget while a large history page waits.
+    for (;;) {
+      const now = Date.now();
+      if (now < this.retryAt)
+        throw new Error(`${label} is rate limited. Try again later.`);
+      this.reservations = this.reservations.filter(
+        (item) => item.time > now - MINUTE_MS,
+      );
+      const used = this.reservations.reduce(
+        (sum, item) => sum + item.weight,
+        0,
+      );
+      if (used + weight <= WEIGHT_BUDGET) {
+        this.reservations.push({ time: now, weight });
+        return;
       }
-    });
-    this.queue = reservation.catch(() => {});
-    return reservation;
+      const delay = this.reservations[0].time + MINUTE_MS - now;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
 }

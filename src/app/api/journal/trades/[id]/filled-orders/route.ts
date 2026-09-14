@@ -5,10 +5,10 @@ import { getApiAuthorizationError } from "@/lib/authorization";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getZonedJournalDateMs } from "@/lib/date";
 import {
-  fetchHyperliquidFilledOrdersByTime,
   fetchHyperliquidOpenPositionSummary,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
+import { getHyperliquidFillCache } from "@/lib/hyperliquid-fill-cache";
 import { getTrade } from "@/lib/journal";
 import { getHyperliquidSnapshotTime } from "@/lib/hyperliquid-info";
 import {
@@ -68,7 +68,7 @@ export async function GET(_request: Request, context: RouteContext) {
     for (const account of accounts) {
       try {
         orders.push(
-          ...(await fetchHyperliquidFilledOrdersByTime({
+          ...(await getHyperliquidFillCache(db).getOrders({
             account,
             startTime,
             endTime,
