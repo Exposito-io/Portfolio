@@ -34,6 +34,9 @@ export function SettingsPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [templates, setTemplates] = useState<JournalDescriptionTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const template =
+    templates.find((item) => item.id === selectedTemplateId) ?? templates[0];
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [templateError, setTemplateError] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -90,6 +93,18 @@ export function SettingsPanel() {
 
   async function saveJournalTemplates(event: FormEvent) {
     event.preventDefault();
+    const invalidTemplate = templates.find(
+      (item) => !item.title.trim() || item.descriptionMarkdown.length > 12_000,
+    );
+    if (invalidTemplate) {
+      setSelectedTemplateId(invalidTemplate.id);
+      setTemplateError(
+        !invalidTemplate.title.trim()
+          ? "Each template needs a title."
+          : "Template descriptions must be 12,000 characters or fewer.",
+      );
+      return;
+    }
     setSavingTemplate(true);
     setTemplateSaved(false);
     setTemplateError("");
@@ -212,7 +227,31 @@ export function SettingsPanel() {
                   No templates yet. Add a template to get started.
                 </p>
               ) : null}
-              {templates.map((template, index) => (
+              {template ? (
+                <div className="grid min-w-0 gap-2">
+                  <label
+                    className="field-label"
+                    htmlFor="settings-journal-template"
+                  >
+                    Journal template
+                  </label>
+                  <select
+                    id="settings-journal-template"
+                    className="input"
+                    value={template.id}
+                    onChange={(event) =>
+                      setSelectedTemplateId(event.target.value)
+                    }
+                  >
+                    {templates.map((item, index) => (
+                      <option key={item.id} value={item.id}>
+                        {item.title.trim() || `Untitled template ${index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              {template ? (
                 <div
                   className="grid min-w-0 gap-4 rounded-xl border border-[#e2e5e2] p-4 lg:grid-cols-2"
                   key={template.id}
@@ -223,7 +262,7 @@ export function SettingsPanel() {
                         className="field-label"
                         htmlFor={`template-title-${template.id}`}
                       >
-                        Template title {index + 1}
+                        Template title
                       </label>
                       <input
                         id={`template-title-${template.id}`}
@@ -242,7 +281,7 @@ export function SettingsPanel() {
                     <button
                       className="button-secondary"
                       type="button"
-                      aria-label={`Remove template ${index + 1}`}
+                      aria-label="Remove selected template"
                       onClick={() => {
                         setTemplates((current) =>
                           current.filter((item) => item.id !== template.id),
@@ -256,7 +295,7 @@ export function SettingsPanel() {
                   </div>
                   <MarkdownEditor
                     id={`template-description-${template.id}`}
-                    label={`Description template ${index + 1}`}
+                    label="Description template"
                     value={template.descriptionMarkdown}
                     onChange={(descriptionMarkdown) =>
                       updateTemplate(template.id, { descriptionMarkdown })
@@ -269,21 +308,19 @@ export function SettingsPanel() {
                     </div>
                   </div>
                 </div>
-              ))}
+              ) : null}
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   className="button-secondary"
                   disabled={templates.length >= 50}
                   type="button"
                   onClick={() => {
+                    const id = crypto.randomUUID();
                     setTemplates((current) => [
                       ...current,
-                      {
-                        id: crypto.randomUUID(),
-                        title: "",
-                        descriptionMarkdown: "",
-                      },
+                      { id, title: "", descriptionMarkdown: "" },
                     ]);
+                    setSelectedTemplateId(id);
                     setTemplateSaved(false);
                   }}
                 >

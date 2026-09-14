@@ -36,15 +36,31 @@ describe("journal template settings", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     const view = render(<SettingsPanel />);
-    expect(await screen.findByLabelText("Description template 1")).toHaveValue(
+    expect(await screen.findByLabelText("Description template")).toHaveValue(
       "  ## Existing\n ",
     );
-    await user.clear(screen.getByLabelText("Template title 1"));
-    await user.type(screen.getByLabelText("Template title 1"), "My setup");
+    await user.clear(screen.getByLabelText("Template title"));
+    await user.type(screen.getByLabelText("Template title"), "My setup");
     await user.click(screen.getByRole("button", { name: "Add template" }));
-    await user.type(screen.getByLabelText("Template title 2"), "Review");
+    await user.type(screen.getByLabelText("Template title"), "Review");
     await user.type(
-      screen.getByLabelText("Description template 2"),
+      screen.getByLabelText("Description template"),
+      "Lessons learned",
+    );
+    expect(screen.getAllByLabelText("Description template")).toHaveLength(1);
+    await user.selectOptions(
+      screen.getByLabelText("Journal template"),
+      "default",
+    );
+    expect(screen.getByLabelText("Template title")).toHaveValue("My setup");
+    expect(screen.getByLabelText("Description template")).toHaveValue(
+      "  ## Existing\n ",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Journal template"),
+      screen.getByRole("option", { name: "Review" }),
+    );
+    expect(screen.getByLabelText("Description template")).toHaveValue(
       "Lessons learned",
     );
     await user.click(screen.getByRole("button", { name: "Save templates" }));
@@ -63,16 +79,21 @@ describe("journal template settings", () => {
     ]);
     view.unmount();
     render(<SettingsPanel />);
-    expect(await screen.findByLabelText("Template title 2")).toHaveValue(
-      "Review",
+    expect(await screen.findByLabelText("Template title")).toHaveValue(
+      "My setup",
     );
-    await user.click(screen.getByRole("button", { name: "Remove template 1" }));
-    expect(screen.getByLabelText("Description template 1")).toHaveValue(
+    expect(screen.getByRole("option", { name: "Review" })).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Remove selected template" }),
+    );
+    expect(screen.getByLabelText("Description template")).toHaveValue(
       "Lessons learned",
     );
     await user.click(screen.getByRole("button", { name: "Save templates" }));
     await waitFor(() => expect(templates).toHaveLength(1));
-    await user.click(screen.getByRole("button", { name: "Remove template 1" }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove selected template" }),
+    );
     await user.click(screen.getByRole("button", { name: "Save templates" }));
     await waitFor(() => expect(templates).toEqual([]));
   });
@@ -115,16 +136,16 @@ describe("journal template settings", () => {
     await user.click(
       await screen.findByRole("button", { name: "Add template" }),
     );
-    await user.type(screen.getByLabelText("Template title 1"), "Draft");
+    await user.type(screen.getByLabelText("Template title"), "Draft");
     await user.type(
-      screen.getByLabelText("Description template 1"),
+      screen.getByLabelText("Description template"),
       "Do not lose this",
     );
     await user.click(screen.getByRole("button", { name: "Save templates" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Unable to save settings.",
     );
-    expect(screen.getByLabelText("Description template 1")).toHaveValue(
+    expect(screen.getByLabelText("Description template")).toHaveValue(
       "Do not lose this",
     );
   });
