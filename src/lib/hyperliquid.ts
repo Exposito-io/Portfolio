@@ -416,40 +416,56 @@ export async function fetchHyperliquidUserFillsByTime(
     startTime,
     endTime,
     coinAliases,
+    aggregateByTime = true,
   }: {
     account: PortfolioAccount;
     startTime: number;
     endTime: number;
-    coinAliases: string[];
+    coinAliases?: string[];
+    aggregateByTime?: boolean;
   },
   fetcher: typeof fetch = fetch,
 ): Promise<HyperliquidFill[]> {
-  const aliases = new Set(coinAliases);
+  const aliases = coinAliases ? new Set(coinAliases) : null;
   const fills: HyperliquidFill[] = [];
+  const seenFillIds = new Set<string>();
   let nextStartTime = startTime;
 
-  for (let page = 0; page < 5 && nextStartTime <= endTime; page += 1) {
+  // Overlap the last timestamp: different fills can share a millisecond.
+  // Raw fills can span more pages than time-aggregated fills. Continue until
+  // the API returns its final page, with a strictly advancing cursor below.
+  while (nextStartTime <= endTime) {
     const response = await postInfo<HyperliquidUserFillResponse>(
       {
         type: "userFillsByTime",
         user: account.address,
         startTime: nextStartTime,
         endTime,
-        aggregateByTime: true,
+        aggregateByTime,
       },
       fetcher,
       `Hyperliquid fills for ${account.label}`,
     );
+    if (!aggregateByTime && response.some((fill) => fill.tid == null)) {
+      throw new Error("Hyperliquid returned a fill without a stable trade ID.");
+    }
     const pageFills = response
-      .filter((fill) => fill.coin && aliases.has(fill.coin))
+      .filter((fill) => fill.coin && (!aliases || aliases.has(fill.coin)))
       .map((fill) => normalizeFill(fill, account));
 
-    fills.push(...pageFills);
+    for (const fill of pageFills) {
+      if (!seenFillIds.has(fill.id)) {
+        seenFillIds.add(fill.id);
+        fills.push(fill);
+      }
+    }
 
     if (response.length < 2000) break;
     const lastTime = Math.max(...response.map((fill) => Number(fill.time ?? 0)));
-    if (!Number.isFinite(lastTime) || lastTime < nextStartTime) break;
-    nextStartTime = lastTime + 1;
+    if (!Number.isFinite(lastTime) || lastTime <= nextStartTime) {
+      throw new Error("Hyperliquid fill history could not be fully paginated. Please retry.");
+    }
+    nextStartTime = lastTime;
   }
 
   return fills.sort((a, b) => b.time - a.time);
@@ -465,7 +481,7 @@ export async function fetchHyperliquidFilledOrdersByTime(
     account: PortfolioAccount;
     startTime: number;
     endTime: number;
-    coinAliases: string[];
+    coinAliases?: string[];
   },
   fetcher: typeof fetch = fetch,
 ): Promise<HyperliquidFilledOrder[]> {
@@ -688,7 +704,7 @@ function normalizeFill(
   };
 }
 
-function aggregateFillsToOrders(
+export function aggregateFillsToOrders(
   fills: HyperliquidFill[],
 ): HyperliquidFilledOrder[] {
   const groups = new Map<
@@ -704,6 +720,7 @@ function aggregateFillsToOrders(
       fee: number | null;
       feeTokens: Set<string>;
       closedPnl: number | null;
+      closedPnlCorrection: number;
       realizedPnlBasisUsd: number | null;
       firstTime: number;
       lastTime: number;
@@ -725,6 +742,7 @@ function aggregateFillsToOrders(
       fee: null,
       feeTokens: new Set<string>(),
       closedPnl: null,
+      closedPnlCorrection: 0,
       realizedPnlBasisUsd: null,
       firstTime: fill.time,
       lastTime: fill.time,
@@ -733,14 +751,19 @@ function aggregateFillsToOrders(
     };
 
     if (fill.direction) group.directions.add(fill.direction);
-    group.notionalUsd += fill.notionalUsd;
+    group.notionalUsd += fill.price * fill.size;
     group.totalSize += fill.size;
     group.fee = fill.fee === null ? group.fee : (group.fee ?? 0) + fill.fee;
     if (fill.feeToken) group.feeTokens.add(fill.feeToken);
-    group.closedPnl =
-      fill.closedPnl === null
-        ? group.closedPnl
-        : (group.closedPnl ?? 0) + fill.closedPnl;
+    if (fill.closedPnl !== null) {
+      // Compensated summation keeps many individual fills from introducing a
+      // floating-point error that changes rounding at a half-cent boundary.
+      const adjusted = fill.closedPnl - group.closedPnlCorrection;
+      const previous = group.closedPnl ?? 0;
+      const total = previous + adjusted;
+      group.closedPnlCorrection = (total - previous) - adjusted;
+      group.closedPnl = total;
+    }
     group.realizedPnlBasisUsd =
       fill.realizedPnlBasisUsd === null
         ? group.realizedPnlBasisUsd
@@ -763,7 +786,7 @@ function aggregateFillsToOrders(
       averagePrice:
         group.totalSize === 0
           ? 0
-          : roundCurrency(group.notionalUsd / group.totalSize),
+          : group.notionalUsd / group.totalSize,
       totalSize: group.totalSize,
       notionalUsd: roundCurrency(group.notionalUsd),
       fee: group.fee === null ? null : roundCurrency(group.fee),

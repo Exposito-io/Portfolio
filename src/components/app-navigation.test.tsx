@@ -45,7 +45,11 @@ describe("AppNavigation", () => {
     );
 
     navigation.addEventListener("click", (event) => event.preventDefault());
-    await user.click(screen.getByRole("link", { name: "Journal" }));
+    expect(screen.getByRole("link", { name: "Stats" })).toHaveAttribute(
+      "href",
+      "/stats",
+    );
+    await user.click(screen.getByRole("link", { name: "Stats" }));
 
     expect(
       screen.getByRole("button", { name: "Open navigation menu" }),

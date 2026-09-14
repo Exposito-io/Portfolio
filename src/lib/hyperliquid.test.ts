@@ -10,6 +10,7 @@ import {
   fetchHyperliquidOpenPositionPnl,
   fetchHyperliquidOpenPositionSummary,
   fetchHyperliquidUserFillsByTime,
+  aggregateFillsToOrders,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
 import type { PortfolioAccount } from "@/lib/types";
@@ -27,6 +28,65 @@ const account: PortfolioAccount = {
 };
 
 describe("Hyperliquid normalization", () => {
+  it("preserves P/L rounding when an order has many small individual fills", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => Array.from({ length: 101 }, (_, tid) => ({
+      coin: "BTC", px: "1", sz: "1", time: tid + 1, tid, oid: 42, closedPnl: "-0.005",
+    })) });
+    const fills = await fetchHyperliquidUserFillsByTime({ account, startTime: 0, endTime: 200, aggregateByTime: false }, fetcher);
+    expect(aggregateFillsToOrders(fills)[0].closedPnl).toBe(-0.5);
+    expect(aggregateFillsToOrders([...fills].reverse())[0].closedPnl).toBe(-0.5);
+  });
+
+  it("reads raw history beyond ten pages without truncating or double counting", async () => {
+    vi.useFakeTimers();
+    try {
+      let page = 0;
+      const fetcher = vi.fn(async () => {
+        const offset = page++ * 2000;
+        return { ok: true, json: async () => Array.from({ length: page <= 11 ? 2000 : 1 }, (_, index) => ({
+          coin: "BTC", px: "1", sz: "1", time: offset + index + 1, tid: offset + index,
+        })) };
+      });
+      const result = fetchHyperliquidUserFillsByTime({ account, startTime: 0, endTime: 30_000, aggregateByTime: false }, fetcher as unknown as typeof fetch);
+      const assertion = expect(result).resolves.toHaveLength(22_001);
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(fetcher).toHaveBeenCalledTimes(12);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects raw fills without stable IDs instead of persisting ambiguous duplicates", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => [{ coin: "BTC", time: 1, oid: 42 }] });
+    await expect(fetchHyperliquidUserFillsByTime({ account, startTime: 0, endTime: 100, aggregateByTime: false }, fetcher)).rejects.toThrow("stable trade ID");
+  });
+
+  it("fails visibly if a full page cannot advance the timestamp cursor", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => Array.from({ length: 2000 }, (_, tid) => ({ coin: "BTC", time: 100, tid })) });
+    await expect(fetchHyperliquidUserFillsByTime({ account, startTime: 0, endTime: 200 }, fetcher)).rejects.toThrow("could not be fully paginated");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("loads all markets over multiple fill pages when no aliases are supplied", async () => {
+    const firstPage = Array.from({ length: 2000 }, (_, index) => ({
+      coin: index % 2 ? "@107" : "BTC", time: index + 1,
+      px: "0.0037295", sz: "2", side: "B", oid: index, tid: index,
+    }));
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => firstPage })
+      .mockResolvedValueOnce({ ok: true, json: async () => [
+        firstPage[1999],
+        { coin: "io:OAI", time: 2001, px: "123", sz: "1", oid: 2000, tid: 2000 },
+        { coin: "xyz:DRAM", time: 2002, px: "50", sz: "1", oid: 2001, tid: 2001 },
+      ] });
+    const orders = await fetchHyperliquidFilledOrdersByTime({ account, startTime: 0, endTime: 3000 }, fetcher);
+    expect(orders).toHaveLength(2002);
+    expect(new Set(orders.map((order) => order.coin))).toEqual(new Set(["BTC", "@107", "io:OAI", "xyz:DRAM"]));
+    expect(orders.at(-1)?.averagePrice).toBe(0.0037295);
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).startTime).toBe(2000);
+  });
+
   it("normalizes account value and open positions", async () => {
     const fetcher = vi
       .fn()
@@ -646,7 +706,7 @@ describe("Hyperliquid normalization", () => {
         id: "hl1:42:BTC:Buy",
         side: "Buy",
         direction: "Open Long",
-        averagePrice: 106.67,
+        averagePrice: 320 / 3,
         totalSize: 3,
         notionalUsd: 320,
         fee: 0.3,

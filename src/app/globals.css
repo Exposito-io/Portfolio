@@ -480,7 +480,7 @@ textarea {
   margin: 0;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 1024px) {
   .mobile-menu-button {
     display: none;
   }
@@ -489,6 +489,9 @@ textarea {
     display: flex;
   }
 
+}
+
+@media (min-width: 640px) {
   .entry-row-header {
     grid-template-columns: minmax(0, 1fr) auto max-content;
   }
@@ -1832,7 +1835,7 @@ textarea {
   }
 }
 
-@media (max-width: 639px) {
+@media (max-width: 1023px) {
   .app-nav {
     border-top: 1px solid rgba(0, 0, 0, 0.1);
     padding-top: 0.75rem;
@@ -1844,6 +1847,9 @@ textarea {
     padding-right: 0.75rem;
   }
 
+}
+
+@media (max-width: 639px) {
   .journal-detail-trade-widget {
     grid-template-columns: 1fr;
     max-width: none;
