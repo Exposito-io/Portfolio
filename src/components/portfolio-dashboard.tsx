@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -12,7 +13,23 @@ import {
 } from "lucide-react";
 
 import { AllocationChart } from "@/components/allocation-chart";
+import { buildStatsPnl, type StatsResponse } from "@/lib/stats";
 import type { PortfolioResponse } from "@/lib/types";
+
+const StatsPnlChart = dynamic(
+  () =>
+    import("@/components/stats-pnl-chart").then(
+      (module) => module.StatsPnlChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-72 items-center justify-center" role="status">
+        Loading chart…
+      </div>
+    ),
+  },
+);
 
 export function PortfolioDashboard() {
   const [date, setDate] = useState("");
@@ -20,6 +37,9 @@ export function PortfolioDashboard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [statsData, setStatsData] = useState<StatsResponse | null>(null);
+  const [statsError, setStatsError] = useState("");
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -63,6 +83,38 @@ export function PortfolioDashboard() {
     return () => controller.abort();
   }, [date, refreshNonce]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadStats() {
+      setStatsLoading(true);
+      setStatsError("");
+      try {
+        const response = await fetch("/api/stats", {
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Unable to load P/L history.");
+        }
+        if (!controller.signal.aborted) setStatsData(payload);
+      } catch (loadError) {
+        if (!controller.signal.aborted) {
+          setStatsError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load P/L history.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setStatsLoading(false);
+      }
+    }
+
+    void loadStats();
+    return () => controller.abort();
+  }, [refreshNonce]);
+
   const snapshot = data?.snapshot;
   const assetPositions =
     snapshot?.positions.filter((position) => position.kind === "asset") ?? [];
@@ -98,6 +150,10 @@ export function PortfolioDashboard() {
       : snapshot
         ? ` Snapshot captured ${formatDateTime(snapshot.capturedAt)}. Use Refresh to retry live account data.`
         : null;
+  const { points: statsPoints, totalPnlUsd: statsTotalPnlUsd } = useMemo(
+    () => buildStatsPnl(statsData?.orders ?? []),
+    [statsData?.orders],
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -125,7 +181,10 @@ export function PortfolioDashboard() {
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
               />
-              <button className="button-secondary h-10" onClick={() => setDate("")}>
+              <button
+                className="button-secondary h-10"
+                onClick={() => setDate("")}
+              >
                 Live
               </button>
               <button
@@ -144,9 +203,7 @@ export function PortfolioDashboard() {
             </div>
           </div>
 
-          {error ? (
-            <Alert tone="error" message={error} />
-          ) : null}
+          {error ? <Alert tone="error" message={error} /> : null}
 
           {snapshot?.sourceErrors.length ? (
             <div className="grid gap-2">
@@ -165,7 +222,10 @@ export function PortfolioDashboard() {
               <Landmark size={28} aria-hidden="true" />
               <div>
                 <h2>No accounts configured</h2>
-                <p>Add Aave or Hyperliquid accounts in Settings to start tracking.</p>
+                <p>
+                  Add Aave or Hyperliquid accounts in Settings to start
+                  tracking.
+                </p>
               </div>
             </div>
           ) : null}
@@ -288,7 +348,10 @@ export function PortfolioDashboard() {
                 ) : null}
                 {!assetPositions.length ? (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-[#69706c]">
+                    <td
+                      colSpan={4}
+                      className="py-10 text-center text-[#69706c]"
+                    >
                       No positions to display.
                     </td>
                   </tr>
@@ -380,6 +443,46 @@ export function PortfolioDashboard() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="panel min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="panel-heading">
+            <h2>Cumulative realized P/L</h2>
+            <p>
+              Hyperliquid closed P/L across all enabled wallets, before fees.
+              Excludes funding and unrealized P/L.
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-[#69706c]">Available history</p>
+            <p
+              className={`text-2xl font-semibold ${statsTotalPnlUsd !== null && statsTotalPnlUsd < 0 ? "text-[#9b3d30]" : "text-[#1f7a68]"}`}
+            >
+              {statsTotalPnlUsd === null
+                ? "N/A"
+                : formatCurrency(statsTotalPnlUsd)}
+            </p>
+          </div>
+        </div>
+        {statsError ? (
+          <div className="alert alert-warning" role="alert">
+            {statsError}
+          </div>
+        ) : null}
+        {statsPoints.length ? (
+          <StatsPnlChart points={statsPoints} />
+        ) : (
+          <div className="flex h-72 items-center justify-center text-center text-sm text-[#69706c]">
+            {statsLoading
+              ? "Loading realized P/L…"
+              : "No reported realized P/L to chart."}
+          </div>
+        )}
+        <p className="mt-3 text-xs text-[#69706c]">
+          Orders are booked at their last fill, matching the journal. Chart
+          times use America/Toronto. Use Refresh above to update the history.
+        </p>
       </section>
     </main>
   );
