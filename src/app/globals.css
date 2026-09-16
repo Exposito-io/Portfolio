@@ -1811,6 +1811,39 @@ textarea {
   color: #9b3d30;
 }
 
+.funding-rate-dark-green {
+  --funding-rate-color: #123d34;
+}
+
+.funding-rate-light-green {
+  --funding-rate-color: #1f7a68;
+}
+
+.funding-rate-yellow {
+  --funding-rate-color: #73501b;
+}
+
+.funding-rate-light-red {
+  --funding-rate-color: #b05a4b;
+}
+
+.funding-rate-dark-red {
+  --funding-rate-color: #842f25;
+}
+
+.funding-rate-neutral {
+  --funding-rate-color: #1f2523;
+}
+
+.journal-funding-metric {
+  border-left-color: var(--funding-rate-color);
+}
+
+.journal-funding-metric > div:first-child strong,
+.journal-pnl-metric-percent.journal-funding-average b {
+  color: var(--funding-rate-color);
+}
+
 .journal-pnl-metric-percent b {
   color: #1f2523;
   display: block;
