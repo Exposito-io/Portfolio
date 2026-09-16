@@ -36,6 +36,7 @@ describe("journal template settings", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     const view = render(<SettingsPanel />);
+    await user.click(screen.getByRole("tab", { name: "Templates" }));
     expect(await screen.findByLabelText("Description template")).toHaveValue(
       "  ## Existing\n ",
     );
@@ -79,6 +80,7 @@ describe("journal template settings", () => {
     ]);
     view.unmount();
     render(<SettingsPanel />);
+    await user.click(screen.getByRole("tab", { name: "Templates" }));
     expect(await screen.findByLabelText("Template title")).toHaveValue(
       "My setup",
     );
@@ -109,7 +111,9 @@ describe("journal template settings", () => {
             : { error: "Settings unavailable" },
       })),
     );
+    const user = userEvent.setup();
     render(<SettingsPanel />);
+    await user.click(screen.getByRole("tab", { name: "Templates" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Settings unavailable",
     );
@@ -133,6 +137,7 @@ describe("journal template settings", () => {
     );
     const user = userEvent.setup();
     render(<SettingsPanel />);
+    await user.click(screen.getByRole("tab", { name: "Templates" }));
     await user.click(
       await screen.findByRole("button", { name: "Add template" }),
     );

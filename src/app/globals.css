@@ -1137,6 +1137,55 @@ textarea {
   font-weight: 800;
 }
 
+.tabs {
+  min-width: 0;
+}
+
+.tab-list {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+
+.tab {
+  border-bottom: 3px solid transparent;
+  color: #69706c;
+  flex: 0 0 auto;
+  font-size: 0.88rem;
+  font-weight: 800;
+  margin-bottom: -1px;
+  padding: 0.7rem 1rem 0.65rem;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.tab:hover {
+  color: #1f2523;
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: #1f7a68;
+  color: #1f7a68;
+}
+
+.tab:focus-visible {
+  border-radius: 6px 6px 0 0;
+  outline: 2px solid #1f7a68;
+  outline-offset: -2px;
+}
+
+.tab-panel {
+  min-width: 0;
+  padding-top: 1.5rem;
+}
+
+.tab-panel:focus-visible {
+  outline: 2px solid #1f7a68;
+  outline-offset: 4px;
+}
+
 .journal-detail-tabs {
   min-width: 0;
 }
