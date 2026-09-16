@@ -137,11 +137,6 @@ export function StatsPanel() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[#69706c]">
-              {data?.sourceErrors.length
-                ? "Available wallets"
-                : "Available history"}
-            </p>
             <p
               className={`text-2xl font-semibold ${totalPnlUsd !== null && totalPnlUsd < 0 ? "text-[#9b3d30]" : "text-[#1f7a68]"}`}
             >

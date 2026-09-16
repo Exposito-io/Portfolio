@@ -455,7 +455,6 @@ export function PortfolioDashboard() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[#69706c]">Available history</p>
             <p
               className={`text-2xl font-semibold ${statsTotalPnlUsd !== null && statsTotalPnlUsd < 0 ? "text-[#9b3d30]" : "text-[#1f7a68]"}`}
             >
