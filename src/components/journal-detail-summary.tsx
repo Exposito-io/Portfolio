@@ -130,6 +130,7 @@ export function JournalDetailSummary({
         />
         {trade.asset.kind !== "spot" ? (
           <JournalFundingMetric
+            direction={trade.direction}
             error={fundingError}
             loading={fundingLoading}
             summary={fundingSummary}

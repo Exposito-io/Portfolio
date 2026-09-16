@@ -1,4 +1,7 @@
-import type { JournalTradePnlSummary } from "@/lib/types";
+import type {
+  JournalTradeDirection,
+  JournalTradePnlSummary,
+} from "@/lib/types";
 import type { JournalFundingSummary } from "@/lib/journal-funding";
 import type { JournalMarketSummary } from "@/lib/journal-market";
 import { calculatePortfolioPercent } from "@/lib/journal-portfolio";
@@ -46,10 +49,12 @@ export function JournalMarketMetric({
 }
 
 export function JournalFundingMetric({
+  direction,
   error,
   loading,
   summary,
 }: {
+  direction: JournalTradeDirection | null;
   error?: string;
   loading?: boolean;
   summary?: JournalFundingSummary | null;
@@ -68,38 +73,78 @@ export function JournalFundingMetric({
     );
   }
 
-  const tone = getMetricTone(summary.currentAnnualizedPercent);
+  const tone = getFundingRateTone(
+    summary.currentAnnualizedPercent,
+    direction,
+  );
 
   return (
-    <section className={`journal-pnl-metric journal-market-metric ${tone}`}>
+    <section
+      className={`journal-pnl-metric journal-market-metric journal-funding-metric ${tone}`}
+    >
       <div>
         <span>Current funding rate</span>
         <strong>{formatSignedPercent(summary.currentAnnualizedPercent)}</strong>
       </div>
       <div className="journal-market-changes">
-        <FundingAverage label="Avg 24h" value={summary.average24hAnnualizedPercent} />
-        <FundingAverage label="Avg 7d" value={summary.average7dAnnualizedPercent} />
-        <FundingAverage label="Avg 30d" value={summary.average30dAnnualizedPercent} />
+        <FundingAverage
+          direction={direction}
+          label="Avg 24h"
+          value={summary.average24hAnnualizedPercent}
+        />
+        <FundingAverage
+          direction={direction}
+          label="Avg 7d"
+          value={summary.average7dAnnualizedPercent}
+        />
+        <FundingAverage
+          direction={direction}
+          label="Avg 30d"
+          value={summary.average30dAnnualizedPercent}
+        />
       </div>
     </section>
   );
 }
 
-function FundingAverage({ label, value }: { label: string; value: number | null }) {
-  const tone = isFiniteNumber(value)
-    ? value > 0
-      ? "journal-market-change-positive"
-      : value < 0
-        ? "journal-market-change-negative"
-        : ""
-    : "";
+function FundingAverage({
+  direction,
+  label,
+  value,
+}: {
+  direction: JournalTradeDirection | null;
+  label: string;
+  value: number | null;
+}) {
+  const tone = getFundingRateTone(value, direction);
 
   return (
-    <div className={`journal-pnl-metric-percent ${tone}`}>
+    <div className={`journal-pnl-metric-percent journal-funding-average ${tone}`}>
       <span>{label}</span>
       <b>{isFiniteNumber(value) ? formatSignedPercent(value) : "N/A"}</b>
     </div>
   );
+}
+
+export function getFundingRateTone(
+  value: number | null,
+  direction: JournalTradeDirection | null,
+) {
+  if (!isFiniteNumber(value) || !direction) return "funding-rate-neutral";
+
+  if (direction === "long") {
+    if (value < 0) return "funding-rate-dark-green";
+    if (value < 12) return "funding-rate-light-green";
+    if (value < 25) return "funding-rate-yellow";
+    if (value < 50) return "funding-rate-light-red";
+    return "funding-rate-dark-red";
+  }
+
+  if (value < -50) return "funding-rate-dark-red";
+  if (value < -20) return "funding-rate-light-red";
+  if (value < 0) return "funding-rate-yellow";
+  if (value < 12) return "funding-rate-light-green";
+  return "funding-rate-dark-green";
 }
 
 function getMetricTone(value: number) {

@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   JournalClosingPriceMetric,
+  JournalFundingMetric,
   JournalMarketMetric,
   JournalPnlMetric,
   JournalPositionValueMetric,
+  getFundingRateTone,
 } from "@/components/journal-pnl-badge";
 import type { JournalTradePnlSummary } from "@/lib/types";
 
@@ -63,6 +65,57 @@ describe("JournalMarketMetric", () => {
     expect(markup.match(/<b>N\/A<\/b>/g)).toHaveLength(3);
     expect(markup).not.toContain("metric-negative");
     expect(markup).not.toContain("metric-positive");
+  });
+});
+
+describe("JournalFundingMetric", () => {
+  it.each([
+    [-1, "funding-rate-dark-green"],
+    [0, "funding-rate-light-green"],
+    [11.99, "funding-rate-light-green"],
+    [12, "funding-rate-yellow"],
+    [24.99, "funding-rate-yellow"],
+    [25, "funding-rate-light-red"],
+    [49.99, "funding-rate-light-red"],
+    [50, "funding-rate-dark-red"],
+  ])("classifies a %s%% long rate as %s", (value, expected) => {
+    expect(getFundingRateTone(value, "long")).toBe(expected);
+  });
+
+  it.each([
+    [-50.01, "funding-rate-dark-red"],
+    [-50, "funding-rate-light-red"],
+    [-20.01, "funding-rate-light-red"],
+    [-20, "funding-rate-yellow"],
+    [-0.01, "funding-rate-yellow"],
+    [0, "funding-rate-light-green"],
+    [11.99, "funding-rate-light-green"],
+    [12, "funding-rate-dark-green"],
+  ])("classifies a %s%% short rate as %s", (value, expected) => {
+    expect(getFundingRateTone(value, "short")).toBe(expected);
+  });
+
+  it("colors each funding period independently", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalFundingMetric, {
+        direction: "long",
+        summary: {
+          currentAnnualizedPercent: -1,
+          average24hAnnualizedPercent: 5,
+          average7dAnnualizedPercent: 20,
+          average30dAnnualizedPercent: 55,
+        },
+      }),
+    );
+
+    expect(markup).toContain("journal-funding-metric funding-rate-dark-green");
+    expect(markup).toContain("journal-funding-average funding-rate-light-green");
+    expect(markup).toContain("journal-funding-average funding-rate-yellow");
+    expect(markup).toContain("journal-funding-average funding-rate-dark-red");
+  });
+
+  it("uses neutral colors without a position direction", () => {
+    expect(getFundingRateTone(20, null)).toBe("funding-rate-neutral");
   });
 });
 
