@@ -37,6 +37,7 @@ const tradeBaseSchema = z.object({
   direction: z.enum(["long", "short"]).nullable().optional().default(null),
   title: z.string().trim().min(1).max(140),
   descriptionMarkdown: markdownSchema,
+  metricsMarkdown: markdownSchema,
   startDate: z.string().trim().refine(isValidDateTimeKey, {
     message: "Start date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
   }),
@@ -62,6 +63,7 @@ const tradeUpdateSchema = z.object({
   direction: z.enum(["long", "short"]).nullable().optional(),
   title: z.string().trim().min(1).max(140).optional(),
   descriptionMarkdown: z.string().trim().max(12_000).optional(),
+  metricsMarkdown: z.string().trim().max(12_000).optional(),
   startDate: z.string().trim().refine(isValidDateTimeKey, {
     message: "Start date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
   }).optional(),
@@ -101,9 +103,16 @@ type JournalEntryDocument = Omit<
 
 type JournalTradeDocument = Omit<
   JournalTrade,
-  "id" | "startDate" | "endDate" | "entries" | "createdAt" | "updatedAt"
+  | "id"
+  | "metricsMarkdown"
+  | "startDate"
+  | "endDate"
+  | "entries"
+  | "createdAt"
+  | "updatedAt"
 > & {
   _id: ObjectId;
+  metricsMarkdown?: string;
   startDate: Date | string;
   endDate: Date | string | null;
   entries: JournalEntryDocument[];
@@ -129,6 +138,7 @@ export function serializeTrade(trade: JournalTradeDocument): JournalTrade {
     direction: trade.direction ?? null,
     title: trade.title,
     descriptionMarkdown: trade.descriptionMarkdown,
+    metricsMarkdown: trade.metricsMarkdown ?? "",
     startDate: serializeDate(trade.startDate),
     endDate: trade.endDate ? serializeDate(trade.endDate) : null,
     asset: trade.asset,
@@ -178,6 +188,7 @@ export async function createTrade(db: Db, payload: unknown) {
     direction: input.direction,
     title: input.title,
     descriptionMarkdown: input.descriptionMarkdown,
+    metricsMarkdown: input.metricsMarkdown,
     startDate: parseInputDate(input.startDate, "start"),
     endDate: input.endDate ? parseInputDate(input.endDate, "end") : null,
     asset: normalizeAsset(input.asset),
@@ -235,6 +246,9 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
   if (input.title !== undefined) update.title = input.title;
   if (input.descriptionMarkdown !== undefined) {
     update.descriptionMarkdown = input.descriptionMarkdown;
+  }
+  if (input.metricsMarkdown !== undefined) {
+    update.metricsMarkdown = input.metricsMarkdown;
   }
   if (input.startDate !== undefined) update.startDate = nextStartDate;
   if ("endDate" in input) update.endDate = nextEndDate;

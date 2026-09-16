@@ -127,6 +127,7 @@ export type JournalTrade = {
   direction: JournalTradeDirection | null;
   title: string;
   descriptionMarkdown: string;
+  metricsMarkdown: string;
   startDate: string;
   endDate: string | null;
   asset: JournalTradeAsset;

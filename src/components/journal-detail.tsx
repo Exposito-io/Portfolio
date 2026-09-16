@@ -12,6 +12,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { JournalChart } from "@/components/journal-chart";
 import { JournalDetailEntries } from "@/components/journal-detail-entries";
+import { JournalDetailMetrics } from "@/components/journal-detail-metrics";
 import { JournalDetailSummary } from "@/components/journal-detail-summary";
 import { JournalDetailTabs } from "@/components/journal-detail-tabs";
 import { JournalDetailTopbar } from "@/components/journal-detail-topbar";
@@ -295,6 +296,33 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
     [trade],
   );
 
+  async function saveMetrics(metricsMarkdown: string) {
+    if (!trade) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/journal/trades/${trade.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metricsMarkdown }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to save metrics.");
+      }
+      setTrade(result.trade);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save metrics.",
+      );
+      throw saveError;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveEntry(event: FormEvent) {
     event.preventDefault();
     if (!trade) return;
@@ -459,6 +487,13 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               onDelete={removeEntry}
               onEdit={beginEditEntry}
               onNewEntry={beginNewEntry}
+            />
+          }
+          metrics={
+            <JournalDetailMetrics
+              saving={saving}
+              trade={trade}
+              onSave={saveMetrics}
             />
           }
           transactions={

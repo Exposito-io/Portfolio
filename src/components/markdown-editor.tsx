@@ -169,9 +169,15 @@ export function MarkdownEditor({
   );
 }
 
-export function MarkdownView({ value }: { value: string }) {
+export function MarkdownView({
+  value,
+  emptyMessage = "No description yet.",
+}: {
+  value: string;
+  emptyMessage?: string;
+}) {
   if (!value.trim()) {
-    return <p className="text-sm text-[#737a76]">No description yet.</p>;
+    return <p className="text-sm text-[#737a76]">{emptyMessage}</p>;
   }
 
   return (

@@ -30,6 +30,7 @@ describe("JournalDetailTabs news loading", () => {
       <JournalDetailTabs
         charts={<div>Charts panel</div>}
         journal={<div>Journal panel</div>}
+        metrics={<div>Metrics panel</div>}
         news={<NewsProbe />}
         transactions={<div>Transactions panel</div>}
       />,

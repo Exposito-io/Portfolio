@@ -124,6 +124,43 @@ describe("journal trades", () => {
     expect(await listTrades(db)).toHaveLength(0);
   });
 
+  it("stores and updates metrics markdown, defaulting legacy trades to empty", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      title: "ETH setup",
+      startDate: "2026-07-01",
+      asset,
+    });
+
+    expect(trade.metricsMarkdown).toBe("");
+
+    const updated = await updateTrade(db, trade.id, {
+      metricsMarkdown: "- [Funding](https://example.com)\n- OI: 12k",
+    });
+
+    expect(updated?.metricsMarkdown).toBe(
+      "- [Funding](https://example.com)\n- OI: 12k",
+    );
+    expect((await getTrade(db, trade.id))?.metricsMarkdown).toBe(
+      "- [Funding](https://example.com)\n- OI: 12k",
+    );
+
+    const legacyId = new ObjectId();
+    await db.collection("journalTrades").insertOne({
+      _id: legacyId,
+      title: "Legacy trade",
+      descriptionMarkdown: "",
+      startDate: new Date("2026-07-01T04:00:00.000Z"),
+      endDate: null,
+      asset,
+      entries: [],
+      createdAt: new Date("2026-07-01T04:00:00.000Z"),
+      updatedAt: new Date("2026-07-01T04:00:00.000Z"),
+    });
+
+    expect((await getTrade(db, legacyId.toString()))?.metricsMarkdown).toBe("");
+  });
+
   it("stores long and short direction for trades", async () => {
     const db = fakeDb();
     const trade = await createTrade(db, {

@@ -2,11 +2,12 @@
 
 import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 
-type JournalDetailTab = "charts" | "journal" | "transactions" | "news";
+type JournalDetailTab = "charts" | "journal" | "metrics" | "transactions" | "news";
 
 const tabs: { id: JournalDetailTab; label: string }[] = [
   { id: "charts", label: "Charts" },
   { id: "journal", label: "Journal" },
+  { id: "metrics", label: "Metrics" },
   { id: "transactions", label: "Transactions" },
   { id: "news", label: "News" },
 ];
@@ -14,11 +15,13 @@ const tabs: { id: JournalDetailTab; label: string }[] = [
 export function JournalDetailTabs({
   charts,
   journal,
+  metrics,
   transactions,
   news,
 }: {
   charts: ReactNode;
   journal: ReactNode;
+  metrics: ReactNode;
   transactions: ReactNode;
   news: ReactNode;
 }) {
@@ -103,6 +106,16 @@ export function JournalDetailTabs({
         tabIndex={0}
       >
         {journal}
+      </div>
+      <div
+        aria-labelledby={`${id}-metrics-tab`}
+        className="journal-detail-tab-panel"
+        hidden={activeTab !== "metrics"}
+        id={`${id}-metrics-panel`}
+        role="tabpanel"
+        tabIndex={0}
+      >
+        {metrics}
       </div>
       <div
         aria-labelledby={`${id}-transactions-tab`}
