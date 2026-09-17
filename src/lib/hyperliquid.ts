@@ -97,6 +97,15 @@ type HyperliquidFundingHistoryResponse = Array<{
   time?: number;
 }>;
 
+type HyperliquidUserFundingResponse = Array<{
+  time?: number;
+  delta?: {
+    type?: string;
+    coin?: string;
+    fundingUsdc?: string;
+  };
+}>;
+
 type HyperliquidMetaAndAssetCtxsResponse = [
   { universe?: Array<{ name?: string }> },
   Array<{ funding?: string }>,
@@ -383,6 +392,47 @@ export async function fetchHyperliquidFundingHistory(
   }
 
   return rates.sort((left, right) => left.time - right.time);
+}
+
+export async function fetchHyperliquidUserFunding(
+  {
+    account,
+    coinAliases,
+    startTime,
+    endTime = Date.now(),
+  }: {
+    account: PortfolioAccount;
+    coinAliases?: string[];
+    startTime: number;
+    endTime?: number;
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<number> {
+  const response = await postInfo<HyperliquidUserFundingResponse>(
+    {
+      type: "userFunding",
+      user: account.address,
+    },
+    fetcher,
+    `Hyperliquid funding payments for ${account.label}`,
+  );
+
+  const aliases = coinAliases ? new Set(coinAliases) : null;
+  // Positive fundingUsdc entries were received; negative ones were paid.
+  return response.reduce((sum, entry) => {
+    const fundingUsdc = Number(entry.delta?.fundingUsdc);
+    if (
+      entry.delta?.type !== "funding" ||
+      (aliases !== null && !aliases.has(entry.delta.coin ?? "")) ||
+      !Number.isFinite(Number(entry.time)) ||
+      Number(entry.time) < startTime ||
+      Number(entry.time) > endTime ||
+      !Number.isFinite(fundingUsdc)
+    ) {
+      return sum;
+    }
+    return sum + fundingUsdc;
+  }, 0);
 }
 
 export async function fetchHyperliquidCurrentFundingRate(

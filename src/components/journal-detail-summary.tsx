@@ -7,6 +7,7 @@ import {
   JournalClosingPriceMetric,
   JournalEntryPriceMetric,
   JournalFundingMetric,
+  JournalFundingPaidMetric,
   JournalMarketMetric,
   JournalPnlMetric,
 } from "@/components/journal-pnl-badge";
@@ -129,12 +130,21 @@ export function JournalDetailSummary({
           summary={marketSummary}
         />
         {trade.asset.kind !== "spot" ? (
-          <JournalFundingMetric
-            direction={trade.direction}
-            error={fundingError}
-            loading={fundingLoading}
-            summary={fundingSummary}
-          />
+          <>
+            <JournalFundingMetric
+              direction={trade.direction}
+              error={fundingError}
+              loading={fundingLoading}
+              summary={fundingSummary}
+            />
+            {trade.kind === "trade" ? (
+              <JournalFundingPaidMetric
+                error={ordersState.error}
+                fundingUsd={ordersState.data?.fundingUsd ?? null}
+                loading={ordersState.loading}
+              />
+            ) : null}
+          </>
         ) : null}
         <JournalLatestNews tradeId={trade.id} />
       </aside>

@@ -6,6 +6,7 @@ import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getZonedJournalDateMs } from "@/lib/date";
 import {
   fetchHyperliquidOpenPositionSummary,
+  fetchHyperliquidUserFunding,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
 import { getHyperliquidFillCache } from "@/lib/hyperliquid-fill-cache";
@@ -17,6 +18,7 @@ import {
   calculateJournalTradePnlSummary,
 } from "@/lib/journal-pnl";
 import { getDb } from "@/lib/mongodb";
+import { roundCurrency } from "@/lib/portfolio-calculations";
 import type { HyperliquidFilledOrder, SourceError } from "@/lib/types";
 
 type RouteContext = {
@@ -64,6 +66,7 @@ export async function GET(_request: Request, context: RouteContext) {
     let positionSize = 0;
     let positionValueUsd = 0;
     let positionCostBasisUsd = 0;
+    let fundingUsd: number | null = null;
 
     for (const account of accounts) {
       try {
@@ -82,6 +85,26 @@ export async function GET(_request: Request, context: RouteContext) {
           accountLabel: account.label,
           message:
             error instanceof Error ? error.message : "Unable to load orders.",
+        });
+      }
+
+      try {
+        const accountFundingUsd = await fetchHyperliquidUserFunding({
+          account,
+          coinAliases,
+          startTime,
+          endTime,
+        });
+        fundingUsd = (fundingUsd ?? 0) + accountFundingUsd;
+      } catch (error) {
+        sourceErrors.push({
+          source: account.source,
+          accountId: account.id,
+          accountLabel: account.label,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Unable to load funding payments.",
         });
       }
 
@@ -132,6 +155,7 @@ export async function GET(_request: Request, context: RouteContext) {
           : calculateJournalTradeClosingPrice(orders, trade.direction),
         positionCostBasisUsd,
       ),
+      fundingUsd: fundingUsd === null ? null : roundCurrency(fundingUsd),
       sourceErrors,
       accountsCount: accounts.length,
       startTime,

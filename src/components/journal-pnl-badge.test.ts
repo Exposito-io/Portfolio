@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   JournalClosingPriceMetric,
   JournalFundingMetric,
+  JournalFundingPaidMetric,
   JournalMarketMetric,
   JournalPnlMetric,
   JournalPositionValueMetric,
@@ -116,6 +117,69 @@ describe("JournalFundingMetric", () => {
 
   it("uses neutral colors without a position direction", () => {
     expect(getFundingRateTone(20, null)).toBe("funding-rate-neutral");
+  });
+});
+
+describe("JournalFundingPaidMetric", () => {
+  it("shows funding received in green", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalFundingPaidMetric, { fundingUsd: 12.5 }),
+    );
+
+    expect(markup).toContain("journal-pnl-metric-positive");
+    expect(markup).toContain("Funding received");
+    expect(markup).toContain("+$12.50");
+    expect(markup).not.toContain("journal-pnl-metric-negative");
+  });
+
+  it("shows funding paid in red", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalFundingPaidMetric, { fundingUsd: -3.25 }),
+    );
+
+    expect(markup).toContain("journal-pnl-metric-negative");
+    expect(markup).toContain("Funding paid");
+    expect(markup).toContain("-$3.25");
+    expect(markup).not.toContain("journal-pnl-metric-positive");
+  });
+
+  it("stays neutral when funding is zero", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalFundingPaidMetric, { fundingUsd: 0 }),
+    );
+
+    expect(markup).toContain("journal-pnl-metric");
+    expect(markup).not.toContain("journal-pnl-metric-positive");
+    expect(markup).not.toContain("journal-pnl-metric-negative");
+    expect(markup).toContain("$0.00");
+  });
+
+  it("falls back to N/A without funding data", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalFundingPaidMetric, { fundingUsd: null }),
+    );
+
+    expect(markup).toContain("<strong>N/A</strong>");
+    expect(markup).not.toContain("metric-positive");
+    expect(markup).not.toContain("metric-negative");
+  });
+
+  it("shows loading and unavailable states", () => {
+    const loadingMarkup = renderToStaticMarkup(
+      createElement(JournalFundingPaidMetric, {
+        fundingUsd: null,
+        loading: true,
+      }),
+    );
+    const errorMarkup = renderToStaticMarkup(
+      createElement(JournalFundingPaidMetric, {
+        error: "Funding failed.",
+        fundingUsd: null,
+      }),
+    );
+
+    expect(loadingMarkup).toContain("<strong>Loading</strong>");
+    expect(errorMarkup).toContain("<strong>Unavailable</strong>");
   });
 });
 

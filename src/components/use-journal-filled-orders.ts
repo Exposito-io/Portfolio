@@ -11,6 +11,7 @@ import type {
 type FilledOrdersResponse = {
   orders: HyperliquidFilledOrder[];
   summary: JournalTradePnlSummary;
+  fundingUsd: number | null;
   sourceErrors: SourceError[];
   accountsCount: number;
   startTime: number;

@@ -147,6 +147,54 @@ export function getFundingRateTone(
   return "funding-rate-dark-green";
 }
 
+export function JournalFundingPaidMetric({
+  error,
+  fundingUsd,
+  loading,
+}: {
+  error?: string;
+  fundingUsd: number | null;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return <MetricShell label="Funding" value="Loading" />;
+  }
+
+  if (error) {
+    return <MetricShell label="Funding" title={error} value="Unavailable" />;
+  }
+
+  if (!isFiniteNumber(fundingUsd)) {
+    return <MetricShell label="Funding" value="N/A" />;
+  }
+
+  // Positive funding was received; negative funding was paid.
+  const tone =
+    fundingUsd > 0
+      ? "journal-pnl-metric-positive"
+      : fundingUsd < 0
+        ? "journal-pnl-metric-negative"
+        : "";
+
+  return (
+    <section
+      className={`journal-pnl-metric ${tone}`}
+      title="Funding paid/received for the current position"
+    >
+      <div>
+        <span>
+          {fundingUsd > 0
+            ? "Funding received"
+            : fundingUsd < 0
+              ? "Funding paid"
+              : "Funding"}
+        </span>
+        <strong>{formatSignedCurrency(fundingUsd)}</strong>
+      </div>
+    </section>
+  );
+}
+
 function getMetricTone(value: number) {
   return value > 0
     ? "journal-pnl-metric-positive"

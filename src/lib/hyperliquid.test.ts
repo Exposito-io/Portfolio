@@ -10,6 +10,7 @@ import {
   fetchHyperliquidOpenPositionPnl,
   fetchHyperliquidOpenPositionSummary,
   fetchHyperliquidUserFillsByTime,
+  fetchHyperliquidUserFunding,
   aggregateFillsToOrders,
   getHyperliquidCoinAliases,
 } from "@/lib/hyperliquid";
@@ -455,6 +456,54 @@ describe("Hyperliquid normalization", () => {
       "https://api.hyperliquid.xyz/info",
       expect.objectContaining({
         body: JSON.stringify({ type: "metaAndAssetCtxs", dex: "xyz" }),
+      }),
+    );
+  });
+
+  it("sums the account's funding payments for the coin within the window", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          time: 1000,
+          delta: { type: "funding", coin: "ETH", fundingUsdc: "-1.25" },
+        },
+        {
+          time: 2000,
+          delta: { type: "funding", coin: "ETH", fundingUsdc: "0.5" },
+        },
+        {
+          time: 2500,
+          delta: { type: "funding", coin: "BTC", fundingUsdc: "10" },
+        },
+        {
+          time: 5000,
+          delta: { type: "funding", coin: "ETH", fundingUsdc: "99" },
+        },
+        {
+          time: 1500,
+          delta: { type: "spotTransfer", coin: "ETH", fundingUsdc: "50" },
+        },
+        {
+          time: 1600,
+          delta: { type: "funding", coin: "ETH", fundingUsdc: "broken" },
+        },
+      ],
+    });
+
+    await expect(
+      fetchHyperliquidUserFunding(
+        { account, coinAliases: ["ETH"], startTime: 500, endTime: 3000 },
+        fetcher,
+      ),
+    ).resolves.toBe(-0.75);
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.hyperliquid.xyz/info",
+      expect.objectContaining({
+        body: JSON.stringify({
+          type: "userFunding",
+          user: account.address,
+        }),
       }),
     );
   });
