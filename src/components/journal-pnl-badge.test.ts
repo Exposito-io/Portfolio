@@ -6,6 +6,7 @@ import {
   JournalClosingPriceMetric,
   JournalFundingMetric,
   JournalMarketMetric,
+  JournalNetFundingMetric,
   JournalPnlMetric,
   JournalPositionValueMetric,
   getFundingRateTone,
@@ -116,6 +117,32 @@ describe("JournalFundingMetric", () => {
 
   it("uses neutral colors without a position direction", () => {
     expect(getFundingRateTone(20, null)).toBe("funding-rate-neutral");
+  });
+});
+
+describe("JournalNetFundingMetric", () => {
+  it("colors received funding green and paid funding red", () => {
+    const received = renderToStaticMarkup(
+      createElement(JournalNetFundingMetric, { value: 25 }),
+    );
+    const paid = renderToStaticMarkup(
+      createElement(JournalNetFundingMetric, { value: -12.34 }),
+    );
+
+    expect(received).toContain("journal-pnl-metric-positive");
+    expect(received).toContain("Net funding");
+    expect(received).toContain("+$25.00");
+    expect(paid).toContain("journal-pnl-metric-negative");
+    expect(paid).toContain("-$12.34");
+  });
+
+  it("shows N/A while the position is flat or unavailable", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JournalNetFundingMetric, { value: null }),
+    );
+
+    expect(markup).toContain("Net funding");
+    expect(markup).toContain("N/A");
   });
 });
 

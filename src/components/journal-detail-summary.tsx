@@ -8,6 +8,7 @@ import {
   JournalEntryPriceMetric,
   JournalFundingMetric,
   JournalMarketMetric,
+  JournalNetFundingMetric,
   JournalPnlMetric,
 } from "@/components/journal-pnl-badge";
 import {
@@ -65,6 +66,8 @@ export function JournalDetailSummary({
   const isFlatTrade =
     filledOrdersSummary !== undefined &&
     Math.abs(filledOrdersSummary.positionValueUsd ?? 0) === 0;
+  const showFundingMetrics = trade.asset.kind !== "spot";
+  const showNetFundingMetric = showFundingMetrics && trade.kind === "trade";
 
   return (
     <section
@@ -128,13 +131,24 @@ export function JournalDetailSummary({
           loading={marketLoading}
           summary={marketSummary}
         />
-        {trade.asset.kind !== "spot" ? (
-          <JournalFundingMetric
-            direction={trade.direction}
-            error={fundingError}
-            loading={fundingLoading}
-            summary={fundingSummary}
-          />
+        {showFundingMetrics ? (
+          <div
+            className={`journal-funding-metrics${showNetFundingMetric ? " journal-funding-metrics-pair" : ""}`}
+          >
+            <JournalFundingMetric
+              direction={trade.direction}
+              error={fundingError}
+              loading={fundingLoading}
+              summary={fundingSummary}
+            />
+            {showNetFundingMetric ? (
+              <JournalNetFundingMetric
+                error={ordersState.error}
+                loading={ordersState.loading}
+                value={ordersState.data?.netFundingUsd}
+              />
+            ) : null}
+          </div>
         ) : null}
         <JournalLatestNews tradeId={trade.id} />
       </aside>

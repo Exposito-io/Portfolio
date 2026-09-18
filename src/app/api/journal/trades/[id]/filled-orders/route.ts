@@ -60,6 +60,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const orders: HyperliquidFilledOrder[] = [];
     const sourceErrors: SourceError[] = [];
     let unrealizedPnlUsd: number | null = null;
+    let netFundingUsd: number | null = null;
     let entryPriceWeightedSize = 0;
     let positionSize = 0;
     let positionValueUsd = 0;
@@ -95,6 +96,9 @@ export async function GET(_request: Request, context: RouteContext) {
           if (openPosition) {
             unrealizedPnlUsd =
               (unrealizedPnlUsd ?? 0) + openPosition.unrealizedPnlUsd;
+            if (openPosition.netFundingUsd !== null) {
+              netFundingUsd = (netFundingUsd ?? 0) + openPosition.netFundingUsd;
+            }
             if (openPosition.entryPriceUsd !== null) {
               entryPriceWeightedSize +=
                 openPosition.entryPriceUsd * openPosition.positionSize;
@@ -133,6 +137,7 @@ export async function GET(_request: Request, context: RouteContext) {
         positionCostBasisUsd,
       ),
       sourceErrors,
+      netFundingUsd,
       accountsCount: accounts.length,
       startTime,
       endTime,

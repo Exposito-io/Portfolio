@@ -525,6 +525,7 @@ describe("Hyperliquid normalization", () => {
       positionValueUsd: 517419.87,
       positionCostBasisUsd: 517338.23,
       unrealizedPnlUsd: 17443.21,
+      netFundingUsd: null,
     });
   });
 
@@ -563,6 +564,7 @@ describe("Hyperliquid normalization", () => {
       positionValueUsd: 220,
       positionCostBasisUsd: 200,
       unrealizedPnlUsd: 20,
+      netFundingUsd: null,
     });
     expect(fetcher).toHaveBeenCalledWith(
       "https://api.hyperliquid.xyz/info",
@@ -623,7 +625,62 @@ describe("Hyperliquid normalization", () => {
       positionValueUsd: 700,
       positionCostBasisUsd: 700,
       unrealizedPnlUsd: 30,
+      netFundingUsd: null,
     });
+  });
+
+  it("reports net funding received from the positions' cumulative funding", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        assetPositions: [
+          {
+            position: {
+              coin: "BTC",
+              entryPx: "50000",
+              szi: "0.02",
+              positionValue: "1000",
+              unrealizedPnl: "-25",
+              cumFunding: {
+                allTime: "12.5",
+                sinceChange: "12.5",
+                sinceOpen: "12.5", // paid
+              },
+            },
+          },
+          {
+            position: {
+              coin: "BTC",
+              entryPx: "51000",
+              szi: "0.01",
+              positionValue: "500",
+              unrealizedPnl: "5",
+              cumFunding: {
+                allTime: "-3.25",
+                sinceChange: "-3.25",
+                sinceOpen: "-3.25", // received
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    const summary = await fetchHyperliquidOpenPositionSummary(
+      {
+        account,
+        asset: {
+          kind: "perp",
+          label: "BTC perp",
+          coin: "BTC",
+          chartCoin: "BTC",
+        },
+      },
+      fetcher,
+    );
+
+    // 12.5 paid - 3.25 received = 9.25 paid, reported as received-flipped.
+    expect(summary?.netFundingUsd).toBe(-9.25);
   });
 
   it("keeps the open position PnL helper as a shortcut", async () => {

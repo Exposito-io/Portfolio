@@ -12,6 +12,7 @@ type FilledOrdersResponse = {
   orders: HyperliquidFilledOrder[];
   summary: JournalTradePnlSummary;
   sourceErrors: SourceError[];
+  netFundingUsd: number | null;
   accountsCount: number;
   startTime: number;
   endTime: number;

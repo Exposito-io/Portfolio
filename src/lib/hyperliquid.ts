@@ -27,6 +27,11 @@ type HyperliquidClearinghouseState = {
       positionValue?: string;
       unrealizedPnl?: string;
       marginUsed?: string;
+      cumFunding?: {
+        allTime?: string;
+        sinceChange?: string;
+        sinceOpen?: string;
+      };
     };
   }>;
 };
@@ -504,6 +509,7 @@ type HyperliquidOpenPositionSummary = {
   positionValueUsd: number;
   positionCostBasisUsd: number;
   unrealizedPnlUsd: number;
+  netFundingUsd: number | null;
 };
 
 export async function fetchHyperliquidOpenPositionSummary(
@@ -543,7 +549,17 @@ export async function fetchHyperliquidOpenPositionSummary(
 
   let entryPriceWeightedSize = 0;
   let positionSize = 0;
+  let netFundingUsd = 0;
+  let hasFundingReport = false;
   for (const position of matchingPositions) {
+    // The clearinghouse reports funding as a cumulative charge: positive
+    // when paid, negative when received. Flip it so positive means received.
+    const fundingCharge = parseNullableNumber(position?.cumFunding?.sinceOpen);
+    if (fundingCharge !== null) {
+      hasFundingReport = true;
+      netFundingUsd -= fundingCharge;
+    }
+
     const entryPrice = parseNullableNumber(position?.entryPx);
     const size = Math.abs(parseNullableNumber(position?.szi) ?? 0);
     if (entryPrice === null || size === 0) continue;
@@ -568,6 +584,7 @@ export async function fetchHyperliquidOpenPositionSummary(
         0,
       ),
     ),
+    netFundingUsd: hasFundingReport ? roundCurrency(netFundingUsd) : null,
   };
 }
 

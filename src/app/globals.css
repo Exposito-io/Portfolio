@@ -1698,6 +1698,11 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.journal-funding-metrics {
+  display: grid;
+  gap: 1rem;
+}
+
 .journal-entry-actions {
   display: inline-flex;
   gap: 0.5rem;
@@ -1848,6 +1853,10 @@ textarea {
   flex-wrap: wrap;
   gap: 0.4rem;
   justify-content: flex-end;
+}
+
+.journal-funding-metrics-pair .journal-market-changes {
+  flex-wrap: wrap;
 }
 
 .journal-market-change-positive b,
@@ -2033,6 +2042,10 @@ textarea {
 
   .journal-detail-position-metrics {
     grid-template-columns: minmax(9rem, 0.55fr) minmax(0, 1.45fr);
+  }
+
+  .journal-funding-metrics-pair {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   }
 
   .journal-detail-position-metrics-flat {

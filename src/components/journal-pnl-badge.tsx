@@ -107,6 +107,49 @@ export function JournalFundingMetric({
   );
 }
 
+export function JournalNetFundingMetric({
+  error,
+  loading,
+  value,
+}: {
+  error?: string;
+  loading?: boolean;
+  value?: number | null;
+}) {
+  if (loading) {
+    return <MetricShell label="Net funding" value="Loading" />;
+  }
+
+  if (error || !isFiniteNumber(value)) {
+    return (
+      <MetricShell
+        label="Net funding"
+        title={error}
+        value={error ? "Unavailable" : "N/A"}
+      />
+    );
+  }
+
+  const tone =
+    value > 0
+      ? "journal-pnl-metric-positive"
+      : value < 0
+        ? "journal-pnl-metric-negative"
+        : "";
+
+  return (
+    <section
+      className={`journal-pnl-metric ${tone}`}
+      title="Funding received (+) or paid (−) by the current Hyperliquid position"
+    >
+      <div>
+        <span>Net funding</span>
+        <strong>{formatSignedCurrency(value)}</strong>
+      </div>
+    </section>
+  );
+}
+
 function FundingAverage({
   direction,
   label,
