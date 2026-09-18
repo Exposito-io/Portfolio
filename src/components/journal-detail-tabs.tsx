@@ -1,6 +1,15 @@
 "use client";
 
-import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  type KeyboardEvent,
+  type ReactNode,
+  useId,
+  useRef,
+  useState,
+} from "react";
+
+import { useJournalNews } from "@/components/journal-news-context";
 
 type JournalDetailTab =
   | "charts"
@@ -26,6 +35,7 @@ export function JournalDetailTabs({
   documents,
   transactions,
   news,
+  newsUnreadCount = 0,
 }: {
   charts: ReactNode;
   journal: ReactNode;
@@ -33,6 +43,7 @@ export function JournalDetailTabs({
   documents: ReactNode;
   transactions: ReactNode;
   news: ReactNode;
+  newsUnreadCount?: number;
 }) {
   const id = useId();
   const [activeTab, setActiveTab] = useState<JournalDetailTab>("charts");
@@ -80,6 +91,11 @@ export function JournalDetailTabs({
         {tabs.map((tab, index) => (
           <button
             aria-controls={`${id}-${tab.id}-panel`}
+            aria-label={
+              tab.id === "news" && newsUnreadCount > 0
+                ? `News, ${newsUnreadCount} unread ${newsUnreadCount === 1 ? "article" : "articles"}`
+                : undefined
+            }
             aria-selected={activeTab === tab.id}
             className="journal-detail-tab"
             id={`${id}-${tab.id}-tab`}
@@ -94,6 +110,11 @@ export function JournalDetailTabs({
             type="button"
           >
             {tab.label}
+            {tab.id === "news" && newsUnreadCount > 0 ? (
+              <span aria-hidden="true" className="journal-detail-tab-badge">
+                {newsUnreadCount > 99 ? "99+" : newsUnreadCount}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -160,4 +181,15 @@ export function JournalDetailTabs({
       </div>
     </section>
   );
+}
+
+export function JournalDetailTabsWithNewsCount({
+  tradeId,
+  ...props
+}: Omit<ComponentProps<typeof JournalDetailTabs>, "newsUnreadCount"> & {
+  tradeId: string;
+}) {
+  const { news } = useJournalNews(tradeId);
+
+  return <JournalDetailTabs {...props} newsUnreadCount={news?.items.length ?? 0} />;
 }

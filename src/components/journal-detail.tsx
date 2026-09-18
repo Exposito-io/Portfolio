@@ -15,7 +15,7 @@ import { JournalChart } from "@/components/journal-chart";
 import { JournalDetailEntries } from "@/components/journal-detail-entries";
 import { JournalDetailMetrics } from "@/components/journal-detail-metrics";
 import { JournalDetailSummary } from "@/components/journal-detail-summary";
-import { JournalDetailTabs } from "@/components/journal-detail-tabs";
+import { JournalDetailTabsWithNewsCount } from "@/components/journal-detail-tabs";
 import { JournalDetailTopbar } from "@/components/journal-detail-topbar";
 import {
   JournalEntryDialog,
@@ -485,7 +485,8 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
           onSave={saveTrade}
         />
 
-        <JournalDetailTabs
+        <JournalDetailTabsWithNewsCount
+          tradeId={trade.id}
           charts={
             <JournalChart
               trade={trade}
