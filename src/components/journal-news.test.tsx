@@ -7,8 +7,12 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { JournalDetailTabs } from "@/components/journal-detail-tabs";
+import {
+  JournalDetailTabs,
+  JournalDetailTabsWithNewsCount,
+} from "@/components/journal-detail-tabs";
 import { JournalNews } from "@/components/journal-news";
+import { JournalNewsProvider } from "@/components/journal-news-context";
 import type { JournalNewsResponse } from "@/lib/types";
 
 afterEach(() => {
@@ -17,6 +21,79 @@ afterEach(() => {
 });
 
 describe("JournalDetailTabs news loading", () => {
+  it("shows an accessible unread count badge on the News tab", () => {
+    render(
+      <JournalDetailTabs
+        charts={<div>Charts panel</div>}
+        documents={<div>Documents panel</div>}
+        journal={<div>Journal panel</div>}
+        metrics={<div>Metrics panel</div>}
+        news={<div>News panel</div>}
+        newsUnreadCount={123}
+        transactions={<div>Transactions panel</div>}
+      />,
+    );
+
+    const newsTab = screen.getByRole("tab", {
+      name: "News, 123 unread articles",
+    });
+    expect(within(newsTab).getByText("99+")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("does not show a badge when there are no unread stories", () => {
+    render(
+      <JournalDetailTabs
+        charts={<div>Charts panel</div>}
+        documents={<div>Documents panel</div>}
+        journal={<div>Journal panel</div>}
+        metrics={<div>Metrics panel</div>}
+        news={<div>News panel</div>}
+        transactions={<div>Transactions panel</div>}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "News" })).toHaveTextContent("News");
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
+  });
+
+  it("updates the badge when a story is marked as read", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ news: sampleNews }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <JournalNewsProvider tradeId="trade-1">
+        <JournalDetailTabsWithNewsCount
+          charts={<div>Charts panel</div>}
+          documents={<div>Documents panel</div>}
+          journal={<div>Journal panel</div>}
+          metrics={<div>Metrics panel</div>}
+          news={<JournalNews tradeId="trade-1" />}
+          tradeId="trade-1"
+          transactions={<div>Transactions panel</div>}
+        />
+      </JournalNewsProvider>,
+    );
+
+    const newsTab = await screen.findByRole("tab", {
+      name: "News, 2 unread articles",
+    });
+    await user.click(newsTab);
+    await user.click(
+      within(await screen.findByText("Shared story").then((story) => story.closest("li") as HTMLLIElement)).getByRole(
+        "button",
+        { name: "Mark as read" },
+      ),
+    );
+
+    expect(
+      screen.getByRole("tab", { name: "News, 1 unread article" }),
+    ).toHaveTextContent("1");
+  });
+
   it("mounts News only when first selected and preserves it across tabs", async () => {
     const mounted = vi.fn();
 

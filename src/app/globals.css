@@ -1198,16 +1198,35 @@ textarea {
 }
 
 .journal-detail-tab {
+  align-items: center;
   border-bottom: 3px solid transparent;
   color: #69706c;
+  display: inline-flex;
   flex: 0 0 auto;
   font-size: 0.88rem;
   font-weight: 800;
+  gap: 0.45rem;
   margin-bottom: -1px;
   padding: 0.7rem 1rem 0.65rem;
   transition:
     border-color 150ms ease,
     color 150ms ease;
+}
+
+.journal-detail-tab-badge {
+  align-items: center;
+  background: #9b3d30;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  justify-content: center;
+  line-height: 1;
+  min-height: 1.25rem;
+  min-width: 1.25rem;
+  padding: 0.15rem 0.35rem;
 }
 
 .journal-detail-tab:hover {
