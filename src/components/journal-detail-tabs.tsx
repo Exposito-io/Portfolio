@@ -2,12 +2,19 @@
 
 import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 
-type JournalDetailTab = "charts" | "journal" | "metrics" | "transactions" | "news";
+type JournalDetailTab =
+  | "charts"
+  | "journal"
+  | "metrics"
+  | "documents"
+  | "transactions"
+  | "news";
 
 const tabs: { id: JournalDetailTab; label: string }[] = [
   { id: "charts", label: "Charts" },
   { id: "journal", label: "Journal" },
   { id: "metrics", label: "Metrics" },
+  { id: "documents", label: "Documents" },
   { id: "transactions", label: "Transactions" },
   { id: "news", label: "News" },
 ];
@@ -16,21 +23,25 @@ export function JournalDetailTabs({
   charts,
   journal,
   metrics,
+  documents,
   transactions,
   news,
 }: {
   charts: ReactNode;
   journal: ReactNode;
   metrics: ReactNode;
+  documents: ReactNode;
   transactions: ReactNode;
   news: ReactNode;
 }) {
   const id = useId();
   const [activeTab, setActiveTab] = useState<JournalDetailTab>("charts");
+  const [documentsMounted, setDocumentsMounted] = useState(false);
   const [newsMounted, setNewsMounted] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function selectTab(tab: JournalDetailTab) {
+    if (tab === "documents") setDocumentsMounted(true);
     if (tab === "news") setNewsMounted(true);
     setActiveTab(tab);
   }
@@ -116,6 +127,16 @@ export function JournalDetailTabs({
         tabIndex={0}
       >
         {metrics}
+      </div>
+      <div
+        aria-labelledby={`${id}-documents-tab`}
+        className="journal-detail-tab-panel"
+        hidden={activeTab !== "documents"}
+        id={`${id}-documents-panel`}
+        role="tabpanel"
+        tabIndex={0}
+      >
+        {documentsMounted ? documents : null}
       </div>
       <div
         aria-labelledby={`${id}-transactions-tab`}

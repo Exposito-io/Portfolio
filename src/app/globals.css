@@ -1239,6 +1239,226 @@ textarea {
   min-height: 5rem;
 }
 
+.journal-documents {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.06);
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.journal-documents-header,
+.journal-document-preview-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.journal-documents-actions,
+.journal-document-preview-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.journal-documents-workspace {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.journal-documents-list {
+  align-content: start;
+  background: #f7f5ef;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.5rem;
+}
+
+.journal-document-list-item {
+  align-items: center;
+  background: #fff;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.journal-document-list-item:hover {
+  border-color: rgba(31, 122, 104, 0.3);
+}
+
+.journal-document-list-item-selected {
+  border-color: #1f7a68;
+  box-shadow: 0 0 0 1px rgba(31, 122, 104, 0.08);
+}
+
+.journal-document-select {
+  align-items: center;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 0.7rem;
+  text-align: left;
+}
+
+.journal-document-select > svg {
+  color: #1f7a68;
+}
+
+.journal-document-select strong,
+.journal-document-select small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journal-document-select strong {
+  color: #1f2523;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.journal-document-select small {
+  color: #69706c;
+  font-size: 0.7rem;
+  margin-top: 0.15rem;
+}
+
+.journal-document-delete {
+  margin-right: 0.35rem;
+}
+
+.journal-document-preview {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  min-height: 32rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: 1rem;
+}
+
+.journal-document-preview-empty {
+  align-items: center;
+  color: #69706c;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  justify-content: center;
+  min-height: 29rem;
+  text-align: center;
+}
+
+.journal-document-form,
+.journal-markdown-document,
+.journal-pdf-document {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.journal-document-preview-header > div:first-child {
+  min-width: 0;
+}
+
+.journal-document-preview-header span {
+  color: #69706c;
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.journal-document-preview-header h3 {
+  color: #1f2523;
+  font-size: 1rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.journal-pdf-frame {
+  background: #f1eee7;
+  border: 0;
+  border-radius: 6px;
+  height: min(68vh, 52rem);
+  min-height: 28rem;
+  width: 100%;
+}
+
+.journal-pdf-fallback,
+.journal-documents-empty,
+.journal-documents-status {
+  color: #69706c;
+  font-size: 0.82rem;
+}
+
+.journal-pdf-fallback a {
+  color: #1f7a68;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.journal-documents-empty {
+  padding: 1rem;
+  text-align: center;
+}
+
+@media (min-width: 900px) {
+  .journal-documents-workspace {
+    align-items: start;
+    grid-template-columns: minmax(15rem, 0.42fr) minmax(0, 1.58fr);
+  }
+
+  .journal-documents-list {
+    max-height: 42rem;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 639px) {
+  .journal-documents-header,
+  .journal-document-preview-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .journal-documents-actions,
+  .journal-document-preview-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .journal-documents-actions .button-primary,
+  .journal-documents-actions .button-secondary,
+  .journal-document-preview-actions .button-secondary {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .journal-document-preview {
+    min-height: 24rem;
+  }
+
+  .journal-pdf-frame {
+    height: 31rem;
+    min-height: 22rem;
+  }
+}
+
 .journal-news {
   display: grid;
   gap: 1rem;

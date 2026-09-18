@@ -29,6 +29,7 @@ describe("JournalDetailTabs news loading", () => {
     render(
       <JournalDetailTabs
         charts={<div>Charts panel</div>}
+        documents={<div>Documents panel</div>}
         journal={<div>Journal panel</div>}
         metrics={<div>Metrics panel</div>}
         news={<NewsProbe />}
@@ -45,6 +46,38 @@ describe("JournalDetailTabs news loading", () => {
 
     await user.click(screen.getByRole("tab", { name: "Charts" }));
     await user.click(screen.getByRole("tab", { name: "News" }));
+    expect(mounted).toHaveBeenCalledTimes(1);
+  });
+
+  it("mounts Documents only when first selected and preserves it across tabs", async () => {
+    const mounted = vi.fn();
+
+    function DocumentsProbe() {
+      useEffect(() => mounted(), []);
+      return <div>Document workspace</div>;
+    }
+
+    const user = userEvent.setup();
+    render(
+      <JournalDetailTabs
+        charts={<div>Charts panel</div>}
+        documents={<DocumentsProbe />}
+        journal={<div>Journal panel</div>}
+        metrics={<div>Metrics panel</div>}
+        news={<div>News panel</div>}
+        transactions={<div>Transactions panel</div>}
+      />,
+    );
+
+    expect(screen.queryByText("Document workspace")).not.toBeInTheDocument();
+    expect(mounted).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("tab", { name: "Documents" }));
+    expect(screen.getByText("Document workspace")).toBeInTheDocument();
+    expect(mounted).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("tab", { name: "Charts" }));
+    await user.click(screen.getByRole("tab", { name: "Documents" }));
     expect(mounted).toHaveBeenCalledTimes(1);
   });
 });

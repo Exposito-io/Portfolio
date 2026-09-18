@@ -332,21 +332,26 @@ describe("journal trades", () => {
 });
 
 function fakeDb() {
-  const collection = new FakeCollection();
+  const collections = new Map<string, FakeCollection>();
   return {
-    collection: () => collection,
+    collection: (name: string) => {
+      let collection = collections.get(name);
+      if (!collection) {
+        collection = new FakeCollection();
+        collections.set(name, collection);
+      }
+      return collection;
+    },
   } as unknown as Db;
 }
 
 class FakeCollection {
   docs: Document[] = [];
 
-  find() {
-    return {
-      sort: () => ({
-        toArray: async () => [...this.docs],
-      }),
-    };
+  find(query: Query = {}) {
+    const matchingDocs = this.docs.filter((doc) => matches(doc, query));
+    const toArray = async () => [...matchingDocs];
+    return { sort: () => ({ toArray }), toArray };
   }
 
   async findOne(query: Query) {
@@ -371,6 +376,12 @@ class FakeCollection {
     this.docs = this.docs.filter((doc) => !idsEqual(doc._id, query._id));
     return { deletedCount: initialLength - this.docs.length };
   }
+
+  async deleteMany(query: Query) {
+    const initialLength = this.docs.length;
+    this.docs = this.docs.filter((doc) => !matches(doc, query));
+    return { deletedCount: initialLength - this.docs.length };
+  }
 }
 
 type Document = {
@@ -388,6 +399,7 @@ type Document = {
 
 type Query = {
   _id?: ObjectId;
+  tradeId?: ObjectId;
   "entries._id"?: ObjectId;
 };
 
@@ -399,6 +411,12 @@ type Update = {
 
 function matches(doc: Document, query: Query) {
   if (query._id && !idsEqual(doc._id, query._id)) return false;
+  if (
+    query.tradeId &&
+    !idsEqual(doc.tradeId as ObjectId | undefined, query.tradeId)
+  ) {
+    return false;
+  }
   if (query["entries._id"]) {
     return Boolean(
       doc.entries?.some((entry) => idsEqual(entry._id, query["entries._id"])),

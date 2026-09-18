@@ -137,6 +137,28 @@ export type JournalTrade = {
   updatedAt: string;
 };
 
+type JournalDocumentBase = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type JournalMarkdownDocument = JournalDocumentBase & {
+  kind: "markdown";
+  contentMarkdown: string;
+};
+
+export type JournalPdfDocument = JournalDocumentBase & {
+  kind: "pdf";
+  contentType: "application/pdf";
+  sizeBytes: number;
+  contentUrl: string;
+  downloadUrl: string;
+};
+
+export type JournalDocument = JournalMarkdownDocument | JournalPdfDocument;
+
 export type JournalNewsFeed = {
   id: string;
   kind: "google" | "rss";

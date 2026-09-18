@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getZonedJournalDateMs, isValidDateTimeKey } from "@/lib/date";
+import { deleteJournalDocumentsForTrade } from "@/lib/journal-documents";
 import type {
   JournalEntry,
   JournalTrade,
@@ -270,6 +271,10 @@ export async function deleteTrade(db: Db, id: string) {
   const _id = toObjectId(id);
   if (!_id) return false;
 
+  const existing = await collection(db).findOne({ _id });
+  if (!existing) return false;
+
+  await deleteJournalDocumentsForTrade(db, id);
   const result = await collection(db).deleteOne({ _id });
   return result.deletedCount === 1;
 }

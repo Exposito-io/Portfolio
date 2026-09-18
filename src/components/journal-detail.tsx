@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   type FormEvent,
   useCallback,
@@ -40,6 +41,20 @@ import type {
   JournalTradeAsset,
   PortfolioResponse,
 } from "@/lib/types";
+
+const JournalDocuments = dynamic(
+  () =>
+    import("@/components/journal-documents").then(
+      (module) => module.JournalDocuments,
+    ),
+  {
+    loading: () => (
+      <p className="journal-documents-status" role="status">
+        Loading documents…
+      </p>
+    ),
+  },
+);
 
 function createEmptyEntryForm(): JournalEntryFormState {
   return {
@@ -496,6 +511,7 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               onSave={saveMetrics}
             />
           }
+          documents={<JournalDocuments tradeId={trade.id} />}
           transactions={
             trade.kind === "trade" ? (
               <JournalFilledOrders

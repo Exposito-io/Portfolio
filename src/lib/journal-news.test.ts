@@ -79,7 +79,7 @@ describe("Google News RSS", () => {
   });
 
   it("falls back to Bing News when Google returns an empty feed", async () => {
-    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+    const fetchImpl = vi.fn<NewsFetch>(async (input: string | URL | Request) => {
       const url = new URL(String(input));
       return new Response(
         url.hostname === "news.google.com"
@@ -93,7 +93,7 @@ describe("Google News RSS", () => {
               </item>
             </channel></rss>`,
       );
-    }) as NewsFetch;
+    });
 
     const items = await fetchGoogleNewsFeed("Micron", fetchImpl, true);
 
@@ -353,8 +353,7 @@ describe("Google News query cache", () => {
 
   it("shares one in-flight refresh across concurrent callers", async () => {
     const { db } = fakeDbWithState([]);
-    let resolveFetch: ((items: ReturnType<typeof newsItem>[]) => void) | null =
-      null;
+    let resolveFetch!: (items: ReturnType<typeof newsItem>[]) => void;
     const fetchItems = vi.fn(
       () =>
         new Promise<ReturnType<typeof newsItem>[]>((resolve) => {
@@ -368,7 +367,7 @@ describe("Google News query cache", () => {
       getCachedGoogleNews(db, " micron ", new Set(), fetchItems, { now }),
     ]);
     await vi.waitFor(() => expect(fetchItems).toHaveBeenCalledTimes(1));
-    resolveFetch?.([newsItem("shared", "Shared story", now)]);
+    resolveFetch([newsItem("shared", "Shared story", now)]);
     const results = await requests;
 
     expect(fetchItems).toHaveBeenCalledTimes(1);
@@ -982,10 +981,7 @@ function fakeDbWithState(documents: StoredDocument[]) {
       }>,
     ) {
       for (const { updateOne } of operations) {
-        state.readReceipts.set(updateOne.filter._id, {
-          _id: updateOne.filter._id,
-          ...updateOne.update.$set,
-        });
+        state.readReceipts.set(updateOne.filter._id, updateOne.update.$set);
       }
       return { acknowledged: true };
     },
