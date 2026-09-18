@@ -59,6 +59,7 @@ type ChartOrderMarker = {
   id: string;
   side: HyperliquidFilledOrder["side"];
   notionalUsd: number;
+  averagePrice: number | null;
   orderCount: number;
 };
 
@@ -533,14 +534,7 @@ export function JournalChart({
             }}
           >
             {hoveredMarker.kind === "order" ? (
-              <>
-                <strong>{hoveredMarker.side}</strong>
-                <span>{formatCompactUsd(hoveredMarker.notionalUsd)}</span>
-                <small>
-                  {hoveredMarker.orderCount}{" "}
-                  {hoveredMarker.orderCount === 1 ? "order" : "orders"}
-                </small>
-              </>
+              <OrderMarkerTooltip marker={hoveredMarker} />
             ) : (
               <EntryMarkerTooltip marker={hoveredMarker} />
             )}
@@ -792,6 +786,24 @@ function EntryMarkerTooltip({ marker }: { marker: ChartEntryMarker }) {
   );
 }
 
+export function OrderMarkerTooltip({ marker }: { marker: ChartOrderMarker }) {
+  return (
+    <>
+      <strong>{marker.side}</strong>
+      <span>{formatCompactUsd(marker.notionalUsd)}</span>
+      <span>
+        Avg price{" "}
+        {marker.averagePrice === null
+          ? "N/A"
+          : formatUsdPrice(marker.averagePrice)}
+      </span>
+      <small>
+        {marker.orderCount} {marker.orderCount === 1 ? "order" : "orders"}
+      </small>
+    </>
+  );
+}
+
 function getHoveredMarkerDetail(
   param: MouseEventParams<Time>,
   details: Map<string, ChartMarkerDetail>,
@@ -801,7 +813,7 @@ function getHoveredMarkerDetail(
   return details.get(String(objectId)) ?? null;
 }
 
-function buildChartMarkers({
+export function buildChartMarkers({
   orders,
   entries,
   candles,
@@ -823,6 +835,8 @@ function buildChartMarkers({
       time: UTCTimestamp;
       side: HyperliquidFilledOrder["side"];
       notionalUsd: number;
+      weightedPriceUsd: number;
+      pricedSize: number;
       orderCount: number;
     }
   >();
@@ -837,9 +851,19 @@ function buildChartMarkers({
       time,
       side: order.side,
       notionalUsd: 0,
+      weightedPriceUsd: 0,
+      pricedSize: 0,
       orderCount: 0,
     };
     group.notionalUsd += order.notionalUsd;
+    if (
+      Number.isFinite(order.averagePrice) &&
+      Number.isFinite(order.totalSize) &&
+      order.totalSize > 0
+    ) {
+      group.weightedPriceUsd += order.averagePrice * order.totalSize;
+      group.pricedSize += order.totalSize;
+    }
     group.orderCount += 1;
     groups.set(key, group);
   }
@@ -854,6 +878,10 @@ function buildChartMarkers({
         id,
         side: group.side,
         notionalUsd: group.notionalUsd,
+        averagePrice:
+          group.pricedSize > 0
+            ? group.weightedPriceUsd / group.pricedSize
+            : null,
         orderCount: group.orderCount,
       });
 
@@ -914,6 +942,14 @@ function formatCompactUsd(value: number) {
     currency: "USD",
     maximumFractionDigits: value >= 1000 ? 0 : 2,
     notation: value >= 100_000 ? "compact" : "standard",
+    style: "currency",
+  }).format(value);
+}
+
+function formatUsdPrice(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    currency: "USD",
+    maximumFractionDigits: 8,
     style: "currency",
   }).format(value);
 }
