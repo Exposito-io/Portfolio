@@ -68,6 +68,8 @@ export function JournalDocuments({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const lastScrolledDocumentIdRef = useRef<string | null>(null);
   const isSelectionControlled = selectedDocumentId !== undefined;
   const selectedId = isSelectionControlled
     ? selectedDocumentId
@@ -81,6 +83,25 @@ export function JournalDocuments({
   useEffect(() => {
     if (!loading && !error) onDocumentCountChange?.(documents.length);
   }, [documents.length, error, loading, onDocumentCountChange]);
+
+  useEffect(() => {
+    if (selectedId === null) {
+      lastScrolledDocumentIdRef.current = null;
+      return;
+    }
+    if (
+      loading ||
+      lastScrolledDocumentIdRef.current === selectedId
+    ) {
+      return;
+    }
+
+    lastScrolledDocumentIdRef.current = selectedId;
+    previewRef.current?.scrollIntoView?.({
+      behavior: "auto",
+      block: "start",
+    });
+  }, [loading, selectedId]);
 
   const navigateDocument = useCallback(
     (documentId: string | null, mode: "push" | "replace") => {
@@ -315,6 +336,12 @@ export function JournalDocuments({
                     onClick={(event) => {
                       if (isModifiedLinkClick(event)) return;
                       event.preventDefault();
+                      if (selectedId === document.id) {
+                        previewRef.current?.scrollIntoView?.({
+                          behavior: "auto",
+                          block: "start",
+                        });
+                      }
                       navigateDocument(document.id, "push");
                       setEditorMode(null);
                       setError("");
@@ -349,7 +376,7 @@ export function JournalDocuments({
             )}
           </aside>
 
-          <div className="journal-document-preview">
+          <div className="journal-document-preview" ref={previewRef}>
             {editorMode ? (
               <MarkdownDocumentForm
                 content={draftMarkdown}

@@ -1374,6 +1374,7 @@ textarea {
   min-width: 0;
   overflow: hidden;
   padding: 1rem;
+  scroll-margin-top: 1rem;
 }
 
 .journal-document-preview-empty {

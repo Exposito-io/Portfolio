@@ -15,9 +15,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { JournalDocuments } from "@/components/journal-documents";
 import type { JournalDocument } from "@/lib/types";
 
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    configurable: true,
+    value: originalScrollIntoView,
+  });
 });
 
 describe("JournalDocuments", () => {
@@ -97,6 +103,11 @@ describe("JournalDocuments", () => {
       "fetch",
       vi.fn().mockResolvedValue(jsonResponse({ documents: [first, second] })),
     );
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
 
     render(
       <JournalDocuments
@@ -112,6 +123,10 @@ describe("JournalDocuments", () => {
     expect(
       screen.getByRole("link", { name: /Linked memo/ }),
     ).toHaveAttribute("aria-current", "page");
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "start",
+    });
   });
 
   it("shows a recoverable missing state for an unknown document link", async () => {
