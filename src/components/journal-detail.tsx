@@ -15,7 +15,10 @@ import { JournalChart } from "@/components/journal-chart";
 import { JournalDetailEntries } from "@/components/journal-detail-entries";
 import { JournalDetailMetrics } from "@/components/journal-detail-metrics";
 import { JournalDetailSummary } from "@/components/journal-detail-summary";
-import { JournalDetailTabsWithNewsCount } from "@/components/journal-detail-tabs";
+import {
+  JournalDetailTabsWithNewsCount,
+  type JournalDetailTab,
+} from "@/components/journal-detail-tabs";
 import { JournalDetailTopbar } from "@/components/journal-detail-topbar";
 import {
   JournalEntryDialog,
@@ -64,7 +67,17 @@ function createEmptyEntryForm(): JournalEntryFormState {
   };
 }
 
-export function JournalDetail({ tradeId }: { tradeId: string }) {
+const JOURNAL_TAB_HISTORY_KEY = "portfolioJournalTab";
+
+export function JournalDetail({
+  tradeId,
+  initialTab = "charts",
+  initialDocumentId = null,
+}: {
+  tradeId: string;
+  initialTab?: JournalDetailTab;
+  initialDocumentId?: string | null;
+}) {
   const [trade, setTrade] = useState<JournalTrade | null>(null);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
   const [marketSummary, setMarketSummary] =
@@ -90,6 +103,11 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [documentCount, setDocumentCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<JournalDetailTab>(initialTab);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    initialDocumentId,
+  );
   const chartCoin = trade?.asset.chartCoin;
   const filledOrdersState = useJournalFilledOrders(
     trade?.kind === "trade" ? trade.id : null,
@@ -113,6 +131,120 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
       ).sort((left, right) => left.localeCompare(right)),
     [trade?.entries],
   );
+
+  const journalPath = `/journal/${encodeURIComponent(tradeId)}`;
+  const documentsPath = `${journalPath}/documents`;
+
+  const navigateToDocument = useCallback(
+    (documentId: string | null, mode: "push" | "replace") => {
+      setSelectedDocumentId(documentId);
+      setActiveTab("documents");
+
+      const path = documentId
+        ? `${documentsPath}/${encodeURIComponent(documentId)}`
+        : documentsPath;
+      if (window.location.pathname === path) return;
+      window.history[mode === "replace" ? "replaceState" : "pushState"](
+        withJournalTabHistory("documents"),
+        "",
+        path,
+      );
+    },
+    [documentsPath],
+  );
+
+  const selectTab = useCallback(
+    (tab: JournalDetailTab) => {
+      setActiveTab(tab);
+
+      if (tab === "documents") {
+        const path = selectedDocumentId
+          ? `${documentsPath}/${encodeURIComponent(selectedDocumentId)}`
+          : documentsPath;
+        if (window.location.pathname !== path) {
+          window.history.replaceState(
+            withJournalTabHistory(activeTab),
+            "",
+            window.location.href,
+          );
+          window.history.pushState(withJournalTabHistory(tab), "", path);
+        }
+        return;
+      }
+
+      if (window.location.pathname.startsWith(`${documentsPath}`)) {
+        window.history.pushState(withJournalTabHistory(tab), "", journalPath);
+      } else {
+        window.history.replaceState(
+          withJournalTabHistory(tab),
+          "",
+          window.location.href,
+        );
+      }
+    },
+    [activeTab, documentsPath, journalPath, selectedDocumentId],
+  );
+
+  useEffect(() => {
+    window.history.replaceState(
+      withJournalTabHistory(initialTab),
+      "",
+      window.location.href,
+    );
+
+    function syncDocumentRoute(event: PopStateEvent) {
+      const pathname = window.location.pathname;
+      if (pathname === documentsPath) {
+        setActiveTab("documents");
+        setSelectedDocumentId(null);
+        return;
+      }
+
+      const documentPrefix = `${documentsPath}/`;
+      if (pathname.startsWith(documentPrefix)) {
+        const documentId = pathname.slice(documentPrefix.length);
+        if (documentId && !documentId.includes("/")) {
+          setActiveTab("documents");
+          try {
+            setSelectedDocumentId(decodeURIComponent(documentId));
+          } catch {
+            setSelectedDocumentId(documentId);
+          }
+        }
+        return;
+      }
+
+      if (pathname === journalPath) {
+        const historyTab = getJournalTabFromHistory(event.state);
+        setActiveTab(historyTab ?? "charts");
+      }
+    }
+
+    window.addEventListener("popstate", syncDocumentRoute);
+    return () => window.removeEventListener("popstate", syncDocumentRoute);
+  }, [documentsPath, initialTab, journalPath]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadDocumentCount() {
+      try {
+        const response = await fetch(
+          `/api/journal/trades/${tradeId}/documents`,
+          { signal: controller.signal },
+        );
+        const payload = (await response.json()) as { documents?: unknown[] };
+        if (response.ok && payload.documents) {
+          setDocumentCount(payload.documents.length);
+        }
+      } catch {
+        // The Documents workspace displays its own loading errors when opened.
+      }
+    }
+
+    void loadDocumentCount();
+    return () => controller.abort();
+  }, [tradeId]);
 
   const loadTrade = useCallback(async () => {
     setLoading(true);
@@ -486,7 +618,10 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
         />
 
         <JournalDetailTabsWithNewsCount
+          activeTab={activeTab}
+          documentCount={documentCount}
           tradeId={trade.id}
+          onTabChange={selectTab}
           charts={
             <JournalChart
               trade={trade}
@@ -512,7 +647,14 @@ export function JournalDetail({ tradeId }: { tradeId: string }) {
               onSave={saveMetrics}
             />
           }
-          documents={<JournalDocuments tradeId={trade.id} />}
+          documents={
+            <JournalDocuments
+              selectedDocumentId={selectedDocumentId}
+              tradeId={trade.id}
+              onDocumentCountChange={setDocumentCount}
+              onDocumentNavigate={navigateToDocument}
+            />
+          }
           transactions={
             trade.kind === "trade" ? (
               <JournalFilledOrders
@@ -549,4 +691,25 @@ function toDateTimeInputValue(value: string, createdAt: string) {
   }
   if (value.includes("T")) return value;
   return `${value}T${getDateTimeKey(new Date(createdAt), PORTFOLIO_TIMEZONE).slice(11)}`;
+}
+
+function withJournalTabHistory(tab: JournalDetailTab) {
+  const currentState = window.history.state;
+  return {
+    ...(currentState && typeof currentState === "object" ? currentState : {}),
+    [JOURNAL_TAB_HISTORY_KEY]: tab,
+  };
+}
+
+function getJournalTabFromHistory(value: unknown): JournalDetailTab | null {
+  if (!value || typeof value !== "object") return null;
+  const tab = (value as Record<string, unknown>)[JOURNAL_TAB_HISTORY_KEY];
+  return tab === "charts" ||
+    tab === "journal" ||
+    tab === "metrics" ||
+    tab === "documents" ||
+    tab === "transactions" ||
+    tab === "news"
+    ? tab
+    : null;
 }

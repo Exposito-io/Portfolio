@@ -7,6 +7,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -37,9 +38,17 @@ describe("JournalDocuments", () => {
       .mockResolvedValueOnce(jsonResponse({ document: created }, 201))
       .mockResolvedValueOnce(jsonResponse({ document: updated }));
     vi.stubGlobal("fetch", fetchMock);
+    const onDocumentCountChange = vi.fn();
+    const onDocumentNavigate = vi.fn();
     const user = userEvent.setup();
 
-    render(<JournalDocuments tradeId="trade-1" />);
+    render(
+      <JournalDocuments
+        tradeId="trade-1"
+        onDocumentCountChange={onDocumentCountChange}
+        onDocumentNavigate={onDocumentNavigate}
+      />,
+    );
     expect(await screen.findByText("No documents yet.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "New Markdown" }));
@@ -69,6 +78,139 @@ describe("JournalDocuments", () => {
     expect(screen.getByText("Updated thesis")).toBeInTheDocument();
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "POST" });
     expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: "PATCH" });
+    expect(onDocumentCountChange).toHaveBeenCalledWith(1);
+    expect(onDocumentNavigate).toHaveBeenCalledWith("document-1", "push");
+  });
+
+  it("opens a requested document instead of the first document", async () => {
+    const first = markdownDocument({
+      id: "document-1",
+      title: "First memo",
+      contentMarkdown: "First content",
+    });
+    const second = markdownDocument({
+      id: "document-2",
+      title: "Linked memo",
+      contentMarkdown: "Linked content",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ documents: [first, second] })),
+    );
+
+    render(
+      <JournalDocuments
+        selectedDocumentId="document-2"
+        tradeId="trade-1"
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Linked memo" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Linked content")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Linked memo/ }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows a recoverable missing state for an unknown document link", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ documents: [markdownDocument({ title: "Available memo" })] }),
+      ),
+    );
+
+    render(
+      <JournalDocuments
+        selectedDocumentId="missing-document"
+        tradeId="trade-1"
+      />,
+    );
+
+    expect(
+      await screen.findByText("Document not found or no longer available."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Available memo/ }),
+    ).toHaveAttribute(
+      "href",
+      "/journal/trade-1/documents/markdown-1",
+    );
+  });
+
+  it("navigates ordinary document clicks while preserving a real link", async () => {
+    const first = markdownDocument({ id: "document-1", title: "First memo" });
+    const second = markdownDocument({ id: "document-2", title: "Second memo" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ documents: [first, second] })),
+    );
+    const onDocumentNavigate = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <JournalDocuments
+        selectedDocumentId="document-1"
+        tradeId="trade-1"
+        onDocumentNavigate={onDocumentNavigate}
+      />,
+    );
+    const secondLink = await screen.findByRole("link", { name: /Second memo/ });
+    expect(secondLink).toHaveAttribute(
+      "href",
+      "/journal/trade-1/documents/document-2",
+    );
+
+    await user.click(secondLink);
+
+    expect(onDocumentNavigate).toHaveBeenCalledWith("document-2", "push");
+  });
+
+  it("copies the canonical document URL with accessible feedback", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ documents: [markdownDocument()] })),
+    );
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<JournalDocuments tradeId="trade-1" />);
+    await user.click(await screen.findByRole("button", { name: "Copy link" }));
+
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/journal/trade-1/documents/markdown-1`,
+    );
+    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Document link copied to clipboard."),
+    ).toBeInTheDocument();
+  });
+
+  it("reports clipboard failures without hiding the document", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ documents: [markdownDocument()] })),
+    );
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error("Denied")) },
+    });
+
+    render(<JournalDocuments tradeId="trade-1" />);
+    await user.click(await screen.findByRole("button", { name: "Copy link" }));
+
+    expect(
+      screen.getByRole("button", { name: "Copy failed" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unable to copy document link.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Memo" })).toBeInTheDocument();
   });
 
   it("keeps a Markdown draft open when saving fails", async () => {
@@ -104,7 +246,13 @@ describe("JournalDocuments", () => {
       .mockResolvedValueOnce(jsonResponse({ document: pdf }, 201));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
-    const { container } = render(<JournalDocuments tradeId="trade-1" />);
+    const onDocumentNavigate = vi.fn();
+    const { container } = render(
+      <JournalDocuments
+        tradeId="trade-1"
+        onDocumentNavigate={onDocumentNavigate}
+      />,
+    );
     await screen.findByText("No documents yet.");
 
     const input = container.querySelector<HTMLInputElement>('input[type="file"]');
@@ -128,6 +276,7 @@ describe("JournalDocuments", () => {
     const formData = fetchMock.mock.calls[1][1]?.body as FormData;
     expect(formData.get("kind")).toBe("pdf");
     expect((formData.get("file") as File).name).toBe("report.pdf");
+    expect(onDocumentNavigate).toHaveBeenCalledWith("pdf-1", "push");
   });
 
   it("keeps the selected document visible when a PDF upload fails", async () => {
@@ -177,9 +326,17 @@ describe("JournalDocuments", () => {
       .mockResolvedValueOnce(jsonResponse({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onDocumentCountChange = vi.fn();
+    const onDocumentNavigate = vi.fn();
     const user = userEvent.setup();
 
-    render(<JournalDocuments tradeId="trade-1" />);
+    render(
+      <JournalDocuments
+        tradeId="trade-1"
+        onDocumentCountChange={onDocumentCountChange}
+        onDocumentNavigate={onDocumentNavigate}
+      />,
+    );
     expect(
       await screen.findByRole("heading", { name: "First memo" }),
     ).toBeInTheDocument();
@@ -190,6 +347,40 @@ describe("JournalDocuments", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("First content")).not.toBeInTheDocument();
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "DELETE" });
+    expect(onDocumentNavigate).toHaveBeenCalledWith("document-2", "replace");
+    await waitFor(() =>
+      expect(onDocumentCountChange).toHaveBeenLastCalledWith(1),
+    );
+  });
+
+  it("returns to the Documents index after deleting the final document", async () => {
+    const onlyDocument = markdownDocument({
+      id: "document-1",
+      title: "Only memo",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ documents: [onlyDocument] }))
+        .mockResolvedValueOnce(jsonResponse({ ok: true })),
+    );
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onDocumentNavigate = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <JournalDocuments
+        selectedDocumentId="document-1"
+        tradeId="trade-1"
+        onDocumentNavigate={onDocumentNavigate}
+      />,
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Delete Only memo" }),
+    );
+
+    expect(onDocumentNavigate).toHaveBeenCalledWith(null, "replace");
   });
 });
 

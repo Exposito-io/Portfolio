@@ -11,7 +11,7 @@ import {
 
 import { useJournalNews } from "@/components/journal-news-context";
 
-type JournalDetailTab =
+export type JournalDetailTab =
   | "charts"
   | "journal"
   | "metrics"
@@ -35,6 +35,9 @@ export function JournalDetailTabs({
   documents,
   transactions,
   news,
+  activeTab,
+  onTabChange,
+  documentCount = 0,
   newsUnreadCount = 0,
 }: {
   charts: ReactNode;
@@ -43,18 +46,26 @@ export function JournalDetailTabs({
   documents: ReactNode;
   transactions: ReactNode;
   news: ReactNode;
+  activeTab?: JournalDetailTab;
+  onTabChange?: (tab: JournalDetailTab) => void;
+  documentCount?: number;
   newsUnreadCount?: number;
 }) {
   const id = useId();
-  const [activeTab, setActiveTab] = useState<JournalDetailTab>("charts");
-  const [documentsMounted, setDocumentsMounted] = useState(false);
-  const [newsMounted, setNewsMounted] = useState(false);
+  const [internalActiveTab, setInternalActiveTab] =
+    useState<JournalDetailTab>("charts");
+  const selectedTab = activeTab ?? internalActiveTab;
+  const [documentsMounted, setDocumentsMounted] = useState(
+    selectedTab === "documents",
+  );
+  const [newsMounted, setNewsMounted] = useState(selectedTab === "news");
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function selectTab(tab: JournalDetailTab) {
     if (tab === "documents") setDocumentsMounted(true);
     if (tab === "news") setNewsMounted(true);
-    setActiveTab(tab);
+    if (activeTab === undefined) setInternalActiveTab(tab);
+    onTabChange?.(tab);
   }
 
   function handleKeyDown(
@@ -91,12 +102,8 @@ export function JournalDetailTabs({
         {tabs.map((tab, index) => (
           <button
             aria-controls={`${id}-${tab.id}-panel`}
-            aria-label={
-              tab.id === "news" && newsUnreadCount > 0
-                ? `News, ${newsUnreadCount} unread ${newsUnreadCount === 1 ? "article" : "articles"}`
-                : undefined
-            }
-            aria-selected={activeTab === tab.id}
+            aria-label={getTabAriaLabel(tab, documentCount, newsUnreadCount)}
+            aria-selected={selectedTab === tab.id}
             className="journal-detail-tab"
             id={`${id}-${tab.id}-tab`}
             key={tab.id}
@@ -106,10 +113,15 @@ export function JournalDetailTabs({
               tabRefs.current[index] = element;
             }}
             role="tab"
-            tabIndex={activeTab === tab.id ? 0 : -1}
+            tabIndex={selectedTab === tab.id ? 0 : -1}
             type="button"
           >
             {tab.label}
+            {tab.id === "documents" && documentCount > 0 ? (
+              <span aria-hidden="true" className="journal-detail-tab-badge">
+                {documentCount > 99 ? "99+" : documentCount}
+              </span>
+            ) : null}
             {tab.id === "news" && newsUnreadCount > 0 ? (
               <span aria-hidden="true" className="journal-detail-tab-badge">
                 {newsUnreadCount > 99 ? "99+" : newsUnreadCount}
@@ -122,7 +134,7 @@ export function JournalDetailTabs({
       <div
         aria-labelledby={`${id}-charts-tab`}
         className="journal-detail-tab-panel"
-        hidden={activeTab !== "charts"}
+        hidden={selectedTab !== "charts"}
         id={`${id}-charts-panel`}
         role="tabpanel"
         tabIndex={0}
@@ -132,7 +144,7 @@ export function JournalDetailTabs({
       <div
         aria-labelledby={`${id}-journal-tab`}
         className="journal-detail-tab-panel"
-        hidden={activeTab !== "journal"}
+        hidden={selectedTab !== "journal"}
         id={`${id}-journal-panel`}
         role="tabpanel"
         tabIndex={0}
@@ -142,7 +154,7 @@ export function JournalDetailTabs({
       <div
         aria-labelledby={`${id}-metrics-tab`}
         className="journal-detail-tab-panel"
-        hidden={activeTab !== "metrics"}
+        hidden={selectedTab !== "metrics"}
         id={`${id}-metrics-panel`}
         role="tabpanel"
         tabIndex={0}
@@ -152,17 +164,17 @@ export function JournalDetailTabs({
       <div
         aria-labelledby={`${id}-documents-tab`}
         className="journal-detail-tab-panel"
-        hidden={activeTab !== "documents"}
+        hidden={selectedTab !== "documents"}
         id={`${id}-documents-panel`}
         role="tabpanel"
         tabIndex={0}
       >
-        {documentsMounted ? documents : null}
+        {documentsMounted || selectedTab === "documents" ? documents : null}
       </div>
       <div
         aria-labelledby={`${id}-transactions-tab`}
         className="journal-detail-tab-panel"
-        hidden={activeTab !== "transactions"}
+        hidden={selectedTab !== "transactions"}
         id={`${id}-transactions-panel`}
         role="tabpanel"
         tabIndex={0}
@@ -172,15 +184,29 @@ export function JournalDetailTabs({
       <div
         aria-labelledby={`${id}-news-tab`}
         className="journal-detail-tab-panel journal-detail-news"
-        hidden={activeTab !== "news"}
+        hidden={selectedTab !== "news"}
         id={`${id}-news-panel`}
         role="tabpanel"
         tabIndex={0}
       >
-        {newsMounted ? news : null}
+        {newsMounted || selectedTab === "news" ? news : null}
       </div>
     </section>
   );
+}
+
+function getTabAriaLabel(
+  tab: (typeof tabs)[number],
+  documentCount: number,
+  newsUnreadCount: number,
+) {
+  if (tab.id === "documents" && documentCount > 0) {
+    return `Documents, ${documentCount} ${documentCount === 1 ? "document" : "documents"}`;
+  }
+  if (tab.id === "news" && newsUnreadCount > 0) {
+    return `News, ${newsUnreadCount} unread ${newsUnreadCount === 1 ? "article" : "articles"}`;
+  }
+  return undefined;
 }
 
 export function JournalDetailTabsWithNewsCount({

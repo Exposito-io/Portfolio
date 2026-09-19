@@ -2,12 +2,16 @@
 
 import {
   type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import {
+  Check,
+  Copy,
   Download,
   ExternalLink,
   FileText,
@@ -37,9 +41,24 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
-export function JournalDocuments({ tradeId }: { tradeId: string }) {
+export function JournalDocuments({
+  tradeId,
+  selectedDocumentId,
+  onDocumentCountChange,
+  onDocumentNavigate,
+}: {
+  tradeId: string;
+  selectedDocumentId?: string | null;
+  onDocumentCountChange?: (count: number) => void;
+  onDocumentNavigate?: (
+    documentId: string | null,
+    mode: "push" | "replace",
+  ) => void;
+}) {
   const [documents, setDocuments] = useState<JournalDocument[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
+    null,
+  );
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftMarkdown, setDraftMarkdown] = useState("");
@@ -49,6 +68,27 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isSelectionControlled = selectedDocumentId !== undefined;
+  const selectedId = isSelectionControlled
+    ? selectedDocumentId
+    : internalSelectedId;
+  const selectedIdRef = useRef(selectedId);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!loading && !error) onDocumentCountChange?.(documents.length);
+  }, [documents.length, error, loading, onDocumentCountChange]);
+
+  const navigateDocument = useCallback(
+    (documentId: string | null, mode: "push" | "replace") => {
+      if (!isSelectionControlled) setInternalSelectedId(documentId);
+      onDocumentNavigate?.(documentId, mode);
+    },
+    [isSelectionControlled, onDocumentNavigate],
+  );
 
   const selectedDocument = useMemo(
     () => documents.find((document) => document.id === selectedId) ?? null,
@@ -61,6 +101,7 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
     async function loadDocuments() {
       setLoading(true);
       setError("");
+      if (!isSelectionControlled) setInternalSelectedId(null);
       try {
         const response = await fetch(
           `/api/journal/trades/${tradeId}/documents`,
@@ -71,7 +112,14 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
           throw new Error(payload.error || "Unable to load documents.");
         }
         setDocuments(payload.documents);
-        setSelectedId(payload.documents[0]?.id ?? null);
+        if (!isSelectionControlled) {
+          setInternalSelectedId(payload.documents[0]?.id ?? null);
+        } else if (
+          selectedIdRef.current === null &&
+          payload.documents.length > 0
+        ) {
+          navigateDocument(payload.documents[0].id, "replace");
+        }
       } catch (loadError) {
         if (!controller.signal.aborted) {
           setError(toErrorMessage(loadError, "Unable to load documents."));
@@ -83,7 +131,7 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
 
     void loadDocuments();
     return () => controller.abort();
-  }, [tradeId]);
+  }, [isSelectionControlled, navigateDocument, tradeId]);
 
   function beginCreate() {
     setError("");
@@ -137,7 +185,7 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
             )
           : [savedDocument, ...current],
       );
-      setSelectedId(savedDocument.id);
+      navigateDocument(savedDocument.id, "push");
       setEditorMode(null);
     } catch (saveError) {
       setError(toErrorMessage(saveError, "Unable to save the document."));
@@ -164,7 +212,7 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
 
       const uploadedDocument = payload.document;
       setDocuments((current) => [uploadedDocument, ...current]);
-      setSelectedId(uploadedDocument.id);
+      navigateDocument(uploadedDocument.id, "push");
       setEditorMode(null);
     } catch (uploadError) {
       setError(toErrorMessage(uploadError, "Unable to upload the PDF."));
@@ -194,7 +242,7 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
       setDocuments(nextDocuments);
       if (selectedId === document.id) {
         const nextIndex = Math.min(removedIndex, nextDocuments.length - 1);
-        setSelectedId(nextDocuments[nextIndex]?.id ?? null);
+        navigateDocument(nextDocuments[nextIndex]?.id ?? null, "replace");
         setEditorMode(null);
       }
     } catch (deleteError) {
@@ -260,15 +308,17 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
                   className={`journal-document-list-item${selectedId === document.id ? " journal-document-list-item-selected" : ""}`}
                   key={document.id}
                 >
-                  <button
-                    aria-pressed={selectedId === document.id}
+                  <a
+                    aria-current={selectedId === document.id ? "page" : undefined}
                     className="journal-document-select"
-                    onClick={() => {
-                      setSelectedId(document.id);
+                    href={getDocumentPath(tradeId, document.id)}
+                    onClick={(event) => {
+                      if (isModifiedLinkClick(event)) return;
+                      event.preventDefault();
+                      navigateDocument(document.id, "push");
                       setEditorMode(null);
                       setError("");
                     }}
-                    type="button"
                   >
                     {document.kind === "pdf" ? (
                       <FileType2 aria-hidden="true" size={18} />
@@ -284,7 +334,7 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
                         {` · ${dateFormatter.format(new Date(document.createdAt))}`}
                       </small>
                     </span>
-                  </button>
+                  </a>
                   <button
                     aria-label={`Delete ${document.title}`}
                     className="icon-button journal-document-delete"
@@ -314,10 +364,20 @@ export function JournalDocuments({ tradeId }: { tradeId: string }) {
             ) : selectedDocument?.kind === "markdown" ? (
               <MarkdownDocumentPreview
                 document={selectedDocument}
+                tradeId={tradeId}
                 onEdit={() => beginEdit(selectedDocument)}
               />
             ) : selectedDocument?.kind === "pdf" ? (
-              <PdfDocumentPreview document={selectedDocument} />
+              <PdfDocumentPreview
+                document={selectedDocument}
+                tradeId={tradeId}
+              />
+            ) : selectedId !== null ? (
+              <div className="journal-document-preview-empty" role="status">
+                <FileText aria-hidden="true" size={28} />
+                <p>Document not found or no longer available.</p>
+                <p>Select another document from the list.</p>
+              </div>
             ) : (
               <div className="journal-document-preview-empty">
                 <FileText aria-hidden="true" size={28} />
@@ -397,9 +457,11 @@ function MarkdownDocumentForm({
 
 function MarkdownDocumentPreview({
   document,
+  tradeId,
   onEdit,
 }: {
   document: JournalMarkdownDocument;
+  tradeId: string;
   onEdit: () => void;
 }) {
   return (
@@ -409,14 +471,17 @@ function MarkdownDocumentPreview({
           <span>Markdown</span>
           <h3>{document.title}</h3>
         </div>
-        <button
-          aria-label={`Edit ${document.title}`}
-          className="icon-button"
-          onClick={onEdit}
-          type="button"
-        >
-          <Pencil aria-hidden="true" size={16} />
-        </button>
+        <div className="journal-document-preview-actions">
+          <DocumentLinkButton documentId={document.id} tradeId={tradeId} />
+          <button
+            aria-label={`Edit ${document.title}`}
+            className="icon-button"
+            onClick={onEdit}
+            type="button"
+          >
+            <Pencil aria-hidden="true" size={16} />
+          </button>
+        </div>
       </div>
       <MarkdownView
         emptyMessage="This document is empty."
@@ -428,8 +493,10 @@ function MarkdownDocumentPreview({
 
 function PdfDocumentPreview({
   document,
+  tradeId,
 }: {
   document: Extract<JournalDocument, { kind: "pdf" }>;
+  tradeId: string;
 }) {
   return (
     <article className="journal-pdf-document">
@@ -439,6 +506,7 @@ function PdfDocumentPreview({
           <h3>{document.title}</h3>
         </div>
         <div className="journal-document-preview-actions">
+          <DocumentLinkButton documentId={document.id} tradeId={tradeId} />
           <a
             className="button-secondary"
             href={document.contentUrl}
@@ -467,6 +535,76 @@ function PdfDocumentPreview({
         .
       </p>
     </article>
+  );
+}
+
+function DocumentLinkButton({
+  documentId,
+  tradeId,
+}: {
+  documentId: string;
+  tradeId: string;
+}) {
+  const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
+
+  useEffect(() => {
+    if (status === "idle") return;
+    const timeout = window.setTimeout(() => setStatus("idle"), 2_000);
+    return () => window.clearTimeout(timeout);
+  }, [status]);
+
+  async function copyLink() {
+    try {
+      const url = new URL(
+        getDocumentPath(tradeId, documentId),
+        window.location.origin,
+      );
+      await navigator.clipboard.writeText(url.toString());
+      setStatus("copied");
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  const label =
+    status === "copied"
+      ? "Copied"
+      : status === "error"
+        ? "Copy failed"
+        : "Copy link";
+
+  return (
+    <>
+      <button className="button-secondary" onClick={copyLink} type="button">
+        {status === "copied" ? (
+          <Check aria-hidden="true" size={16} />
+        ) : (
+          <Copy aria-hidden="true" size={16} />
+        )}
+        {label}
+      </button>
+      <span aria-live="polite" className="sr-only" role="status">
+        {status === "copied"
+          ? "Document link copied to clipboard."
+          : status === "error"
+            ? "Unable to copy document link."
+            : ""}
+      </span>
+    </>
+  );
+}
+
+function getDocumentPath(tradeId: string, documentId: string) {
+  return `/journal/${encodeURIComponent(tradeId)}/documents/${encodeURIComponent(documentId)}`;
+}
+
+function isModifiedLinkClick(event: ReactMouseEvent<HTMLAnchorElement>) {
+  return (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
   );
 }
 

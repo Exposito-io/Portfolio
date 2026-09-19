@@ -21,6 +21,28 @@ afterEach(() => {
 });
 
 describe("JournalDetailTabs news loading", () => {
+  it("shows the document count on the Documents tab", () => {
+    render(
+      <JournalDetailTabs
+        charts={<div>Charts panel</div>}
+        documentCount={2}
+        documents={<div>Documents panel</div>}
+        journal={<div>Journal panel</div>}
+        metrics={<div>Metrics panel</div>}
+        news={<div>News panel</div>}
+        transactions={<div>Transactions panel</div>}
+      />,
+    );
+
+    const documentsTab = screen.getByRole("tab", {
+      name: "Documents, 2 documents",
+    });
+    expect(within(documentsTab).getByText("2")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
   it("shows an accessible unread count badge on the News tab", () => {
     render(
       <JournalDetailTabs
@@ -53,6 +75,9 @@ describe("JournalDetailTabs news loading", () => {
     );
 
     expect(screen.getByRole("tab", { name: "News" })).toHaveTextContent("News");
+    expect(screen.getByRole("tab", { name: "Documents" })).toHaveTextContent(
+      "Documents",
+    );
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
@@ -156,6 +181,33 @@ describe("JournalDetailTabs news loading", () => {
     await user.click(screen.getByRole("tab", { name: "Charts" }));
     await user.click(screen.getByRole("tab", { name: "Documents" }));
     expect(mounted).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders a route-controlled Documents tab on the initial load", async () => {
+    const onTabChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <JournalDetailTabs
+        activeTab="documents"
+        charts={<div>Charts panel</div>}
+        documents={<div>Linked document workspace</div>}
+        journal={<div>Journal panel</div>}
+        metrics={<div>Metrics panel</div>}
+        news={<div>News panel</div>}
+        transactions={<div>Transactions panel</div>}
+        onTabChange={onTabChange}
+      />,
+    );
+
+    expect(screen.getByText("Linked document workspace")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Documents" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Charts" }));
+    expect(onTabChange).toHaveBeenCalledWith("charts");
   });
 });
 

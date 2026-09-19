@@ -1330,6 +1330,13 @@ textarea {
   min-width: 0;
   padding: 0.7rem;
   text-align: left;
+  text-decoration: none;
+}
+
+.journal-document-select:focus-visible {
+  border-radius: 7px;
+  outline: 2px solid #1f7a68;
+  outline-offset: 2px;
 }
 
 .journal-document-select > svg {
