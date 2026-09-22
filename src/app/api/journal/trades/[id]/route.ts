@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 
 import { getApiAuthorizationError } from "@/lib/authorization";
 import { deleteTrade, getTrade, updateTrade } from "@/lib/journal";
-import { findGroupForTrade } from "@/lib/journal-groups";
+import { findGroupForTrade, getGroup } from "@/lib/journal-groups";
 import { getDb } from "@/lib/mongodb";
 
 type RouteContext = {
@@ -18,13 +18,18 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const { id } = await context.params;
-    const trade = await getTrade(await getDb(), id);
+    const db = await getDb();
+    const [trade, membership] = await Promise.all([
+      getTrade(db, id),
+      findGroupForTrade(db, id),
+    ]);
 
     if (!trade) {
       return NextResponse.json({ error: "Trade not found." }, { status: 404 });
     }
 
-    return NextResponse.json({ trade });
+    const group = membership ? await getGroup(db, membership.id) : null;
+    return NextResponse.json({ trade, group });
   } catch (error) {
     return toErrorResponse(error);
   }

@@ -3,10 +3,11 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowLeft, Check, Layers3, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { FilledOrdersTable } from "@/components/filled-orders-table";
 import { JournalGroupDialog, type JournalGroupFormPayload } from "@/components/journal-group-dialog";
+import { JournalGroupScope } from "@/components/journal-group-scope";
 import { JournalTradeForm, type TradeFormPayload } from "@/components/journal-trade-form";
 import { JournalChart } from "@/components/journal-chart";
 import { JournalDetailMetrics } from "@/components/journal-detail-metrics";
@@ -298,15 +299,7 @@ export function JournalGroupDetail({
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
-      <nav aria-label="Journal positions" className="journal-group-scope">
-        <span className="active"><Layers3 size={15} />All</span>
-        {group.members.map((member) => (
-          <Link href={`/journal/${member.id}`} key={member.id}>
-            {member.asset.coin}
-            <small>{member.endDate ? "Closed" : "Open"}</small>
-          </Link>
-        ))}
-      </nav>
+      <JournalGroupScope activeTradeId={null} group={group} />
 
       <section className="journal-detail-summary-grid">
         <div className="panel">

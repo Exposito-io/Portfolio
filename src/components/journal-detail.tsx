@@ -26,6 +26,7 @@ import {
 } from "@/components/journal-entry-dialog";
 import { groupOrdersByDate } from "@/components/journal-entry-order-totals";
 import { JournalFilledOrders } from "@/components/journal-filled-orders";
+import { JournalGroupScope } from "@/components/journal-group-scope";
 import { JournalNews } from "@/components/journal-news";
 import { JournalNewsProvider } from "@/components/journal-news-context";
 import type { TradeFormPayload } from "@/components/journal-trade-form";
@@ -42,6 +43,7 @@ import type {
   JournalEntry,
   JournalTrade,
   JournalTradeAsset,
+  JournalTradeGroup,
   PortfolioResponse,
 } from "@/lib/types";
 
@@ -79,6 +81,7 @@ export function JournalDetail({
   initialDocumentId?: string | null;
 }) {
   const [trade, setTrade] = useState<JournalTrade | null>(null);
+  const [group, setGroup] = useState<JournalTradeGroup | null>(null);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
   const [marketSummary, setMarketSummary] =
     useState<JournalMarketSummary | null>(null);
@@ -130,6 +133,17 @@ export function JournalDetail({
         ).values(),
       ).sort((left, right) => left.localeCompare(right)),
     [trade?.entries],
+  );
+  const scopeGroup = useMemo(
+    () => group && trade
+      ? {
+          ...group,
+          members: group.members.map((member) =>
+            member.id === trade.id ? trade : member,
+          ),
+        }
+      : null,
+    [group, trade],
   );
 
   const journalPath = `/journal/${encodeURIComponent(tradeId)}`;
@@ -254,6 +268,7 @@ export function JournalDetail({
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to load trade.");
       setTrade(payload.trade);
+      setGroup(payload.group ?? null);
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "Unable to load trade.",
@@ -596,6 +611,10 @@ export function JournalDetail({
 
       {error && !entryFormOpen ? (
         <div className="alert alert-error">{error}</div>
+      ) : null}
+
+      {scopeGroup ? (
+        <JournalGroupScope activeTradeId={trade.id} group={scopeGroup} />
       ) : null}
 
       <JournalNewsProvider key={trade.id} tradeId={trade.id}>
