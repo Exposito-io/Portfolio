@@ -4,10 +4,12 @@ export function FilledOrdersTable({
   orders,
   cumulativePnlByOrderId,
   showAccountAndAsset = false,
+  assetColumnLabel = "Asset",
 }: {
   orders: HyperliquidFilledOrder[];
   cumulativePnlByOrderId: Map<string, number>;
   showAccountAndAsset?: boolean;
+  assetColumnLabel?: string;
 }) {
   return (
     <div className="mt-4 overflow-x-auto">
@@ -18,7 +20,7 @@ export function FilledOrdersTable({
             {showAccountAndAsset ? (
               <>
                 <th>Account</th>
-                <th>Asset</th>
+                <th>{assetColumnLabel}</th>
               </>
             ) : null}
             <th>Side</th>

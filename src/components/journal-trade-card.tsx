@@ -27,6 +27,8 @@ export type JournalCardMarketState = {
 };
 
 type JournalTradeCardProps = {
+  assetSuffix?: string;
+  href?: string;
   marketState?: JournalCardMarketState;
   pnlState?: {
     error: string;
@@ -42,6 +44,8 @@ type JournalTradeCardProps = {
 };
 
 export function JournalTradeCard({
+  assetSuffix = "",
+  href,
   marketState,
   pnlState,
   portfolioState,
@@ -55,7 +59,7 @@ export function JournalTradeCard({
     <Link
       aria-label={`Open ${trade.title}`}
       className="journal-card"
-      href={`/journal/${trade.id}`}
+      href={href ?? `/journal/${trade.id}`}
     >
       <article>
         <header className="journal-card-header">
@@ -66,7 +70,7 @@ export function JournalTradeCard({
             <div className="min-w-0">
               <h3>{trade.title}</h3>
               <div className="journal-card-meta">
-                <strong>{trade.asset.coin}</strong>
+                <strong>{trade.asset.coin}{assetSuffix}</strong>
                 <span aria-hidden="true">·</span>
                 <span className={`journal-card-status journal-card-status-${status.toLowerCase()}`}>
                   <i aria-hidden="true" />

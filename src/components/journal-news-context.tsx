@@ -15,6 +15,7 @@ import {
 import type { JournalNewsResponse } from "@/lib/types";
 
 type JournalNewsState = {
+  apiBasePath: string;
   error: string;
   loading: boolean;
   news: JournalNewsResponse | null;
@@ -28,11 +29,13 @@ const JournalNewsContext = createContext<JournalNewsState | null>(null);
 export function JournalNewsProvider({
   children,
   tradeId,
+  apiBasePath,
 }: {
   children: ReactNode;
   tradeId: string;
+  apiBasePath?: string;
 }) {
-  const state = useJournalNewsState(tradeId, true);
+  const state = useJournalNewsState(tradeId, true, apiBasePath);
   return (
     <JournalNewsContext.Provider value={state}>
       {children}
@@ -40,9 +43,9 @@ export function JournalNewsProvider({
   );
 }
 
-export function useJournalNews(tradeId: string) {
+export function useJournalNews(tradeId: string, apiBasePath?: string) {
   const sharedState = useContext(JournalNewsContext);
-  const localState = useJournalNewsState(tradeId, sharedState === null);
+  const localState = useJournalNewsState(tradeId, sharedState === null, apiBasePath);
 
   if (sharedState && sharedState.tradeId !== tradeId) {
     throw new Error("Journal news was requested for the wrong journal.");
@@ -53,14 +56,16 @@ export function useJournalNews(tradeId: string) {
 function useJournalNewsState(
   tradeId: string,
   enabled: boolean,
+  apiBasePath?: string,
 ): JournalNewsState {
   const [news, setNews] = useState<JournalNewsResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(enabled);
+  const resolvedApiBasePath = apiBasePath ?? `/api/journal/trades/${tradeId}/news`;
 
   const requestNews = useCallback(
     async (signal?: AbortSignal) => {
-      const response = await fetch(`/api/journal/trades/${tradeId}/news`, {
+      const response = await fetch(resolvedApiBasePath, {
         signal,
       });
       const payload = (await response.json()) as {
@@ -72,7 +77,7 @@ function useJournalNewsState(
       }
       return payload.news;
     },
-    [tradeId],
+    [resolvedApiBasePath],
   );
 
   const refreshNews = useCallback(async () => {
@@ -107,8 +112,8 @@ function useJournalNewsState(
   }, [enabled, requestNews]);
 
   return useMemo(
-    () => ({ error, loading, news, refreshNews, setNews, tradeId }),
-    [error, loading, news, refreshNews, tradeId],
+    () => ({ apiBasePath: resolvedApiBasePath, error, loading, news, refreshNews, setNews, tradeId }),
+    [error, loading, news, refreshNews, resolvedApiBasePath, tradeId],
   );
 }
 

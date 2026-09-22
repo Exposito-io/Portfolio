@@ -154,6 +154,53 @@ export function calculateJournalTradePnlSummary(
   };
 }
 
+export function aggregateJournalTradePnlSummaries(
+  summaries: Array<JournalTradePnlSummary | null | undefined>,
+): JournalTradePnlSummary | null {
+  const available = summaries.filter(
+    (summary): summary is JournalTradePnlSummary => Boolean(summary),
+  );
+  if (!available.length) return null;
+
+  const sumNullable = (
+    select: (summary: JournalTradePnlSummary) => number | null,
+  ) => {
+    const values = available.map(select).filter((value): value is number => value !== null);
+    return values.length ? roundCurrency(values.reduce((sum, value) => sum + value, 0)) : null;
+  };
+  const pnlUsd = sumNullable((summary) => summary.pnlUsd);
+  const realizedPnlUsd = sumNullable((summary) => summary.realizedPnlUsd);
+  const unrealizedPnlUsd = sumNullable((summary) => summary.unrealizedPnlUsd);
+  const realizedPnlBasisUsd = roundCurrency(
+    available.reduce((sum, summary) => sum + summary.realizedPnlBasisUsd, 0),
+  );
+  const positionCostBasisUsd = roundCurrency(
+    available.reduce((sum, summary) => sum + summary.positionCostBasisUsd, 0),
+  );
+  const totalBasisUsd = roundCurrency(realizedPnlBasisUsd + positionCostBasisUsd);
+
+  return {
+    pnlUsd,
+    pnlPercent: calculatePnlPercent(pnlUsd, totalBasisUsd),
+    realizedPnlUsd,
+    realizedPnlPercent: calculatePnlPercent(realizedPnlUsd, realizedPnlBasisUsd),
+    realizedPnlBasisUsd,
+    unrealizedPnlUsd,
+    unrealizedPnlPercent: calculatePnlPercent(unrealizedPnlUsd, positionCostBasisUsd),
+    entryPriceUsd: null,
+    closingPriceUsd: null,
+    positionValueUsd: roundCurrency(
+      available.reduce((sum, summary) => sum + (summary.positionValueUsd ?? 0), 0),
+    ),
+    positionCostBasisUsd,
+    orderCount: available.reduce((sum, summary) => sum + summary.orderCount, 0),
+    fillCount: available.reduce((sum, summary) => sum + summary.fillCount, 0),
+    notionalUsd: roundCurrency(
+      available.reduce((sum, summary) => sum + summary.notionalUsd, 0),
+    ),
+  };
+}
+
 function calculatePnlPercent(value: number | null, basisUsd: number) {
   if (
     value === null ||

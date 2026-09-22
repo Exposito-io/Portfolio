@@ -4,9 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  Layers3,
   Plus,
   X,
 } from "lucide-react";
+
+import {
+  JournalGroupDialog,
+  type JournalGroupFormPayload,
+} from "@/components/journal-group-dialog";
 
 import {
   JournalTradeForm,
@@ -17,9 +23,11 @@ import {
   type JournalCardMarketState,
 } from "@/components/journal-trade-card";
 import { calculateJournalMarketSummary } from "@/lib/journal-market";
+import { aggregateJournalTradePnlSummaries } from "@/lib/journal-pnl";
 import { comparePositionValuesDescending } from "@/lib/journal-sort";
 import type {
   HyperliquidCandle,
+  JournalItem,
   JournalTrade,
   JournalTradeAsset,
   JournalTradePnlSummary,
@@ -33,9 +41,10 @@ type TradePnlState = {
 };
 
 export function JournalPanel() {
-  const [trades, setTrades] = useState<JournalTrade[]>([]);
+  const [items, setItems] = useState<JournalItem[]>([]);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
   const [tradeFormOpen, setTradeFormOpen] = useState(false);
+  const [groupFormOpen, setGroupFormOpen] = useState(false);
   const [closedTradesOpen, setClosedTradesOpen] = useState(false);
   const [tradePnlById, setTradePnlById] = useState<Record<string, TradePnlState>>(
     {},
@@ -51,19 +60,32 @@ export function JournalPanel() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const visibleItems = useMemo(
+    () => items.filter((item) => !getItemEndDate(item) || closedTradesOpen),
+    [items, closedTradesOpen],
+  );
   const visibleTrades = useMemo(
-    () => trades.filter((trade) => !trade.endDate || closedTradesOpen),
-    [trades, closedTradesOpen],
+    () => uniqueTrades(visibleItems.flatMap(getItemTrades)),
+    [visibleItems],
   );
 
-  const loadTrades = useCallback(async (showLoading = true) => {
+  const loadItems = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/journal/trades");
+      const response = await fetch("/api/journal/items");
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to load trades.");
-      setTrades(payload.trades);
+      if (Array.isArray(payload.items)) {
+        setItems(payload.items);
+      } else {
+        const legacyResponse = await fetch("/api/journal/trades");
+        const legacyPayload = await legacyResponse.json();
+        if (!legacyResponse.ok || !Array.isArray(legacyPayload.trades)) {
+          throw new Error(legacyPayload.error || "Unable to load trades.");
+        }
+        setItems(legacyPayload.trades.map((trade: JournalTrade) => ({ itemType: "trade" as const, trade })));
+      }
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "Unable to load trades.",
@@ -75,11 +97,11 @@ export function JournalPanel() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      void loadTrades();
+      void loadItems();
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [loadTrades]);
+  }, [loadItems]);
 
   useEffect(() => {
     async function loadMarkets() {
@@ -174,7 +196,7 @@ export function JournalPanel() {
   useEffect(() => {
     const controller = new AbortController();
     const coins = Array.from(
-      new Set(visibleTrades.map((trade) => trade.asset.chartCoin).filter(Boolean)),
+      new Set(visibleItems.map(getItemPrimaryTrade).map((trade) => trade.asset.chartCoin).filter(Boolean)),
     );
 
     if (!coins.length) {
@@ -242,7 +264,7 @@ export function JournalPanel() {
 
     void loadMarketsForCards();
     return () => controller.abort();
-  }, [visibleTrades]);
+  }, [visibleItems]);
 
   useEffect(() => {
     if (!tradeFormOpen) return;
@@ -274,11 +296,31 @@ export function JournalPanel() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save trade.");
       setTradeFormOpen(false);
-      await loadTrades(false);
+      await loadItems(false);
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "Unable to save trade.",
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveGroup(payload: JournalGroupFormPayload) {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/journal/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to create group.");
+      setGroupFormOpen(false);
+      await loadItems(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to create group.");
     } finally {
       setSaving(false);
     }
@@ -336,22 +378,26 @@ export function JournalPanel() {
     setTradeFormOpen(false);
   }
 
-  const tradesByPositionValue = useMemo(
-    () => [...trades].sort((left, right) => comparePositionValuesDescending(
-      tradePnlById[left.id]?.summary?.positionValueUsd,
-      tradePnlById[right.id]?.summary?.positionValueUsd,
+  const itemsByPositionValue = useMemo(
+    () => [...items].sort((left, right) => comparePositionValuesDescending(
+      getItemPnlState(left, tradePnlById).summary?.positionValueUsd,
+      getItemPnlState(right, tradePnlById).summary?.positionValueUsd,
     )),
-    [tradePnlById, trades],
+    [items, tradePnlById],
   );
-  const openTrades = tradesByPositionValue.filter((trade) => !trade.endDate);
-  const closedTrades = tradesByPositionValue.filter((trade) => trade.endDate);
+  const openItems = itemsByPositionValue.filter((item) => !getItemEndDate(item));
+  const closedItems = itemsByPositionValue.filter((item) => getItemEndDate(item));
 
-  function renderTrade(trade: JournalTrade) {
+  function renderItem(item: JournalItem) {
+    const trade = getItemDisplayTrade(item);
+    const group = item.itemType === "group" ? item.group : null;
     return (
       <JournalTradeCard
-        key={trade.id}
+        assetSuffix={group ? ` +${group.members.length - 1}` : ""}
+        href={group ? `/journal/groups/${group.id}` : undefined}
+        key={`${item.itemType}:${group?.id ?? trade.id}`}
         marketState={marketByCoin[trade.asset.chartCoin]}
-        pnlState={tradePnlById[trade.id]}
+        pnlState={getItemPnlState(item, tradePnlById)}
         portfolioState={{
           error: portfolioError,
           investmentsUsd: portfolioInvestmentsUsd,
@@ -369,14 +415,16 @@ export function JournalPanel() {
           <div>
             <h1>Journal</h1>
           </div>
-          <button
-            className="journal-new-button"
-            onClick={openNewTradeForm}
-            type="button"
-          >
-            <Plus size={17} aria-hidden="true" />
-            New journal item
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className="button-secondary" onClick={() => { setError(""); setGroupFormOpen(true); }} type="button">
+              <Layers3 size={17} aria-hidden="true" />
+              Group items
+            </button>
+            <button className="journal-new-button" onClick={openNewTradeForm} type="button">
+              <Plus size={17} aria-hidden="true" />
+              New journal item
+            </button>
+          </div>
         </div>
 
         {error && !tradeFormOpen ? (
@@ -387,7 +435,7 @@ export function JournalPanel() {
           <p className="py-8 text-sm text-[#69706c]">Loading trades...</p>
         ) : null}
 
-        {!loading && !trades.length ? (
+        {!loading && !items.length ? (
           <div className="empty-state">
             <Plus size={28} aria-hidden="true" />
             <div>
@@ -397,18 +445,18 @@ export function JournalPanel() {
           </div>
         ) : null}
 
-        {!loading && trades.length ? (
+        {!loading && items.length ? (
           <>
             <div className="journal-trade-section">
               <div className="journal-trade-section-heading">
                 <h2>Open journal items</h2>
-                <span aria-label={`${openTrades.length} open journal items`}>
-                  {openTrades.length}
+                <span aria-label={`${openItems.length} open journal items`}>
+                  {openItems.length}
                 </span>
               </div>
               <div className="journal-card-grid">
-                {openTrades.map(renderTrade)}
-                {!openTrades.length ? (
+                {openItems.map(renderItem)}
+                {!openItems.length ? (
                   <p className="py-3 text-sm text-[#69706c]">
                     No open journal items.
                   </p>
@@ -416,7 +464,7 @@ export function JournalPanel() {
               </div>
             </div>
 
-            {closedTrades.length ? (
+            {closedItems.length ? (
               <div className="journal-trade-section journal-closed-trades">
                 <button
                   aria-expanded={closedTradesOpen}
@@ -432,11 +480,11 @@ export function JournalPanel() {
                     )}
                     Closed journal items
                   </span>
-                  <span>{closedTrades.length}</span>
+                  <span>{closedItems.length}</span>
                 </button>
                 {closedTradesOpen ? (
                   <div className="journal-card-grid mt-4">
-                    {closedTrades.map(renderTrade)}
+                    {closedItems.map(renderItem)}
                   </div>
                 ) : null}
               </div>
@@ -485,6 +533,59 @@ export function JournalPanel() {
           </div>
         </div>
       ) : null}
+      {groupFormOpen ? (
+        <JournalGroupDialog
+          error={error}
+          markets={markets}
+          saving={saving}
+          trades={items.filter((item): item is Extract<JournalItem, { itemType: "trade" }> => item.itemType === "trade").map((item) => item.trade)}
+          onClose={() => { if (!saving) setGroupFormOpen(false); }}
+          onSubmit={saveGroup}
+        />
+      ) : null}
     </main>
   );
+}
+
+function getItemTrades(item: JournalItem) {
+  return item.itemType === "group" ? item.group.members : [item.trade];
+}
+
+function uniqueTrades(trades: JournalTrade[]) {
+  return Array.from(new Map(trades.map((trade) => [trade.id, trade])).values());
+}
+
+function getItemPrimaryTrade(item: JournalItem) {
+  if (item.itemType === "trade") return item.trade;
+  return item.group.members.find((trade) => trade.id === item.group.primaryTradeId) ?? item.group.members[0];
+}
+
+function getItemDisplayTrade(item: JournalItem): JournalTrade {
+  if (item.itemType === "trade") return item.trade;
+  return {
+    ...getItemPrimaryTrade(item),
+    id: item.group.id,
+    title: item.group.title,
+    startDate: item.group.startDate,
+    endDate: item.group.endDate,
+    descriptionMarkdown: item.group.descriptionMarkdown,
+    metricsMarkdown: item.group.metricsMarkdown,
+    updatedAt: item.group.updatedAt,
+  };
+}
+
+function getItemEndDate(item: JournalItem) {
+  return item.itemType === "group" ? item.group.endDate : item.trade.endDate;
+}
+
+function getItemPnlState(item: JournalItem, states: Record<string, TradePnlState>): TradePnlState {
+  const memberStates = getItemTrades(item).filter((trade) => trade.kind === "trade").map((trade) => states[trade.id]);
+  if (item.itemType === "trade") {
+    return states[item.trade.id] ?? { summary: null, error: "", loading: item.trade.kind === "trade" };
+  }
+  return {
+    summary: aggregateJournalTradePnlSummaries(memberStates.map((state) => state?.summary)),
+    error: memberStates.map((state) => state?.error).filter(Boolean).join(" "),
+    loading: memberStates.some((state) => !state || state.loading),
+  };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateAnnualizedPnlPercent,
+  aggregateJournalTradePnlSummaries,
   calculateCumulativeRealizedPnlByOrder,
   calculateJournalTradeClosingPrice,
   calculateJournalTradeEntryPrice,
@@ -30,6 +31,20 @@ const baseOrder: HyperliquidFilledOrder = {
 };
 
 describe("journal PnL", () => {
+  it("aggregates dollar values and bases without inventing a cross-asset price", () => {
+    const first = calculateJournalTradePnlSummary([], 10, 500, false, 100, null, 400);
+    const second = calculateJournalTradePnlSummary([], -5, 250, false, 50, null, 200);
+    expect(aggregateJournalTradePnlSummaries([first, second])).toMatchObject({
+      pnlUsd: 5,
+      pnlPercent: 0.83,
+      unrealizedPnlUsd: 5,
+      positionValueUsd: 750,
+      positionCostBasisUsd: 600,
+      entryPriceUsd: null,
+      closingPriceUsd: null,
+    });
+  });
+
   it("annualizes PnL over the trade holding period", () => {
     const dayMs = 24 * 60 * 60 * 1000;
 

@@ -114,8 +114,11 @@ const xmlParser = new XMLParser({
   trimValues: true,
 });
 
-function collection(db: Db): Collection<JournalNewsDocument> {
-  return db.collection<JournalNewsDocument>("journalTrades");
+function collection(
+  db: Db,
+  collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
+): Collection<JournalNewsDocument> {
+  return db.collection<JournalNewsDocument>(collectionName);
 }
 
 export function buildGoogleNewsUrl(keywords: string) {
@@ -303,11 +306,12 @@ export async function getJournalNews(
   db: Db,
   journalId: string,
   fetchImpl: NewsFetch = fetch,
+  collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
 ): Promise<JournalNewsResponse | null> {
   const _id = toObjectId(journalId);
   if (!_id) return null;
 
-  const journal = await collection(db).findOne({ _id });
+  const journal = await collection(db, collectionName).findOne({ _id });
   if (!journal) return null;
 
   return getNewsForJournal(db, journal, fetchImpl);
@@ -384,12 +388,13 @@ export async function addJournalNewsFeed(
   journalId: string,
   payload: unknown,
   fetchImpl: NewsFetch = fetch,
+  collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
 ) {
   const _id = toObjectId(journalId);
   if (!_id) return null;
 
   const input = classifyFeedInput(feedInputSchema.parse(payload));
-  const journal = await collection(db).findOne({ _id });
+  const journal = await collection(db, collectionName).findOne({ _id });
   if (!journal) return null;
 
   const feeds = journal.newsFeeds ?? [];
@@ -439,20 +444,21 @@ export async function addJournalNewsFeed(
     };
   }
 
-  await collection(db).updateOne({ _id }, { $push: { newsFeeds: feed } });
-  return getJournalNews(db, journalId, fetchImpl);
+  await collection(db, collectionName).updateOne({ _id }, { $push: { newsFeeds: feed } });
+  return getJournalNews(db, journalId, fetchImpl, collectionName);
 }
 
 export async function removeJournalNewsFeed(
   db: Db,
   journalId: string,
   feedId: string,
+  collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
 ) {
   const _id = toObjectId(journalId);
   const feedObjectId = toObjectId(feedId);
   if (!_id || !feedObjectId) return false;
 
-  const result = await collection(db).updateOne(
+  const result = await collection(db, collectionName).updateOne(
     { _id, "newsFeeds._id": feedObjectId },
     { $pull: { newsFeeds: { _id: feedObjectId } } },
   );
@@ -463,29 +469,32 @@ export async function markJournalNewsItemRead(
   db: Db,
   journalId: string,
   payload: unknown,
+  collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
 ) {
   const input = readInputSchema.parse(payload);
-  return persistJournalNewsReadItems(db, journalId, [input.itemId]);
+  return persistJournalNewsReadItems(db, journalId, [input.itemId], collectionName);
 }
 
 export async function markJournalNewsItemsRead(
   db: Db,
   journalId: string,
   payload: unknown,
+  collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
 ) {
   const input = readManyInputSchema.parse(payload);
-  return persistJournalNewsReadItems(db, journalId, input.itemIds);
+  return persistJournalNewsReadItems(db, journalId, input.itemIds, collectionName);
 }
 
 async function persistJournalNewsReadItems(
   db: Db,
   journalId: string,
   itemIds: string[],
+  collectionName: "journalTrades" | "journalTradeGroups",
 ) {
   const _id = toObjectId(journalId);
   if (!_id) return false;
 
-  const journal = await collection(db).findOne({ _id });
+  const journal = await collection(db, collectionName).findOne({ _id });
   if (!journal) return false;
   await saveJournalNewsReadReceipts(db, journal._id, itemIds);
   return true;

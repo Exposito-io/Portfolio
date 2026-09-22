@@ -30,7 +30,8 @@ const markdownDocumentUpdateSchema = z
 
 type JournalDocumentBaseRecord = {
   _id: ObjectId;
-  tradeId: ObjectId;
+  tradeId?: ObjectId;
+  groupId?: ObjectId;
   title: string;
   createdAt: Date;
   updatedAt: Date;
@@ -78,7 +79,10 @@ export function serializeJournalDocument(
     };
   }
 
-  const contentUrl = `/api/journal/trades/${document.tradeId.toString()}/documents/${document._id.toString()}/content`;
+  const ownerPath = document.groupId
+    ? `groups/${document.groupId.toString()}`
+    : `trades/${document.tradeId!.toString()}`;
+  const contentUrl = `/api/journal/${ownerPath}/documents/${document._id.toString()}/content`;
   return {
     ...base,
     kind: "pdf",
@@ -98,6 +102,16 @@ export async function listJournalDocuments(db: Db, tradeId: string) {
     .sort({ createdAt: -1 })
     .toArray();
 
+  return documents.map(serializeJournalDocument);
+}
+
+export async function listJournalGroupDocuments(db: Db, groupId: string) {
+  const ownerId = await findGroupId(db, groupId);
+  if (!ownerId) return null;
+  const documents = await collection(db)
+    .find({ groupId: ownerId })
+    .sort({ createdAt: -1 })
+    .toArray();
   return documents.map(serializeJournalDocument);
 }
 
@@ -121,6 +135,19 @@ export async function createMarkdownDocument(
     updatedAt: now,
   };
 
+  await collection(db).insertOne(document);
+  return serializeJournalDocument(document);
+}
+
+export async function createGroupMarkdownDocument(db: Db, groupId: string, payload: unknown) {
+  const ownerId = await findGroupId(db, groupId);
+  if (!ownerId) return null;
+  const input = markdownDocumentSchema.parse(payload);
+  const now = new Date();
+  const document: JournalMarkdownDocumentRecord = {
+    _id: new ObjectId(), groupId: ownerId, kind: "markdown", title: input.title,
+    contentMarkdown: input.contentMarkdown, createdAt: now, updatedAt: now,
+  };
   await collection(db).insertOne(document);
   return serializeJournalDocument(document);
 }
@@ -174,6 +201,44 @@ export async function uploadPdfDocument(
   }
 }
 
+export async function uploadGroupPdfDocument(db: Db, groupId: string, file: File) {
+  const ownerId = await findGroupId(db, groupId);
+  if (!ownerId) return null;
+  return uploadOwnerPdfDocument(db, { groupId: ownerId }, file);
+}
+
+async function uploadOwnerPdfDocument(
+  db: Db,
+  owner: { tradeId: ObjectId } | { groupId: ObjectId },
+  file: File,
+) {
+  validatePdf(file);
+  const now = new Date();
+  const documentId = new ObjectId();
+  const fileId = new ObjectId();
+  const bucket = getJournalDocumentFilesBucket(db);
+  const uploadStream = bucket.openUploadStreamWithId(fileId, file.name, {
+    metadata: { ...owner, documentId, contentType: "application/pdf", createdAt: now },
+  });
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await new Promise<void>((resolve, reject) => {
+      uploadStream.on("error", reject);
+      uploadStream.on("finish", () => resolve());
+      Readable.from(buffer).pipe(uploadStream);
+    });
+    const document: JournalPdfDocumentRecord = {
+      _id: documentId, ...owner, kind: "pdf", title: file.name, fileId,
+      contentType: "application/pdf", sizeBytes: file.size, createdAt: now, updatedAt: now,
+    };
+    await collection(db).insertOne(document);
+    return serializeJournalDocument(document);
+  } catch (error) {
+    await bucket.delete(fileId).catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function updateMarkdownDocument(
   db: Db,
   tradeId: string,
@@ -201,6 +266,23 @@ export async function updateMarkdownDocument(
   return result ? serializeJournalDocument(result) : null;
 }
 
+export async function updateGroupMarkdownDocument(
+  db: Db, groupId: string, documentId: string, payload: unknown,
+) {
+  const ids = toOwnerDocumentIds(groupId, documentId, "groupId");
+  if (!ids) return null;
+  const input = markdownDocumentUpdateSchema.parse(payload);
+  const update: Partial<JournalMarkdownDocumentRecord> = { updatedAt: new Date() };
+  if (input.title !== undefined) update.title = input.title;
+  if (input.contentMarkdown !== undefined) update.contentMarkdown = input.contentMarkdown;
+  const result = await collection(db).findOneAndUpdate(
+    { _id: ids.documentId, groupId: ids.ownerId, kind: "markdown" },
+    { $set: update },
+    { returnDocument: "after" },
+  );
+  return result ? serializeJournalDocument(result) : null;
+}
+
 export async function deleteJournalDocument(
   db: Db,
   tradeId: string,
@@ -222,6 +304,16 @@ export async function deleteJournalDocument(
     _id: ids.documentId,
     tradeId: ids.tradeId,
   });
+  return result.deletedCount === 1;
+}
+
+export async function deleteJournalGroupDocument(db: Db, groupId: string, documentId: string) {
+  const ids = toOwnerDocumentIds(groupId, documentId, "groupId");
+  if (!ids) return false;
+  const document = await collection(db).findOne({ _id: ids.documentId, groupId: ids.ownerId });
+  if (!document) return false;
+  if (document.kind === "pdf") await getJournalDocumentFilesBucket(db).delete(document.fileId);
+  const result = await collection(db).deleteOne({ _id: ids.documentId, groupId: ids.ownerId });
   return result.deletedCount === 1;
 }
 
@@ -251,6 +343,26 @@ export async function findJournalPdf(
   };
 }
 
+export async function findJournalGroupPdf(db: Db, groupId: string, documentId: string) {
+  const ids = toOwnerDocumentIds(groupId, documentId, "groupId");
+  if (!ids) return null;
+  const document = await collection(db).findOne({ _id: ids.documentId, groupId: ids.ownerId, kind: "pdf" });
+  if (!document || document.kind !== "pdf") return null;
+  const bucket = getJournalDocumentFilesBucket(db);
+  const file = await bucket.find({ _id: document.fileId }).limit(1).next();
+  if (!file) return null;
+  return { document: serializeJournalDocument(document), file: file as GridFSFile, stream: bucket.openDownloadStream(document.fileId) };
+}
+
+export async function deleteJournalDocumentsForGroup(db: Db, groupId: string) {
+  if (!ObjectId.isValid(groupId)) return;
+  const ownerId = new ObjectId(groupId);
+  const documents = await collection(db).find({ groupId: ownerId }).toArray();
+  const bucket = getJournalDocumentFilesBucket(db);
+  await Promise.all(documents.flatMap((document) => document.kind === "pdf" ? [bucket.delete(document.fileId)] : []));
+  await collection(db).deleteMany({ groupId: ownerId });
+}
+
 export async function deleteJournalDocumentsForTrade(db: Db, tradeId: string) {
   if (!ObjectId.isValid(tradeId)) return;
   const ownerId = new ObjectId(tradeId);
@@ -275,12 +387,28 @@ async function findTradeId(db: Db, tradeId: string) {
   return trade ? _id : null;
 }
 
+async function findGroupId(db: Db, groupId: string) {
+  if (!ObjectId.isValid(groupId)) return null;
+  const _id = new ObjectId(groupId);
+  const group = await db.collection("journalTradeGroups").findOne(
+    { _id },
+    { projection: { _id: 1 } },
+  );
+  return group ? _id : null;
+}
+
 function toDocumentIds(tradeId: string, documentId: string) {
   if (!ObjectId.isValid(tradeId) || !ObjectId.isValid(documentId)) return null;
   return {
     tradeId: new ObjectId(tradeId),
     documentId: new ObjectId(documentId),
   };
+}
+
+function toOwnerDocumentIds(ownerId: string, documentId: string, field: "groupId") {
+  void field;
+  if (!ObjectId.isValid(ownerId) || !ObjectId.isValid(documentId)) return null;
+  return { ownerId: new ObjectId(ownerId), documentId: new ObjectId(documentId) };
 }
 
 function validatePdf(file: File) {

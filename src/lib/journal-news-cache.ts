@@ -176,6 +176,13 @@ export async function saveJournalNewsReadReceipts(
   );
 }
 
+export async function deleteJournalNewsReadReceipts(
+  db: Db,
+  journalId: ObjectId,
+) {
+  await readReceiptCollection(db).deleteMany({ journalId });
+}
+
 async function refreshGoogleNewsQuery(
   db: Db,
   queryKey: string,

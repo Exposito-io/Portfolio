@@ -8,7 +8,7 @@ import type {
   SourceError,
 } from "@/lib/types";
 
-type FilledOrdersResponse = {
+export type FilledOrdersResponse = {
   orders: HyperliquidFilledOrder[];
   summary: JournalTradePnlSummary;
   sourceErrors: SourceError[];

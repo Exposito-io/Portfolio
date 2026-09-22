@@ -1,4 +1,4 @@
-import { ObjectId, type Collection, type Db, type Document } from "mongodb";
+import { ObjectId, type ClientSession, type Collection, type Db, type Document } from "mongodb";
 import { z } from "zod";
 
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
@@ -163,9 +163,9 @@ function serializeEntry(entry: JournalEntryDocument): JournalEntry {
   };
 }
 
-export async function listTrades(db: Db) {
+export async function listTrades(db: Db, session?: ClientSession) {
   const trades = await collection(db)
-    .find()
+    .find({}, { session })
     .sort({ startDate: -1, updatedAt: -1 })
     .toArray();
 
@@ -180,7 +180,7 @@ export async function getTrade(db: Db, id: string) {
   return trade ? serializeTrade(trade) : null;
 }
 
-export async function createTrade(db: Db, payload: unknown) {
+export async function createTrade(db: Db, payload: unknown, session?: ClientSession) {
   const input = tradeInputSchema.parse(payload);
   const now = new Date();
   const trade: JournalTradeDocument = {
@@ -201,7 +201,7 @@ export async function createTrade(db: Db, payload: unknown) {
     updatedAt: now,
   };
 
-  await collection(db).insertOne(trade);
+  await collection(db).insertOne(trade, { session });
   return serializeTrade(trade);
 }
 
@@ -306,11 +306,16 @@ export async function createEntry(db: Db, tradeId: string, payload: unknown) {
   return result ? serializeTrade(result) : null;
 }
 
-export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
+export async function closeTrade(
+  db: Db,
+  tradeId: string,
+  payload: unknown,
+  session?: ClientSession,
+) {
   const _id = toObjectId(tradeId);
   if (!_id) return null;
 
-  const existing = await collection(db).findOne({ _id });
+  const existing = await collection(db).findOne({ _id }, { session });
   if (!existing) return null;
 
   const input = closeTradeInputSchema.parse(payload);
@@ -344,7 +349,7 @@ export async function closeTrade(db: Db, tradeId: string, payload: unknown) {
           $set: { endDate: closeDate, updatedAt: now },
         }
       : { $set: { endDate: closeDate, updatedAt: now } },
-    { returnDocument: "after" },
+    { returnDocument: "after", session },
   );
 
   return result ? serializeTrade(result) : null;

@@ -113,11 +113,15 @@ export function JournalChart({
   markets,
   ordersState,
   onTradeChange,
+  onSaveCharts,
 }: {
   trade: JournalTrade;
   markets: JournalTrade["asset"][];
   ordersState: FilledOrdersState;
   onTradeChange: (trade: JournalTrade) => void;
+  onSaveCharts?: (
+    charts: JournalTrade["tradingViewCharts"],
+  ) => Promise<JournalTrade | null>;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -393,6 +397,11 @@ export function JournalChart({
     setChartsSaving(true);
     setError("");
     try {
+      if (onSaveCharts) {
+        const updatedTrade = await onSaveCharts(charts);
+        if (updatedTrade) onTradeChange(updatedTrade);
+        return updatedTrade;
+      }
       const response = await fetch(`/api/journal/trades/${trade.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

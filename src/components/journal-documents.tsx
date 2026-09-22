@@ -43,11 +43,15 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 
 export function JournalDocuments({
   tradeId,
+  apiBasePath,
+  documentPathBase,
   selectedDocumentId,
   onDocumentCountChange,
   onDocumentNavigate,
 }: {
   tradeId: string;
+  apiBasePath?: string;
+  documentPathBase?: string;
   selectedDocumentId?: string | null;
   onDocumentCountChange?: (count: number) => void;
   onDocumentNavigate?: (
@@ -56,6 +60,8 @@ export function JournalDocuments({
   ) => void;
 }) {
   const [documents, setDocuments] = useState<JournalDocument[]>([]);
+  const documentsEndpoint = apiBasePath ?? `/api/journal/trades/${tradeId}/documents`;
+  const documentHrefBase = documentPathBase ?? `/journal/${encodeURIComponent(tradeId)}/documents`;
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
     null,
   );
@@ -125,7 +131,7 @@ export function JournalDocuments({
       if (!isSelectionControlled) setInternalSelectedId(null);
       try {
         const response = await fetch(
-          `/api/journal/trades/${tradeId}/documents`,
+          documentsEndpoint,
           { signal: controller.signal },
         );
         const payload = (await response.json()) as DocumentsPayload;
@@ -152,7 +158,7 @@ export function JournalDocuments({
 
     void loadDocuments();
     return () => controller.abort();
-  }, [isSelectionControlled, navigateDocument, tradeId]);
+  }, [documentsEndpoint, isSelectionControlled, navigateDocument]);
 
   function beginCreate() {
     setError("");
@@ -182,8 +188,8 @@ export function JournalDocuments({
     try {
       const isEditing = editorMode === "edit" && selectedDocument?.kind === "markdown";
       const endpoint = isEditing
-        ? `/api/journal/trades/${tradeId}/documents/${selectedDocument.id}`
-        : `/api/journal/trades/${tradeId}/documents`;
+        ? `${documentsEndpoint}/${selectedDocument.id}`
+        : documentsEndpoint;
       const response = await fetch(endpoint, {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -223,7 +229,7 @@ export function JournalDocuments({
       formData.set("kind", "pdf");
       formData.set("file", file);
       const response = await fetch(
-        `/api/journal/trades/${tradeId}/documents`,
+        documentsEndpoint,
         { method: "POST", body: formData },
       );
       const payload = (await response.json()) as DocumentsPayload;
@@ -250,7 +256,7 @@ export function JournalDocuments({
     setError("");
     try {
       const response = await fetch(
-        `/api/journal/trades/${tradeId}/documents/${document.id}`,
+        `${documentsEndpoint}/${document.id}`,
         { method: "DELETE" },
       );
       const payload = (await response.json()) as DocumentsPayload;
@@ -332,7 +338,7 @@ export function JournalDocuments({
                   <a
                     aria-current={selectedId === document.id ? "page" : undefined}
                     className="journal-document-select"
-                    href={getDocumentPath(tradeId, document.id)}
+                    href={getDocumentPath(documentHrefBase, document.id)}
                     onClick={(event) => {
                       if (isModifiedLinkClick(event)) return;
                       event.preventDefault();
@@ -391,13 +397,13 @@ export function JournalDocuments({
             ) : selectedDocument?.kind === "markdown" ? (
               <MarkdownDocumentPreview
                 document={selectedDocument}
-                tradeId={tradeId}
+                documentHrefBase={documentHrefBase}
                 onEdit={() => beginEdit(selectedDocument)}
               />
             ) : selectedDocument?.kind === "pdf" ? (
               <PdfDocumentPreview
                 document={selectedDocument}
-                tradeId={tradeId}
+                documentHrefBase={documentHrefBase}
               />
             ) : selectedId !== null ? (
               <div className="journal-document-preview-empty" role="status">
@@ -484,11 +490,11 @@ function MarkdownDocumentForm({
 
 function MarkdownDocumentPreview({
   document,
-  tradeId,
+  documentHrefBase,
   onEdit,
 }: {
   document: JournalMarkdownDocument;
-  tradeId: string;
+  documentHrefBase: string;
   onEdit: () => void;
 }) {
   return (
@@ -499,7 +505,7 @@ function MarkdownDocumentPreview({
           <h3>{document.title}</h3>
         </div>
         <div className="journal-document-preview-actions">
-          <DocumentLinkButton documentId={document.id} tradeId={tradeId} />
+          <DocumentLinkButton documentId={document.id} documentHrefBase={documentHrefBase} />
           <button
             aria-label={`Edit ${document.title}`}
             className="icon-button"
@@ -520,10 +526,10 @@ function MarkdownDocumentPreview({
 
 function PdfDocumentPreview({
   document,
-  tradeId,
+  documentHrefBase,
 }: {
   document: Extract<JournalDocument, { kind: "pdf" }>;
-  tradeId: string;
+  documentHrefBase: string;
 }) {
   return (
     <article className="journal-pdf-document">
@@ -533,7 +539,7 @@ function PdfDocumentPreview({
           <h3>{document.title}</h3>
         </div>
         <div className="journal-document-preview-actions">
-          <DocumentLinkButton documentId={document.id} tradeId={tradeId} />
+          <DocumentLinkButton documentId={document.id} documentHrefBase={documentHrefBase} />
           <a
             className="button-secondary"
             href={document.contentUrl}
@@ -567,10 +573,10 @@ function PdfDocumentPreview({
 
 function DocumentLinkButton({
   documentId,
-  tradeId,
+  documentHrefBase,
 }: {
   documentId: string;
-  tradeId: string;
+  documentHrefBase: string;
 }) {
   const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
 
@@ -583,7 +589,7 @@ function DocumentLinkButton({
   async function copyLink() {
     try {
       const url = new URL(
-        getDocumentPath(tradeId, documentId),
+        getDocumentPath(documentHrefBase, documentId),
         window.location.origin,
       );
       await navigator.clipboard.writeText(url.toString());
@@ -621,8 +627,8 @@ function DocumentLinkButton({
   );
 }
 
-function getDocumentPath(tradeId: string, documentId: string) {
-  return `/journal/${encodeURIComponent(tradeId)}/documents/${encodeURIComponent(documentId)}`;
+function getDocumentPath(documentHrefBase: string, documentId: string) {
+  return `${documentHrefBase}/${encodeURIComponent(documentId)}`;
 }
 
 function isModifiedLinkClick(event: ReactMouseEvent<HTMLAnchorElement>) {

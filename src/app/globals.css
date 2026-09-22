@@ -153,6 +153,139 @@ textarea {
   gap: 0.4rem;
 }
 
+.journal-group-member-list {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  display: grid;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.journal-group-member {
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.75rem;
+}
+
+.journal-group-member:last-child {
+  border-bottom: 0;
+}
+
+.journal-group-member.selected {
+  background: #f0f6f3;
+}
+
+.journal-group-member > label:first-child {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.journal-group-member span {
+  display: grid;
+  min-width: 0;
+}
+
+.journal-group-member small {
+  color: #69706c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journal-group-primary {
+  align-items: center;
+  color: #1f7a68;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  gap: 0.35rem;
+}
+
+.journal-group-scope {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 12px;
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.4rem;
+}
+
+.journal-group-scope a,
+.journal-group-scope > span {
+  align-items: center;
+  border-radius: 8px;
+  color: #52605a;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.84rem;
+  font-weight: 700;
+  gap: 0.45rem;
+  min-height: 2.45rem;
+  padding: 0 0.8rem;
+}
+
+.journal-group-scope .active {
+  background: #123d34;
+  color: #fff;
+}
+
+.journal-group-scope small {
+  color: #838b87;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.journal-group-positions {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
+.journal-group-position-card {
+  align-content: start;
+  display: grid;
+  gap: 1rem;
+}
+
+.journal-group-position-card > div:first-child p {
+  color: #69706c;
+  font-size: 0.86rem;
+  margin-top: 0.25rem;
+}
+
+.journal-group-position-symbol {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.journal-group-position-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.journal-group-position-summary {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.journal-group-position-summary > span,
+.journal-group-position-summary > small {
+  color: #69706c;
+  font-size: 0.78rem;
+}
+
+.journal-group-position-summary > strong {
+  font-size: 1.35rem;
+}
+
 .button-primary,
 .button-secondary,
 .icon-button {

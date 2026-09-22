@@ -38,14 +38,15 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 const MAX_FEED_INPUT_LENGTH = 2_048;
 
-export function JournalNews({ tradeId }: { tradeId: string }) {
+export function JournalNews({ tradeId, apiBasePath }: { tradeId: string; apiBasePath?: string }) {
   const {
     error: loadError,
     loading,
     news,
     refreshNews: refreshSharedNews,
     setNews,
-  } = useJournalNews(tradeId);
+    apiBasePath: resolvedApiBasePath,
+  } = useJournalNews(tradeId, apiBasePath);
   const [activeFeedId, setActiveFeedId] = useState("all");
   const [feedInput, setFeedInput] = useState("");
   const [error, setError] = useState("");
@@ -79,7 +80,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
     setError("");
 
     try {
-      const response = await fetch(`/api/journal/trades/${tradeId}/news/feeds`, {
+      const response = await fetch(`${resolvedApiBasePath}/feeds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: feedInput }),
@@ -114,7 +115,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
     setError("");
     try {
       const response = await fetch(
-        `/api/journal/trades/${tradeId}/news/feeds/${feed.id}`,
+        `${resolvedApiBasePath}/feeds/${feed.id}`,
         { method: "DELETE" },
       );
       const payload = (await response.json()) as { error?: string };
@@ -136,7 +137,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
     setNews((current) => removeJournalNewsItem(current, item));
 
     try {
-      const response = await fetch(`/api/journal/trades/${tradeId}/news/read`, {
+      const response = await fetch(`${resolvedApiBasePath}/read`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId: item.id }),
@@ -177,7 +178,7 @@ export function JournalNews({ tradeId }: { tradeId: string }) {
 
     try {
       const response = await fetch(
-        `/api/journal/trades/${tradeId}/news/read-all`,
+        `${resolvedApiBasePath}/read-all`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

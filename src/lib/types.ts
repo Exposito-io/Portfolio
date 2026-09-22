@@ -137,6 +137,36 @@ export type JournalTrade = {
   updatedAt: string;
 };
 
+export type JournalTradeGroupEntry = {
+  id: string;
+  date: string;
+  tradeIds: string[];
+  tags: string[];
+  descriptionMarkdown: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type JournalTradeGroup = {
+  id: string;
+  kind: JournalTradeKind;
+  title: string;
+  descriptionMarkdown: string;
+  metricsMarkdown: string;
+  primaryTradeId: string;
+  members: JournalTrade[];
+  entries: JournalTradeGroupEntry[];
+  tradingViewCharts: JournalTradingViewChart[];
+  startDate: string;
+  endDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type JournalItem =
+  | { itemType: "trade"; trade: JournalTrade }
+  | { itemType: "group"; group: JournalTradeGroup };
+
 type JournalDocumentBase = {
   id: string;
   title: string;
