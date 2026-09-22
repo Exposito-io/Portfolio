@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Layers3, Plus, Trash2, X } from "lucide-react";
 
+import { JournalTemplatePicker } from "@/components/journal-template-picker";
 import { JournalTradeForm, type TradeFormPayload } from "@/components/journal-trade-form";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import type { JournalTrade, JournalTradeAsset, JournalTradeGroup, JournalTradeKind } from "@/lib/types";
@@ -222,6 +223,11 @@ export function JournalGroupDialog({
               </button>
             ) : null}
           </fieldset>
+          <JournalTemplatePicker
+            descriptionMarkdown={descriptionMarkdown}
+            disabled={saving}
+            onInsert={setDescriptionMarkdown}
+          />
           <MarkdownEditor
             id="group-description"
             label="Shared thesis"
