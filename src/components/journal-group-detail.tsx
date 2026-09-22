@@ -22,6 +22,7 @@ import type { FilledOrdersState } from "@/components/use-journal-filled-orders";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { formatJournalDateTimeKey, getDateTimeKey } from "@/lib/date";
 import { calculateCumulativeRealizedPnlByOrder } from "@/lib/journal-pnl";
+import { getOpenPositionMarketKeys } from "@/lib/journal-market-options";
 import type {
   HyperliquidFilledOrder,
   JournalTrade,
@@ -30,6 +31,7 @@ import type {
   JournalTradeGroupEntry,
   JournalItem,
   PortfolioResponse,
+  PortfolioPosition,
 } from "@/lib/types";
 
 const JournalDocuments = dynamic(
@@ -56,6 +58,7 @@ export function JournalGroupDetail({
   const [group, setGroup] = useState<JournalTradeGroup | null>(null);
   const [markets, setMarkets] = useState<JournalTradeAsset[]>([]);
   const [portfolioValue, setPortfolioValue] = useState<number | null>(null);
+  const [portfolioPositions, setPortfolioPositions] = useState<PortfolioPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -100,7 +103,10 @@ export function JournalGroupDetail({
       }),
       fetch("/api/portfolio", { signal: controller.signal }).then(async (response) => {
         const payload = await response.json() as PortfolioResponse;
-        if (response.ok) setPortfolioValue(payload.snapshot?.totals.totalInvestmentsUsd ?? null);
+        if (response.ok) {
+          setPortfolioValue(payload.snapshot?.totals.totalInvestmentsUsd ?? null);
+          setPortfolioPositions(payload.snapshot?.positions ?? []);
+        }
       }),
     ]).catch(() => undefined);
     return () => controller.abort();
@@ -109,6 +115,10 @@ export function JournalGroupDetail({
   const primaryTrade = group
     ? group.members.find((member) => member.id === group.primaryTradeId) ?? group.members[0]
     : null;
+  const openPositionMarketKeys = useMemo(
+    () => getOpenPositionMarketKeys(markets, portfolioPositions),
+    [markets, portfolioPositions],
+  );
   const primaryOrdersState = primaryTrade
     ? orders.byTradeId[primaryTrade.id] ?? emptyOrdersState(primaryTrade.kind)
     : emptyOrdersState("idea");
@@ -414,6 +424,8 @@ export function JournalGroupDetail({
           group={group}
           saving={saving}
           trades={availableTrades}
+          markets={markets}
+          openPositionMarketKeys={openPositionMarketKeys}
           onClose={() => { if (!saving) setManageOpen(false); }}
           onSubmit={saveMembership}
         />
@@ -422,7 +434,7 @@ export function JournalGroupDetail({
         <div className="journal-modal-backdrop" onClick={() => { if (!saving) setAddMemberOpen(false); }}>
           <div className="journal-modal journal-trade-modal" role="dialog" aria-modal="true" aria-labelledby="group-new-position-title" onClick={(event) => event.stopPropagation()}>
             <div className="journal-modal-header"><div><p>{group.title}</p><h2 id="group-new-position-title">New position</h2></div><button className="icon-button" aria-label="Close position form" onClick={() => setAddMemberOpen(false)} type="button"><X size={16} /></button></div>
-            <div className="journal-modal-body">{error ? <div className="alert alert-error">{error}</div> : null}<JournalTradeForm markets={markets} saving={saving} submitLabel="Add position" onCancel={() => setAddMemberOpen(false)} onSubmit={createMember} /></div>
+            <div className="journal-modal-body">{error ? <div className="alert alert-error">{error}</div> : null}<JournalTradeForm markets={markets} openPositionMarketKeys={openPositionMarketKeys} saving={saving} submitLabel="Add position" onCancel={() => setAddMemberOpen(false)} onSubmit={createMember} /></div>
           </div>
         </div>
       ) : null}

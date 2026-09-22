@@ -13,6 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JournalTradeForm } from "@/components/journal-trade-form";
+import { getJournalAssetKey } from "@/lib/journal-market-options";
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -43,6 +44,46 @@ const market = {
 };
 
 describe("JournalTradeForm", () => {
+  it("shows open-position tickers before the other markets", () => {
+    const btc = {
+      kind: "perp" as const,
+      label: "BTC perp",
+      coin: "BTC",
+      chartCoin: "BTC",
+    };
+    const sol = {
+      kind: "perp" as const,
+      label: "SOL perp",
+      coin: "SOL",
+      chartCoin: "SOL",
+    };
+
+    render(
+      <JournalTradeForm
+        markets={[btc, market, sol]}
+        openPositionMarketKeys={[
+          getJournalAssetKey(market),
+          getJournalAssetKey(sol),
+        ]}
+        saving={false}
+        submitLabel="Add item"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const select = screen.getByLabelText("Ticker / Hyperliquid asset");
+    const groups = Array.from(select.querySelectorAll("optgroup"));
+    expect(groups.map((group) => group.label)).toEqual([
+      "Open positions",
+      "Other markets",
+    ]);
+    expect(
+      groups.map((group) =>
+        Array.from(group.querySelectorAll("option"), (option) => option.textContent),
+      ),
+    ).toEqual([["ETH perp", "SOL perp"], ["BTC perp"]]);
+  });
+
   it("allows writing when templates are unavailable", async () => {
     vi.stubGlobal(
       "fetch",

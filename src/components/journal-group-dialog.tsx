@@ -29,6 +29,7 @@ export function JournalGroupDialog({
   saving,
   trades,
   markets = [],
+  openPositionMarketKeys = [],
   group,
   onClose,
   onSubmit,
@@ -37,6 +38,7 @@ export function JournalGroupDialog({
   saving: boolean;
   trades: JournalTrade[];
   markets?: JournalTradeAsset[];
+  openPositionMarketKeys?: string[];
   group?: JournalTradeGroup;
   onClose: () => void;
   onSubmit: (payload: JournalGroupFormPayload) => Promise<void>;
@@ -128,6 +130,7 @@ export function JournalGroupDialog({
             </div>
             <JournalTradeForm
               markets={markets}
+              openPositionMarketKeys={openPositionMarketKeys}
               saving={saving}
               submitLabel="Add to group"
               onCancel={() => setNewTradeFormOpen(false)}

@@ -14,6 +14,7 @@ import { JournalTemplatePicker } from "@/components/journal-template-picker";
 import { MarkdownEditor, MarkdownView } from "@/components/markdown-editor";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getDateTimeKey } from "@/lib/date";
+import { getJournalAssetKey } from "@/lib/journal-market-options";
 import type {
   JournalTrade,
   JournalTradeAsset,
@@ -43,6 +44,8 @@ type TradeFormState = {
 
 type AutoSaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
 
+const EMPTY_MARKET_KEYS: string[] = [];
+
 function createEmptyForm(): TradeFormState {
   return {
     kind: "trade",
@@ -65,13 +68,14 @@ function createTradeForm(trade: JournalTrade): TradeFormState {
     endDate: trade.endDate
       ? toDateTimeInputValue(trade.endDate, "23:59")
       : "",
-    assetKey: getAssetKey(trade.asset),
+    assetKey: getJournalAssetKey(trade.asset),
   };
 }
 
 export function JournalTradeForm({
   trade,
   markets,
+  openPositionMarketKeys = EMPTY_MARKET_KEYS,
   saving,
   submitLabel,
   onCancel,
@@ -82,6 +86,7 @@ export function JournalTradeForm({
 }: {
   trade?: JournalTrade | null;
   markets: JournalTradeAsset[];
+  openPositionMarketKeys?: string[];
   saving: boolean;
   submitLabel: string;
   onCancel?: () => void;
@@ -90,10 +95,19 @@ export function JournalTradeForm({
   autoSaveIntervalMs?: number;
   showDescriptionPreview?: boolean;
 }) {
-  const marketOptions = useMemo(
-    () => markets.map((market) => [getAssetKey(market), market] as const),
-    [markets],
-  );
+  const { marketOptions, openPositionOptions, otherMarketOptions } = useMemo(() => {
+    const preferredKeys = new Set(openPositionMarketKeys);
+    const options = markets.map(
+      (market) => [getJournalAssetKey(market), market] as const,
+    );
+    const preferred = options.filter(([key]) => preferredKeys.has(key));
+
+    return {
+      marketOptions: [...preferred, ...options.filter(([key]) => !preferredKeys.has(key))],
+      openPositionOptions: preferred,
+      otherMarketOptions: options.filter(([key]) => !preferredKeys.has(key)),
+    };
+  }, [markets, openPositionMarketKeys]);
   const [form, setForm] = useState<TradeFormState>(() =>
     trade ? createTradeForm(trade) : createEmptyForm(),
   );
@@ -267,11 +281,32 @@ export function JournalTradeForm({
           onChange={(event) => setForm({ ...form, assetKey: event.target.value })}
         >
           {!marketOptions.length ? <option value="">Loading markets...</option> : null}
-          {marketOptions.map(([key, market]) => (
-            <option key={key} value={key}>
-              {market.label}
-            </option>
-          ))}
+          {openPositionOptions.length ? (
+            <>
+              <optgroup label="Open positions">
+                {openPositionOptions.map(([key, market]) => (
+                  <option key={key} value={key}>
+                    {market.label}
+                  </option>
+                ))}
+              </optgroup>
+              {otherMarketOptions.length ? (
+                <optgroup label="Other markets">
+                  {otherMarketOptions.map(([key, market]) => (
+                    <option key={key} value={key}>
+                      {market.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+            </>
+          ) : (
+            marketOptions.map(([key, market]) => (
+              <option key={key} value={key}>
+                {market.label}
+              </option>
+            ))
+          )}
         </select>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -368,10 +403,6 @@ function formatAutoSaveStatus(
   if (status === "error") return "Autosave failed — retrying";
 
   return `Description autosaves every ${Math.round(autoSaveIntervalMs / 1_000)} seconds`;
-}
-
-export function getAssetKey(asset: JournalTradeAsset) {
-  return `${asset.kind}:${asset.dex ?? ""}:${asset.chartCoin}`;
 }
 
 function toDateTimeInputValue(value: string, fallbackTime: string) {

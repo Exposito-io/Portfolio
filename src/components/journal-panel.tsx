@@ -23,6 +23,7 @@ import {
   type JournalCardMarketState,
 } from "@/components/journal-trade-card";
 import { calculateJournalMarketSummary } from "@/lib/journal-market";
+import { getOpenPositionMarketKeys } from "@/lib/journal-market-options";
 import { aggregateJournalTradePnlSummaries } from "@/lib/journal-pnl";
 import { comparePositionValuesDescending } from "@/lib/journal-sort";
 import type {
@@ -32,6 +33,7 @@ import type {
   JournalTradeAsset,
   JournalTradePnlSummary,
   PortfolioResponse,
+  PortfolioPosition,
 } from "@/lib/types";
 
 type TradePnlState = {
@@ -55,6 +57,7 @@ export function JournalPanel() {
   const [portfolioInvestmentsUsd, setPortfolioInvestmentsUsd] = useState<
     number | null
   >(null);
+  const [portfolioPositions, setPortfolioPositions] = useState<PortfolioPosition[]>([]);
   const [portfolioError, setPortfolioError] = useState("");
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [error, setError] = useState("");
@@ -67,6 +70,10 @@ export function JournalPanel() {
   const visibleTrades = useMemo(
     () => uniqueTrades(visibleItems.flatMap(getItemTrades)),
     [visibleItems],
+  );
+  const openPositionMarketKeys = useMemo(
+    () => getOpenPositionMarketKeys(markets, portfolioPositions),
+    [markets, portfolioPositions],
   );
 
   const loadItems = useCallback(async (showLoading = true) => {
@@ -141,6 +148,7 @@ export function JournalPanel() {
         setPortfolioInvestmentsUsd(
           payload.snapshot?.totals.totalInvestmentsUsd ?? null,
         );
+        setPortfolioPositions(payload.snapshot?.positions ?? []);
       } catch (loadError) {
         if (!controller.signal.aborted) {
           setPortfolioError(
@@ -524,6 +532,7 @@ export function JournalPanel() {
                 key="new"
                 trade={null}
                 markets={markets}
+                openPositionMarketKeys={openPositionMarketKeys}
                 saving={saving}
                 submitLabel="Add item"
                 onCancel={closeTradeForm}
@@ -537,6 +546,7 @@ export function JournalPanel() {
         <JournalGroupDialog
           error={error}
           markets={markets}
+          openPositionMarketKeys={openPositionMarketKeys}
           saving={saving}
           trades={items.filter((item): item is Extract<JournalItem, { itemType: "trade" }> => item.itemType === "trade").map((item) => item.trade)}
           onClose={() => { if (!saving) setGroupFormOpen(false); }}
