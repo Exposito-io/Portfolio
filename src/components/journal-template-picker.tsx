@@ -2,17 +2,16 @@
 
 import { useEffect, useState } from "react";
 
-import { MarkdownView } from "@/components/markdown-editor";
 import type { JournalDescriptionTemplate } from "@/lib/types";
 
 export function JournalTemplatePicker({
   descriptionMarkdown,
   disabled,
-  onInsert,
+  onSelect,
 }: {
   descriptionMarkdown: string;
   disabled: boolean;
-  onInsert: (descriptionMarkdown: string) => void;
+  onSelect: (descriptionMarkdown: string) => void;
 }) {
   const [templates, setTemplates] = useState<JournalDescriptionTemplate[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -47,64 +46,69 @@ export function JournalTemplatePicker({
   }, []);
 
   const selected = templates.find((template) => template.id === selectedId);
-  const nextDescription = selected
-    ? `${descriptionMarkdown}${descriptionMarkdown ? "\n\n" : ""}${selected.descriptionMarkdown}`
-    : descriptionMarkdown;
-  const tooLong = nextDescription.length > 12_000;
+  const tooLong = Boolean(
+    selected && selected.descriptionMarkdown.length > 12_000,
+  );
+
+  function selectTemplate(templateId: string) {
+    if (!templateId) {
+      setSelectedId("");
+      return;
+    }
+
+    const template = templates.find((item) => item.id === templateId);
+    if (!template) return;
+
+    if (template.descriptionMarkdown.length > 12_000) {
+      setSelectedId(templateId);
+      return;
+    }
+
+    if (
+      descriptionMarkdown &&
+      !window.confirm(
+        "Replace your current description with this template? Your current description will be lost.",
+      )
+    ) {
+      return;
+    }
+
+    onSelect(template.descriptionMarkdown);
+    setSelectedId("");
+  }
 
   return (
     <div className="grid min-w-0 gap-2">
       <label className="field-label" htmlFor="journal-template">
         Description template
       </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          id="journal-template"
-          className="input min-w-0 flex-1"
-          disabled={disabled || loading || !templates.length}
-          value={selectedId}
-          onChange={(event) => setSelectedId(event.target.value)}
-        >
-          <option value="">
-            {loading ? "Loading templates..." : "Choose a template"}
+      <select
+        id="journal-template"
+        className="input min-w-0"
+        disabled={disabled || loading || !templates.length}
+        value={selectedId}
+        onChange={(event) => selectTemplate(event.target.value)}
+      >
+        <option value="">
+          {loading ? "Loading templates..." : "Choose a template"}
+        </option>
+        {templates.map((template) => (
+          <option key={template.id} value={template.id}>
+            {template.title}
           </option>
-          {templates.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.title}
-            </option>
-          ))}
-        </select>
-        <button
-          className="button-secondary"
-          type="button"
-          disabled={disabled || !selected?.descriptionMarkdown || tooLong}
-          onClick={() => {
-            onInsert(nextDescription);
-            setSelectedId("");
-          }}
-        >
-          Insert template
-        </button>
-      </div>
+        ))}
+      </select>
       <p className="text-sm text-[#69706c]">
         {error
           ? `${error} You can still write your description.`
           : !loading && !templates.length
             ? "Add templates in Settings. You can also write your own description."
-            : "Insert adds the template below your existing text. Choosing a template only previews it."}
+            : "Choosing a template replaces the description. You'll be asked first if the description isn't empty."}
       </p>
       {tooLong ? (
         <p className="text-sm text-red-700" role="alert">
           This template would exceed the 12,000-character description limit.
         </p>
-      ) : null}
-      {selected ? (
-        <section
-          aria-label="Template preview"
-          className="markdown-template-preview"
-        >
-          <MarkdownView value={selected.descriptionMarkdown} />
-        </section>
       ) : null}
     </div>
   );

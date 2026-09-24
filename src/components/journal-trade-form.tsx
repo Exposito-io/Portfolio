@@ -341,7 +341,7 @@ export function JournalTradeForm({
       <JournalTemplatePicker
         descriptionMarkdown={form.descriptionMarkdown}
         disabled={saving}
-        onInsert={(descriptionMarkdown) =>
+        onSelect={(descriptionMarkdown) =>
           setForm((current) => ({ ...current, descriptionMarkdown }))
         }
       />

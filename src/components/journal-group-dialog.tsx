@@ -229,7 +229,7 @@ export function JournalGroupDialog({
           <JournalTemplatePicker
             descriptionMarkdown={descriptionMarkdown}
             disabled={saving}
-            onInsert={setDescriptionMarkdown}
+            onSelect={setDescriptionMarkdown}
           />
           <MarkdownEditor
             id="group-description"

@@ -4,7 +4,6 @@ import "@testing-library/jest-dom/vitest";
 
 import {
   cleanup,
-  fireEvent,
   render,
   screen,
   waitFor,
@@ -108,13 +107,30 @@ describe("JournalTradeForm", () => {
     expect(screen.getByLabelText("Description")).toHaveValue(
       "Independent draft",
     );
+    expect(screen.getByLabelText("Description template")).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Insert template" }),
-    ).toBeDisabled();
+      screen.queryByRole("button", { name: "Insert template" }),
+    ).not.toBeInTheDocument();
   });
 
   it("prevents insertion beyond the journal description limit without truncating text", async () => {
     const user = userEvent.setup();
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("confirm", confirm);
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        settings: {
+          journalDescriptionTemplates: [
+            {
+              id: "oversized",
+              title: "Oversized",
+              descriptionMarkdown: "x".repeat(12_001),
+            },
+          ],
+        },
+      }),
+    } as Response);
     render(
       <JournalTradeForm
         markets={[market]}
@@ -123,28 +139,23 @@ describe("JournalTradeForm", () => {
         onSubmit={vi.fn()}
       />,
     );
-    await screen.findByRole("option", { name: "Setup" });
-    fireEvent.change(screen.getByLabelText("Description"), {
-      target: { value: "x".repeat(12_000) },
-    });
+    await screen.findByRole("option", { name: "Oversized" });
     await user.selectOptions(
       screen.getByLabelText("Description template"),
-      "setup",
+      "oversized",
     );
     expect(screen.getByRole("alert")).toHaveTextContent(
       "12,000-character description limit",
     );
-    expect(
-      screen.getByRole("button", { name: "Insert template" }),
-    ).toBeDisabled();
-    expect(screen.getByLabelText("Description")).toHaveValue(
-      "x".repeat(12_000),
-    );
+    expect(screen.getByLabelText("Description")).toHaveValue("");
+    expect(confirm).not.toHaveBeenCalled();
   });
 
-  it("previews without changing a draft and inserts only on request, preserving existing text", async () => {
+  it("inserts immediately and confirms before replacing a non-empty description", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn(async () => undefined);
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
     render(
       <JournalTradeForm
         markets={[market]}
@@ -156,35 +167,48 @@ describe("JournalTradeForm", () => {
     await screen.findByRole("option", { name: "Setup" });
     const description = screen.getByLabelText("Description");
     expect(description).toHaveValue("");
+
+    await user.selectOptions(
+      screen.getByLabelText("Description template"),
+      "setup",
+    );
+    expect(description).toHaveValue("## Setup");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Description template")).toHaveValue("");
+
+    await user.clear(description);
     await user.type(description, "My own notes");
     await user.selectOptions(
       screen.getByLabelText("Description template"),
       "setup",
     );
     expect(description).toHaveValue("My own notes");
-    expect(
-      screen.getByRole("region", { name: "Template preview" }),
-    ).toHaveTextContent("Setup");
+    expect(confirm).toHaveBeenCalledWith(
+      "Replace your current description with this template? Your current description will be lost.",
+    );
+    expect(screen.getByLabelText("Description template")).toHaveValue("");
+
+    confirm.mockReturnValue(true);
     await user.selectOptions(
       screen.getByLabelText("Description template"),
       "review",
     );
-    expect(description).toHaveValue("My own notes");
-    await user.click(screen.getByRole("button", { name: "Insert template" }));
-    expect(description).toHaveValue("My own notes\n\n## Review");
+    expect(description).toHaveValue("## Review");
+    expect(screen.getByLabelText("Description template")).toHaveValue("");
     expect(onSubmit).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText("Title"), "Review trade");
     await user.click(screen.getByRole("button", { name: "Add item" }));
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        descriptionMarkdown: "My own notes\n\n## Review",
+        descriptionMarkdown: "## Review",
       }),
     );
   });
 
-  it("preserves a saved description and autosaves only an explicitly inserted template", async () => {
+  it("autosaves a template after the user confirms replacing a saved description", async () => {
     const user = userEvent.setup();
     const onAutoSaveDescription = vi.fn(async () => undefined);
+    vi.stubGlobal("confirm", vi.fn(() => true));
     const trade = {
       id: "one",
       kind: "trade",
@@ -211,13 +235,9 @@ describe("JournalTradeForm", () => {
       screen.getByLabelText("Description template"),
       "setup",
     );
-    expect(screen.getByLabelText("Description")).toHaveValue("Original text");
-    expect(onAutoSaveDescription).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Insert template" }));
+    expect(screen.getByLabelText("Description")).toHaveValue("## Setup");
     await waitFor(() =>
-      expect(onAutoSaveDescription).toHaveBeenCalledWith(
-        "Original text\n\n## Setup",
-      ),
+      expect(onAutoSaveDescription).toHaveBeenCalledWith("## Setup"),
     );
   });
 
