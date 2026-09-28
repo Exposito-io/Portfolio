@@ -3590,6 +3590,134 @@ textarea {
   margin-top: 0.3rem;
 }
 
+.simulator-order-form {
+  gap: 0.7rem;
+}
+
+.simulator-order-side {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.simulator-order-side legend {
+  grid-column: 1 / -1;
+}
+
+.simulator-order-side button {
+  background: #f4f4f0;
+  border: 1px solid rgba(19, 44, 37, 0.13);
+  border-radius: 7px;
+  color: #46504c;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.62rem 0.8rem;
+}
+
+.simulator-order-side button.buy.active {
+  background: #e4f3e9;
+  border-color: #9bc7a9;
+  color: #17603b;
+}
+
+.simulator-order-side button.sell.active {
+  background: #fde9e7;
+  border-color: #e6aaa5;
+  color: #a03630;
+}
+
+.simulator-order-fields {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.simulator-order-preview {
+  background: #f6f7f4;
+  border: 1px solid rgba(19, 44, 37, 0.1);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+}
+
+.simulator-order-preview-heading {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.simulator-order-preview-heading > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.simulator-order-preview span,
+.simulator-order-preview dt,
+.simulator-order-preview > small {
+  color: #69706c;
+  font-size: 0.72rem;
+}
+
+.simulator-order-preview strong,
+.simulator-order-preview dd {
+  font-size: 0.86rem;
+  font-weight: 720;
+}
+
+.simulator-order-position {
+  align-items: center;
+  background: #fff;
+  border-radius: 6px;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+  padding: 0.55rem;
+}
+
+.simulator-order-preview dl {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.simulator-order-preview dl > div {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.simulator-order-preview dd {
+  margin: 0;
+}
+
+.simulator-order-errors {
+  display: grid;
+  gap: 0.35rem;
+  list-style: none;
+}
+
+.simulator-order-warning,
+.simulator-order-valid {
+  align-items: flex-start;
+  border-radius: 6px;
+  display: flex;
+  font-size: 0.76rem;
+  gap: 0.4rem;
+  line-height: 1.4;
+  padding: 0.55rem;
+}
+
+.simulator-order-warning {
+  background: #fff4e8;
+  color: #875017;
+}
+
+.simulator-order-valid {
+  background: #eaf5ee;
+  color: #235f42;
+}
+
 .simulator-review {
   display: grid;
   gap: 1.1rem;
@@ -3626,6 +3754,13 @@ textarea {
   color: #52605a;
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.simulator-review li small {
+  color: #737b77;
+  display: block;
+  font-size: 0.72rem;
+  margin-top: 0.15rem;
 }
 
 .simulator-warning-list li {
@@ -3704,6 +3839,12 @@ textarea {
   .simulator-metrics,
   .simulator-scenario,
   .simulator-review-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .simulator-order-fields,
+  .simulator-order-preview-heading,
+  .simulator-order-preview dl {
     grid-template-columns: 1fr;
   }
 

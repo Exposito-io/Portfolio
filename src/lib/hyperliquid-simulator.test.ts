@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   calculateMaintenanceMargin,
   createHyperliquidSimulationDraft,
+  createHyperliquidOrderPreview,
+  quantizeOrderSize,
   simulateHyperliquidPositions,
 } from "@/lib/hyperliquid-simulator";
 import type {
@@ -141,6 +143,7 @@ describe("Hyperliquid simulator", () => {
       marginMode: "cross",
       leverage: 5,
       isolatedMarginAdjustment: 0,
+      orders: [],
     });
 
     const result = simulateHyperliquidPositions(source, draft);
@@ -215,6 +218,152 @@ describe("Hyperliquid simulator", () => {
         "unsupported-margin-mode",
         "insufficient-initial-margin",
         "unsafe-collateral-removal",
+      ]),
+    );
+  });
+
+  it("converts USD notional to a rounded-down size and previews margin", () => {
+    const source = snapshot();
+    const draft = createHyperliquidSimulationDraft(source);
+    const preview = createHyperliquidOrderPreview(source, draft, {
+      id: "order-1",
+      marketId: market.id,
+      side: "buy",
+      requestedNotional: 250,
+      fillPrice: 110,
+      marginMode: "cross",
+      leverage: 5,
+    });
+
+    expect(quantizeOrderSize(250 / 110, 2)).toBe(2.27);
+    expect(preview.errors).toEqual([]);
+    expect(preview.order?.effectiveNotional).toBeCloseTo(249.7);
+    expect(preview.resultingSignedSize).toBe(7.27);
+    expect(preview.order?.additionalInitialMargin).toBeCloseTo(49.94);
+    expect(preview.marginAfter).toBeCloseTo(145.4);
+    expect(preview.draft?.collateralAdjustment).toBe(0);
+  });
+
+  it("requires no opening margin for a close and only funds a flip remainder", () => {
+    const source = snapshot();
+    const draft = createHyperliquidSimulationDraft(source);
+    const close = createHyperliquidOrderPreview(source, draft, {
+      id: "close",
+      marketId: market.id,
+      side: "sell",
+      requestedNotional: 500,
+      fillPrice: 100,
+      marginMode: "cross",
+      leverage: 5,
+    });
+    expect(close.resultingSignedSize).toBe(0);
+    expect(close.order?.additionalInitialMargin).toBe(0);
+
+    const flip = createHyperliquidOrderPreview(source, draft, {
+      id: "flip",
+      marketId: market.id,
+      side: "sell",
+      requestedNotional: 800,
+      fillPrice: 100,
+      marginMode: "cross",
+      leverage: 5,
+    });
+    expect(flip.resultingSignedSize).toBe(-3);
+    expect(flip.order?.additionalInitialMargin).toBe(60);
+  });
+
+  it("replays stacked fills and preserves round-trip execution impact", () => {
+    const source = snapshot();
+    const initial = createHyperliquidSimulationDraft(source);
+    const first = createHyperliquidOrderPreview(source, initial, {
+      id: "buy",
+      marketId: market.id,
+      side: "buy",
+      requestedNotional: 100,
+      fillPrice: 100,
+      marginMode: "cross",
+      leverage: 5,
+    });
+    const second = createHyperliquidOrderPreview(source, first.draft!, {
+      id: "sell",
+      marketId: market.id,
+      side: "sell",
+      requestedNotional: 110,
+      fillPrice: 110,
+      marginMode: "cross",
+      leverage: 5,
+    });
+
+    expect(second.resultingSignedSize).toBe(5);
+    expect(second.result?.trades).toHaveLength(2);
+    expect(second.result?.metrics.simulatedAccountEquity).toBe(310);
+    expect(second.result?.positions[0].simulatedEntryPrice).toBeCloseTo(
+      91.666666,
+    );
+  });
+
+  it("allocates and releases isolated margin as orders change exposure", () => {
+    const isolatedPosition = position({
+      signedSize: 2,
+      positionValue: 200,
+      marginMode: "isolated",
+      leverage: 5,
+      marginUsed: 60,
+    });
+    const source = snapshot({
+      accountEquity: 500,
+      spotUsdcBalance: 500,
+      crossMaintenance: 0,
+      isolatedMargin: 60,
+      positions: [isolatedPosition],
+    });
+    const draft = createHyperliquidSimulationDraft(source);
+    const increase = createHyperliquidOrderPreview(source, draft, {
+      id: "isolated-buy",
+      marketId: market.id,
+      side: "buy",
+      requestedNotional: 100,
+      fillPrice: 100,
+      marginMode: "isolated",
+      leverage: 5,
+    });
+    expect(increase.order?.additionalInitialMargin).toBe(20);
+    expect(increase.marginAfter).toBe(80);
+
+    const reduce = createHyperliquidOrderPreview(source, draft, {
+      id: "isolated-sell",
+      marketId: market.id,
+      side: "sell",
+      requestedNotional: 100,
+      fillPrice: 100,
+      marginMode: "isolated",
+      leverage: 5,
+    });
+    expect(reduce.order?.additionalInitialMargin).toBe(0);
+    expect(reduce.marginAfter).toBe(30);
+    expect(reduce.marginChange).toBe(-30);
+  });
+
+  it("rejects sub-precision orders and invalid leverage", () => {
+    const source = snapshot();
+    const preview = createHyperliquidOrderPreview(
+      source,
+      createHyperliquidSimulationDraft(source),
+      {
+        id: "invalid",
+        marketId: market.id,
+        side: "buy",
+        requestedNotional: 0.5,
+        fillPrice: 100,
+        marginMode: "cross",
+        leverage: 11,
+      },
+    );
+    expect(preview.order).toBeNull();
+    expect(preview.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Leverage"),
+        expect.stringContaining("too small"),
       ]),
     );
   });

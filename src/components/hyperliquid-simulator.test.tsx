@@ -126,24 +126,56 @@ describe("HyperliquidSimulator", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("adds and removes a hypothetical position without a network write", async () => {
+  it("simulates a USD order for a new market without a network write", async () => {
     const user = userEvent.setup();
     render(<HyperliquidSimulator />);
     await screen.findByRole("spinbutton", { name: "BTC target size" });
 
-    await user.click(screen.getByRole("button", { name: "Add position" }));
+    await user.click(screen.getByRole("button", { name: "Simulate order" }));
     const dialog = screen.getByRole("dialog");
-    const size = dialog.querySelector<HTMLInputElement>('input[type="number"]');
-    expect(size).not.toBeNull();
-    await user.clear(size!);
-    await user.type(size!, "2");
-    await user.click(within(dialog).getByRole("button", { name: "Add position" }));
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Market" }),
+      "default:ETH",
+    );
+    const value = within(dialog).getByRole("spinbutton", { name: "Order value" });
+    await user.clear(value);
+    await user.type(value, "100");
+    expect(dialog).toHaveTextContent("Calculated size2");
+    expect(dialog).toHaveTextContent("Additional initial margin$20.00");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Apply to scenario" }),
+    );
 
     expect(
       await screen.findByRole("spinbutton", { name: "ETH target size" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Open ETH long")).toBeInTheDocument();
+    expect(screen.getByText(/Buy \$100 of ETH at \$50/)).toBeInTheDocument();
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
+  it("stacks orders and replaces their ledger after a direct edit", async () => {
+    const user = userEvent.setup();
+    render(<HyperliquidSimulator />);
+    const targetSize = await screen.findByRole("spinbutton", {
+      name: "BTC target size",
+    });
+
+    for (const amount of [100, 50]) {
+      await user.click(screen.getByRole("button", { name: "Simulate order" }));
+      const dialog = screen.getByRole("dialog");
+      const value = within(dialog).getByRole("spinbutton", { name: "Order value" });
+      await user.clear(value);
+      await user.type(value, String(amount));
+      await user.click(
+        within(dialog).getByRole("button", { name: "Apply to scenario" }),
+      );
+    }
+
+    expect(screen.getByText(/Pending changes \(2\)/)).toBeInTheDocument();
+    await user.clear(targetSize);
+    await user.type(targetSize, "3");
+    expect(screen.getByText(/Pending changes \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText("Increase BTC long by 2")).toBeInTheDocument();
   });
 
   it("shows the configured-account empty state", async () => {

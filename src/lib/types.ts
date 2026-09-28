@@ -319,6 +319,43 @@ export type HyperliquidSimulationPositionDraft = {
   marginMode: "cross" | "isolated";
   leverage: number;
   isolatedMarginAdjustment: number;
+  orders: HyperliquidSimulationOrder[];
+};
+
+export type HyperliquidSimulationOrder = {
+  id: string;
+  marketId: string;
+  side: "buy" | "sell";
+  requestedNotional: number;
+  effectiveNotional: number;
+  size: number;
+  fillPrice: number;
+  marginMode: "cross" | "isolated";
+  leverage: number;
+  additionalInitialMargin: number;
+  marginImpact: number;
+};
+
+export type HyperliquidSimulationOrderInput = {
+  id: string;
+  marketId: string;
+  side: "buy" | "sell";
+  requestedNotional: number;
+  fillPrice: number;
+  marginMode: "cross" | "isolated";
+  leverage: number;
+};
+
+export type HyperliquidSimulationOrderPreview = {
+  order: HyperliquidSimulationOrder | null;
+  draft: HyperliquidSimulationDraft | null;
+  result: HyperliquidSimulationResult | null;
+  currentSignedSize: number;
+  resultingSignedSize: number;
+  marginBefore: number;
+  marginAfter: number;
+  marginChange: number;
+  errors: string[];
 };
 
 export type HyperliquidSimulationDraft = {
@@ -347,6 +384,11 @@ export type HyperliquidDerivedTrade = {
   deltaSize: number;
   fillPrice: number;
   description: string;
+  orderId: string | null;
+  requestedNotional: number | null;
+  effectiveNotional: number;
+  additionalInitialMargin: number;
+  marginImpact: number;
 };
 
 export type HyperliquidSimulatedPosition = {

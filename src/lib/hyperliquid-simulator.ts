@@ -3,6 +3,9 @@ import type {
   HyperliquidMarginTier,
   HyperliquidSimulatedPosition,
   HyperliquidSimulationDraft,
+  HyperliquidSimulationOrder,
+  HyperliquidSimulationOrderInput,
+  HyperliquidSimulationOrderPreview,
   HyperliquidSimulationPositionDraft,
   HyperliquidSimulationResult,
   HyperliquidSimulationWarning,
@@ -36,8 +39,163 @@ export function createHyperliquidSimulationDraft(
       marginMode: position.marginMode,
       leverage: position.leverage,
       isolatedMarginAdjustment: 0,
+      orders: [],
     })),
   };
+}
+
+export function createHyperliquidOrderPreview(
+  snapshot: HyperliquidSimulatorSnapshot,
+  draft: HyperliquidSimulationDraft,
+  input: HyperliquidSimulationOrderInput,
+): HyperliquidSimulationOrderPreview {
+  const market = snapshot.markets.find((item) => item.id === input.marketId);
+  const errors: string[] = [];
+  if (!market) errors.push("Select an available market.");
+  if (!Number.isFinite(input.requestedNotional) || input.requestedNotional <= 0) {
+    errors.push("Order value must be greater than zero.");
+  }
+  if (!Number.isFinite(input.fillPrice) || input.fillPrice <= 0) {
+    errors.push("Assumed fill price must be greater than zero.");
+  }
+  if (
+    !Number.isInteger(input.leverage) ||
+    input.leverage < 1 ||
+    (market && input.leverage > market.maxLeverage)
+  ) {
+    errors.push(
+      market
+        ? `Leverage must be an integer from 1x to ${market.maxLeverage}x.`
+        : "Enter a valid leverage.",
+    );
+  }
+  if (market && input.marginMode === "cross" && market.marginMode !== "cross") {
+    errors.push(`${market.coin} only supports isolated margin.`);
+  }
+
+  const baseResult = simulateHyperliquidPositions(snapshot, draft);
+  const currentPosition = baseResult.positions.find(
+    (position) => position.marketId === input.marketId,
+  );
+  const currentSignedSize = currentPosition?.targetSignedSize ?? 0;
+  const size =
+    market && input.fillPrice > 0 && input.requestedNotional > 0
+      ? quantizeOrderSize(
+          input.requestedNotional / input.fillPrice,
+          market.sizeDecimals,
+        )
+      : 0;
+  if (market && size <= 0 && input.requestedNotional > 0 && input.fillPrice > 0) {
+    errors.push(
+      `Order value is too small for ${market.coin}'s ${market.sizeDecimals}-decimal size precision.`,
+    );
+  }
+  const deltaSize = (input.side === "buy" ? 1 : -1) * size;
+  const resultingSignedSize = normalizeSignedSize(
+    currentSignedSize + deltaSize,
+    market?.sizeDecimals ?? 8,
+  );
+  const openingSize = calculateOpeningSize(currentSignedSize, deltaSize);
+  const effectiveNotional = size * input.fillPrice;
+  const additionalInitialMargin =
+    input.leverage > 0 ? (openingSize * input.fillPrice) / input.leverage : 0;
+
+  if (!market || errors.length) {
+    return {
+      order: null,
+      draft: null,
+      result: null,
+      currentSignedSize,
+      resultingSignedSize,
+      marginBefore: currentPosition?.simulatedMarginUsed ?? 0,
+      marginAfter: currentPosition?.simulatedMarginUsed ?? 0,
+      marginChange: 0,
+      errors,
+    };
+  }
+
+  const order: HyperliquidSimulationOrder = {
+    id: input.id,
+    marketId: input.marketId,
+    side: input.side,
+    requestedNotional: input.requestedNotional,
+    effectiveNotional,
+    size,
+    fillPrice: input.fillPrice,
+    marginMode: input.marginMode,
+    leverage: input.leverage,
+    additionalInitialMargin,
+    marginImpact: 0,
+  };
+  const existingDraft = draft.positions.find(
+    (position) => position.marketId === input.marketId,
+  );
+  const positionId = existingDraft?.id ?? `new:${market.id}`;
+  const nextPosition: HyperliquidSimulationPositionDraft = existingDraft
+    ? {
+        ...existingDraft,
+        marginMode: input.marginMode,
+        leverage: input.leverage,
+        orders: [...existingDraft.orders, order],
+      }
+    : {
+        id: positionId,
+        marketId: market.id,
+        targetSide: input.side === "buy" ? "long" : "short",
+        targetSize: 0,
+        fillPrice: market.markPrice,
+        marginMode: input.marginMode,
+        leverage: input.leverage,
+        isolatedMarginAdjustment: 0,
+        orders: [order],
+      };
+  let nextDraft: HyperliquidSimulationDraft = {
+    ...draft,
+    positions: existingDraft
+      ? draft.positions.map((position) =>
+          position.id === existingDraft.id ? nextPosition : position,
+        )
+      : [...draft.positions, nextPosition],
+  };
+  let result = simulateHyperliquidPositions(snapshot, nextDraft);
+  const marginBefore = currentPosition?.simulatedMarginUsed ?? 0;
+  const marginAfter =
+    result.positions.find((position) => position.id === positionId)
+      ?.simulatedMarginUsed ?? 0;
+  const marginImpact = marginAfter - marginBefore;
+  const completedOrder = { ...order, marginImpact };
+  nextDraft = {
+    ...nextDraft,
+    positions: nextDraft.positions.map((position) =>
+      position.id === positionId
+        ? {
+            ...position,
+            orders: position.orders.map((item) =>
+              item.id === completedOrder.id ? completedOrder : item,
+            ),
+          }
+        : position,
+    ),
+  };
+  result = simulateHyperliquidPositions(snapshot, nextDraft);
+
+  return {
+    order: completedOrder,
+    draft: nextDraft,
+    result,
+    currentSignedSize,
+    resultingSignedSize,
+    marginBefore,
+    marginAfter,
+    marginChange: marginImpact,
+    errors,
+  };
+}
+
+export function quantizeOrderSize(value: number, decimals: number) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const precision = 10 ** decimals;
+  return Math.floor((value + EPSILON) * precision) / precision;
 }
 
 export function simulateHyperliquidPositions(
@@ -65,37 +223,64 @@ export function simulateHyperliquidPositions(
       continue;
     }
 
-    validatePositionDraft(positionDraft, market, warnings);
-    const targetSignedSize =
+    const manualTargetSignedSize =
       (positionDraft.targetSide === "long" ? 1 : -1) *
       Math.max(0, positionDraft.targetSize);
     const currentSignedSize = current?.signedSize ?? 0;
-    const deltaSize = targetSignedSize - currentSignedSize;
     const markPrice = current?.markPrice || market.markPrice || 0;
-    const fillPrice = positionDraft.fillPrice;
-    executionEquityImpact += deltaSize * (markPrice - fillPrice);
-
-    const changed = hasPositionChanged(current, positionDraft, targetSignedSize);
-    if (Math.abs(deltaSize) > EPSILON) {
+    const manualDeltaSize = manualTargetSignedSize - currentSignedSize;
+    let targetSignedSize = manualTargetSignedSize;
+    let simulatedEntryPrice = calculateEntryPrice(
+      current,
+      manualTargetSignedSize,
+      positionDraft.fillPrice,
+    );
+    let fillPrice = positionDraft.fillPrice;
+    executionEquityImpact +=
+      manualDeltaSize * (markPrice - positionDraft.fillPrice);
+    if (Math.abs(manualDeltaSize) > EPSILON) {
       trades.push(
         createDerivedTrade(
           positionDraft,
           market,
           currentSignedSize,
-          targetSignedSize,
-          deltaSize,
+          manualTargetSignedSize,
+          manualDeltaSize,
         ),
       );
     }
 
-    const simulatedEntryPrice = calculateEntryPrice(
-      current,
+    for (const order of positionDraft.orders) {
+      const deltaSize = (order.side === "buy" ? 1 : -1) * order.size;
+      const beforeSignedSize = targetSignedSize;
+      const nextSignedSize = normalizeSignedSize(
+        beforeSignedSize + deltaSize,
+        market.sizeDecimals,
+      );
+      simulatedEntryPrice = applyExecutionToEntryPrice(
+        beforeSignedSize,
+        simulatedEntryPrice,
+        nextSignedSize,
+        order.fillPrice,
+      );
+      executionEquityImpact += deltaSize * (markPrice - order.fillPrice);
+      trades.push(createOrderDerivedTrade(positionDraft, market, order, deltaSize));
+      targetSignedSize = nextSignedSize;
+      fillPrice = order.fillPrice;
+    }
+
+    validatePositionDraft(
+      positionDraft,
+      market,
       targetSignedSize,
       fillPrice,
+      warnings,
     );
-    const simulatedMarginUsed = calculateSimulatedMargin(
+    const changed = hasPositionChanged(current, positionDraft, targetSignedSize);
+    const simulatedMarginUsed = calculateSimulatedMarginWithOrders(
       current,
       positionDraft,
+      manualTargetSignedSize,
       targetSignedSize,
       markPrice,
     );
@@ -314,6 +499,126 @@ function calculateSimulatedMargin(
   return Math.max(0, margin + draft.isolatedMarginAdjustment);
 }
 
+function calculateSimulatedMarginWithOrders(
+  current: HyperliquidSimulatorPosition | null,
+  draft: HyperliquidSimulationPositionDraft,
+  manualTargetSignedSize: number,
+  targetSignedSize: number,
+  markPrice: number,
+) {
+  if (Math.abs(targetSignedSize) <= EPSILON) return 0;
+  if (draft.marginMode === "cross") {
+    return (Math.abs(targetSignedSize) * markPrice) / draft.leverage;
+  }
+
+  const withoutAdjustment = { ...draft, isolatedMarginAdjustment: 0 };
+  let margin = calculateSimulatedMargin(
+    current,
+    withoutAdjustment,
+    manualTargetSignedSize,
+    markPrice,
+  );
+  let signedSize = manualTargetSignedSize;
+  let previousMode: "cross" | "isolated" = draft.marginMode;
+
+  for (const order of draft.orders) {
+    const deltaSize = (order.side === "buy" ? 1 : -1) * order.size;
+    const nextSignedSize = signedSize + deltaSize;
+    if (order.marginMode !== "isolated") {
+      margin = (Math.abs(nextSignedSize) * markPrice) / order.leverage;
+    } else if (previousMode !== "isolated") {
+      margin =
+        (Math.abs(nextSignedSize) * order.fillPrice) / order.leverage +
+        nextSignedSize * (markPrice - order.fillPrice);
+    } else {
+      margin = applyIsolatedOrderMargin(
+        margin,
+        signedSize,
+        nextSignedSize,
+        order.fillPrice,
+        order.leverage,
+        markPrice,
+      );
+    }
+    signedSize = nextSignedSize;
+    previousMode = order.marginMode;
+  }
+
+  return Math.max(0, margin + draft.isolatedMarginAdjustment);
+}
+
+function applyIsolatedOrderMargin(
+  currentMargin: number,
+  beforeSignedSize: number,
+  afterSignedSize: number,
+  fillPrice: number,
+  leverage: number,
+  markPrice: number,
+) {
+  const beforeAbs = Math.abs(beforeSignedSize);
+  const afterAbs = Math.abs(afterSignedSize);
+  if (afterAbs <= EPSILON) return 0;
+  if (beforeAbs <= EPSILON || Math.sign(beforeSignedSize) !== Math.sign(afterSignedSize)) {
+    return Math.max(
+      0,
+      (afterAbs * fillPrice) / leverage +
+        afterSignedSize * (markPrice - fillPrice),
+    );
+  }
+  if (afterAbs <= beforeAbs) {
+    return currentMargin * (afterAbs / beforeAbs);
+  }
+  const addedSize = afterAbs - beforeAbs;
+  const signedAdded = Math.sign(afterSignedSize) * addedSize;
+  return Math.max(
+    0,
+    currentMargin +
+      (addedSize * fillPrice) / leverage +
+      signedAdded * (markPrice - fillPrice),
+  );
+}
+
+function applyExecutionToEntryPrice(
+  beforeSignedSize: number,
+  beforeEntryPrice: number | null,
+  afterSignedSize: number,
+  fillPrice: number,
+) {
+  if (Math.abs(afterSignedSize) <= EPSILON) return null;
+  if (
+    Math.abs(beforeSignedSize) <= EPSILON ||
+    beforeEntryPrice === null ||
+    Math.sign(beforeSignedSize) !== Math.sign(afterSignedSize)
+  ) {
+    return fillPrice;
+  }
+  if (Math.abs(afterSignedSize) <= Math.abs(beforeSignedSize)) {
+    return beforeEntryPrice;
+  }
+  const addedSize = Math.abs(afterSignedSize) - Math.abs(beforeSignedSize);
+  return (
+    (Math.abs(beforeSignedSize) * beforeEntryPrice + addedSize * fillPrice) /
+    Math.abs(afterSignedSize)
+  );
+}
+
+function calculateOpeningSize(beforeSignedSize: number, deltaSize: number) {
+  if (Math.abs(deltaSize) <= EPSILON) return 0;
+  if (
+    Math.abs(beforeSignedSize) <= EPSILON ||
+    Math.sign(beforeSignedSize) === Math.sign(deltaSize)
+  ) {
+    return Math.abs(deltaSize);
+  }
+  return Math.max(0, Math.abs(deltaSize) - Math.abs(beforeSignedSize));
+}
+
+function normalizeSignedSize(value: number, decimals: number) {
+  const precision = 10 ** decimals;
+  const normalized = Math.round(value * precision) / precision;
+  return Math.abs(normalized) <= EPSILON ? 0 : normalized;
+}
+
 function solveLiquidationPrice(
   position: WorkingPosition,
   bufferAtPrice: (price: number) => number,
@@ -360,9 +665,11 @@ function solveLiquidationPrice(
 function validatePositionDraft(
   draft: HyperliquidSimulationPositionDraft,
   market: HyperliquidSimulatorMarket,
+  targetSignedSize: number,
+  fillPrice: number,
   warnings: HyperliquidSimulationWarning[],
 ) {
-  if (!Number.isFinite(draft.fillPrice) || draft.fillPrice <= 0) {
+  if (!Number.isFinite(fillPrice) || fillPrice <= 0) {
     warnings.push({
       code: "invalid-fill",
       message: `${market.coin} needs a positive assumed fill price.`,
@@ -382,9 +689,8 @@ function validatePositionDraft(
   }
   const precision = 10 ** market.sizeDecimals;
   if (
-    !Number.isFinite(draft.targetSize) ||
-    draft.targetSize < 0 ||
-    Math.abs(draft.targetSize * precision - Math.round(draft.targetSize * precision)) >
+    !Number.isFinite(targetSignedSize) ||
+    Math.abs(targetSignedSize * precision - Math.round(targetSignedSize * precision)) >
       EPSILON
   ) {
     warnings.push({
@@ -475,6 +781,7 @@ function hasPositionChanged(
     Math.abs(targetSignedSize - current.signedSize) > EPSILON;
   return (
     sizeChanged ||
+    draft.orders.length > 0 ||
     draft.marginMode !== current.marginMode ||
     draft.leverage !== current.leverage ||
     Math.abs(draft.isolatedMarginAdjustment) > EPSILON
@@ -509,6 +816,34 @@ function createDerivedTrade(
     deltaSize,
     fillPrice: draft.fillPrice,
     description,
+    orderId: null,
+    requestedNotional: null,
+    effectiveNotional: Math.abs(deltaSize) * draft.fillPrice,
+    additionalInitialMargin:
+      (calculateOpeningSize(currentSignedSize, deltaSize) * draft.fillPrice) /
+      draft.leverage,
+    marginImpact: 0,
+  };
+}
+
+function createOrderDerivedTrade(
+  draft: HyperliquidSimulationPositionDraft,
+  market: HyperliquidSimulatorMarket,
+  order: HyperliquidSimulationOrder,
+  deltaSize: number,
+): HyperliquidDerivedTrade {
+  return {
+    positionId: draft.id,
+    marketId: market.id,
+    coin: market.coin,
+    deltaSize,
+    fillPrice: order.fillPrice,
+    description: `${order.side === "buy" ? "Buy" : "Sell"} ${formatOrderUsd(order.requestedNotional)} of ${market.coin}`,
+    orderId: order.id,
+    requestedNotional: order.requestedNotional,
+    effectiveNotional: order.effectiveNotional,
+    additionalInitialMargin: order.additionalInitialMargin,
+    marginImpact: order.marginImpact,
   };
 }
 
@@ -548,5 +883,14 @@ function formatUsd(value: number) {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
+  });
+}
+
+function formatOrderUsd(value: number) {
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   });
 }
