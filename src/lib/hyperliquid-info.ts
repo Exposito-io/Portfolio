@@ -13,6 +13,7 @@ function requestWeight(body: Record<string, unknown>) {
     return 2;
   if (body.type === "userFillsByTime") return 120; // Up to 2,000 fills per page.
   if (body.type === "fundingHistory") return 45; // Up to 500 rates per page.
+  if (body.type === "allPerpMetas" || body.type === "perpDexs") return 20;
   if (body.type === "candleSnapshot") {
     const req = body.req as {
       interval: string;
@@ -133,7 +134,11 @@ export class HyperliquidInfoClient {
     }
 
     const value = (await response.json()) as T;
-    const catalog = body.type === "meta" || body.type === "spotMeta";
+    const catalog =
+      body.type === "meta" ||
+      body.type === "spotMeta" ||
+      body.type === "allPerpMetas" ||
+      body.type === "perpDexs";
     const ttl = catalog ? 15 * MINUTE_MS : 15_000;
     const now = Date.now();
     // Bound memory use as users browse different markets and history ranges.

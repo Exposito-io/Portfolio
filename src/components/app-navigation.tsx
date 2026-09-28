@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   ChartNoAxesCombined,
+  FlaskConical,
   LogOut,
   Menu,
   Newspaper,
@@ -59,6 +60,10 @@ export function AppNavigation({ email, signOutAction }: AppNavigationProps) {
         <Link className="nav-link" href="/news" onClick={closeMenu}>
           <Newspaper size={16} aria-hidden="true" />
           News
+        </Link>
+        <Link className="nav-link" href="/simulator" onClick={closeMenu}>
+          <FlaskConical size={16} aria-hidden="true" />
+          Simulator
         </Link>
         <Link className="nav-link" href="/settings" onClick={closeMenu}>
           <Settings size={16} aria-hidden="true" />

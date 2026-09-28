@@ -49,6 +49,10 @@ describe("AppNavigation", () => {
       "href",
       "/stats",
     );
+    expect(screen.getByRole("link", { name: "Simulator" })).toHaveAttribute(
+      "href",
+      "/simulator",
+    );
     await user.click(screen.getByRole("link", { name: "Stats" }));
 
     expect(

@@ -58,6 +58,12 @@ export async function listAccounts(db: Db, onlyEnabled = false) {
   return accounts.map(serializeAccount);
 }
 
+export async function getAccount(db: Db, id: string) {
+  if (!ObjectId.isValid(id)) return null;
+  const account = await collection(db).findOne({ _id: new ObjectId(id) });
+  return account ? serializeAccount(account) : null;
+}
+
 export async function createAccount(db: Db, payload: unknown) {
   const input = accountInputSchema.parse(payload);
   const now = new Date();

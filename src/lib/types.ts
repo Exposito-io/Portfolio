@@ -259,6 +259,138 @@ export type HyperliquidFundingRate = {
   time: number;
 };
 
+export type HyperliquidMarginTier = {
+  lowerBound: number;
+  maxLeverage: number;
+};
+
+export type HyperliquidSimulatorMarket = {
+  id: string;
+  dex: string;
+  coin: string;
+  label: string;
+  markPrice: number;
+  sizeDecimals: number;
+  maxLeverage: number;
+  marginMode: "cross" | "noCross" | "strictIsolated";
+  marginTiers: HyperliquidMarginTier[];
+};
+
+export type HyperliquidSimulatorPosition = {
+  id: string;
+  marketId: string;
+  dex: string;
+  coin: string;
+  signedSize: number;
+  entryPrice: number;
+  markPrice: number;
+  liquidationPrice: number | null;
+  positionValue: number;
+  unrealizedPnl: number;
+  marginMode: "cross" | "isolated";
+  leverage: number;
+  isolatedRawUsd: number | null;
+  marginUsed: number;
+  maxLeverage: number;
+  accruedFunding: number | null;
+  sizeDecimals: number;
+  marginTiers: HyperliquidMarginTier[];
+};
+
+export type HyperliquidSimulatorSnapshot = {
+  account: PortfolioAccount;
+  accountMode: "unifiedAccount";
+  capturedAt: string;
+  accountEquity: number;
+  spotUsdcBalance: number;
+  crossMaintenance: number;
+  isolatedMargin: number;
+  positions: HyperliquidSimulatorPosition[];
+  markets: HyperliquidSimulatorMarket[];
+  unsupportedPositionCount: number;
+};
+
+export type HyperliquidSimulationPositionDraft = {
+  id: string;
+  marketId: string;
+  targetSide: "long" | "short";
+  targetSize: number;
+  fillPrice: number;
+  marginMode: "cross" | "isolated";
+  leverage: number;
+  isolatedMarginAdjustment: number;
+};
+
+export type HyperliquidSimulationDraft = {
+  collateralAdjustment: number;
+  positions: HyperliquidSimulationPositionDraft[];
+};
+
+export type HyperliquidSimulationWarning = {
+  code:
+    | "invalid-fill"
+    | "invalid-leverage"
+    | "invalid-size"
+    | "unsupported-margin-mode"
+    | "missing-market"
+    | "insufficient-initial-margin"
+    | "unsafe-collateral-removal"
+    | "liquidatable";
+  message: string;
+  positionId?: string;
+};
+
+export type HyperliquidDerivedTrade = {
+  positionId: string;
+  marketId: string;
+  coin: string;
+  deltaSize: number;
+  fillPrice: number;
+  description: string;
+};
+
+export type HyperliquidSimulatedPosition = {
+  id: string;
+  marketId: string;
+  dex: string;
+  coin: string;
+  currentSignedSize: number;
+  targetSignedSize: number;
+  currentEntryPrice: number | null;
+  simulatedEntryPrice: number | null;
+  markPrice: number;
+  fillPrice: number;
+  currentLiquidationPrice: number | null;
+  simulatedLiquidationPrice: number | null;
+  currentPositionValue: number;
+  simulatedPositionValue: number;
+  currentMarginUsed: number;
+  simulatedMarginUsed: number;
+  marginMode: "cross" | "isolated";
+  leverage: number;
+  accruedFunding: number | null;
+  changed: boolean;
+};
+
+export type HyperliquidSimulationResult = {
+  metrics: {
+    currentAccountEquity: number;
+    simulatedAccountEquity: number;
+    currentCrossMaintenance: number;
+    simulatedCrossMaintenance: number;
+    currentMarginBuffer: number;
+    simulatedMarginBuffer: number;
+    nearestLiquidation: {
+      coin: string;
+      price: number;
+      distancePercent: number;
+    } | null;
+  };
+  positions: HyperliquidSimulatedPosition[];
+  trades: HyperliquidDerivedTrade[];
+  warnings: HyperliquidSimulationWarning[];
+};
+
 export type HyperliquidFill = {
   id: string;
   accountId: string;
