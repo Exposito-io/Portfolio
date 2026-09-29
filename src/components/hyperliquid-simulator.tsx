@@ -4,6 +4,8 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
+  CircleHelp,
+  ExternalLink,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -12,7 +14,14 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   createHyperliquidSimulationDraft,
@@ -21,8 +30,10 @@ import {
 } from "@/lib/hyperliquid-simulator";
 import type {
   HyperliquidSimulationDraft,
+  HyperliquidLiquidationCalculation,
   HyperliquidSimulationPositionDraft,
   HyperliquidSimulationResult,
+  HyperliquidSimulatedPosition,
   HyperliquidSimulatorMarket,
   HyperliquidSimulatorSnapshot,
   PortfolioAccount,
@@ -51,6 +62,9 @@ export function HyperliquidSimulator() {
   const [showReview, setShowReview] = useState(false);
   const [orderForm, setOrderForm] = useState<OrderForm | null>(null);
   const [marginPositionId, setMarginPositionId] = useState<string | null>(null);
+  const [liquidationPositionId, setLiquidationPositionId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -228,6 +242,9 @@ export function HyperliquidSimulator() {
   );
   const marginMarket = snapshot?.markets.find(
     (market) => market.id === marginDraft?.marketId,
+  );
+  const liquidationPosition = result?.positions.find(
+    (position) => position.id === liquidationPositionId,
   );
 
   return (
@@ -425,11 +442,21 @@ export function HyperliquidSimulator() {
                           />
                         </td>
                         <td>
-                          <CurrentSimulated
-                            current={formatPrice(position.currentLiquidationPrice)}
-                            simulated={formatPrice(position.simulatedLiquidationPrice)}
-                            emphasize
-                          />
+                          <div className="simulator-liquidation-cell">
+                            <CurrentSimulated
+                              current={formatPrice(position.currentLiquidationPrice)}
+                              simulated={formatPrice(position.simulatedLiquidationPrice)}
+                              emphasize
+                            />
+                            <button
+                              aria-label={`Explain ${position.coin} liquidation price`}
+                              className="simulator-liquidation-help"
+                              onClick={() => setLiquidationPositionId(position.id)}
+                              type="button"
+                            >
+                              <CircleHelp aria-hidden="true" size={16} />
+                            </button>
+                          </div>
                         </td>
                         <td>
                           <CurrentSimulated
@@ -664,6 +691,13 @@ export function HyperliquidSimulator() {
         </Modal>
       ) : null}
 
+      {liquidationPosition ? (
+        <LiquidationExplanationDialog
+          onClose={() => setLiquidationPositionId(null)}
+          position={liquidationPosition}
+        />
+      ) : null}
+
       {showReview && result ? (
         <ReviewDialog onClose={() => setShowReview(false)} result={result} />
       ) : null}
@@ -733,6 +767,341 @@ function OrderPreview({ preview }: { preview: NonNullable<ReturnType<typeof crea
   );
 }
 
+function LiquidationExplanationDialog({
+  position,
+  onClose,
+}: {
+  position: HyperliquidSimulatedPosition;
+  onClose: () => void;
+}) {
+  const calculation = position.liquidationCalculation;
+  const activeTier = calculation.tiers.find((tier) => tier.active) ?? null;
+  const activeTierIndex = calculation.tiers.findIndex((tier) => tier.active);
+  const previousTier =
+    activeTierIndex > 0 ? calculation.tiers[activeTierIndex - 1] : null;
+  const isExchangeReported = calculation.status === "exchange-reported";
+  const evaluationLabel = isExchangeReported
+    ? "Frozen-snapshot evaluation at the reported price"
+    : "Solved liquidation equality";
+  const difference =
+    calculation.equityAtLiquidation !== null &&
+    calculation.totalMaintenanceAtLiquidation !== null
+      ? calculation.equityAtLiquidation -
+        calculation.totalMaintenanceAtLiquidation
+      : null;
+  const variables = [
+    {
+      symbol: "P_liq",
+      name: "Liquidation mark price",
+      value: formatPrice(calculation.liquidationPrice),
+    },
+    {
+      symbol: "P_mark",
+      name: "Frozen mark price",
+      value: formatPrice(calculation.markPrice),
+    },
+    {
+      symbol: "P",
+      name: "Candidate mark price tested by the solver",
+      value: formatPrice(calculation.liquidationPrice),
+    },
+    {
+      symbol: "d",
+      name: "Direction: +1 long, −1 short",
+      value: String(calculation.direction),
+    },
+    {
+      symbol: "q",
+      name: "Absolute position size",
+      value: formatSize(calculation.positionSize),
+    },
+    {
+      symbol: "margin_available",
+      name: "Equity minus total maintenance at the frozen mark",
+      value: formatCurrencyDetailed(calculation.marginAvailableAtMark),
+    },
+    {
+      symbol: "N(P_liq)",
+      name: "Position notional at liquidation",
+      value: formatCurrencyDetailed(calculation.notionalAtLiquidation),
+    },
+    {
+      symbol: "t",
+      name: "Maintenance-tier index, starting at zero",
+      value: activeTierIndex >= 0 ? String(activeTierIndex) : "—",
+    },
+    {
+      symbol: "L_t",
+      name: "Maximum leverage in the active tier",
+      value: activeTier ? `${activeTier.maxLeverage}x` : "—",
+    },
+    {
+      symbol: "r_t",
+      name: "Maintenance rate for the active tier",
+      value: activeTier ? formatPercent(activeTier.maintenanceRate) : "—",
+    },
+    {
+      symbol: "r_(t−1)",
+      name: "Maintenance rate in the previous tier",
+      value: previousTier
+        ? formatPercent(previousTier.maintenanceRate)
+        : "Not applicable in tier 0",
+    },
+    {
+      symbol: "B_t",
+      name: "Active tier notional lower bound",
+      value: activeTier
+        ? formatCurrencyDetailed(activeTier.lowerBound)
+        : "—",
+    },
+    {
+      symbol: "D_t",
+      name: "Cumulative maintenance deduction",
+      value: activeTier
+        ? formatCurrencyDetailed(activeTier.maintenanceDeduction)
+        : "—",
+    },
+    {
+      symbol: "D_0",
+      name: "Base-tier maintenance deduction",
+      value: formatCurrencyDetailed(0),
+    },
+    {
+      symbol: "MM(P_liq)",
+      name: "Position maintenance at liquidation",
+      value: formatCurrencyDetailed(
+        calculation.positionMaintenanceAtLiquidation,
+      ),
+    },
+    {
+      symbol:
+        calculation.marginMode === "cross"
+          ? "E_cross(P_liq)"
+          : "E_iso(P_liq)",
+      name: "Equity evaluated at the liquidation price",
+      value: formatCurrencyDetailed(calculation.equityAtLiquidation),
+    },
+    {
+      symbol: calculation.marginMode === "cross" ? "A_cross" : "M_iso",
+      name:
+        calculation.marginMode === "cross"
+          ? "Cross equity available at the frozen mark"
+          : "Allocated isolated margin at the frozen mark",
+      value: formatCurrencyDetailed(calculation.baseEquity),
+    },
+    ...(calculation.marginMode === "cross"
+      ? [
+          {
+            symbol: "MM_other",
+            name: "Maintenance for other cross positions",
+            value: formatCurrencyDetailed(calculation.otherMaintenance),
+          },
+          {
+            symbol: "MM_cross(P_liq)",
+            name: "Total cross maintenance at liquidation",
+            value: formatCurrencyDetailed(
+              calculation.totalMaintenanceAtLiquidation,
+            ),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <Modal
+      onClose={onClose}
+      title={`Liquidation price — ${position.coin}`}
+      wide
+    >
+      <div className="simulator-liquidation-explanation">
+        <section className="simulator-liquidation-summary">
+          <div>
+            <span>Current</span>
+            <strong>{formatPrice(position.currentLiquidationPrice)}</strong>
+            <small>Reported by Hyperliquid</small>
+          </div>
+          <ArrowRight aria-hidden="true" size={18} />
+          <div>
+            <span>Simulated</span>
+            <strong>{formatPrice(position.simulatedLiquidationPrice)}</strong>
+            <small>
+              {isExchangeReported
+                ? "Matches reported value"
+                : "Calculated for this scenario"}
+            </small>
+          </div>
+        </section>
+
+        <LiquidationStatusNotice calculation={calculation} />
+
+        <section>
+          <h3>Formula</h3>
+          <p>
+            Liquidation occurs when equity equals maintenance margin. The
+            reference form assumes one fixed maintenance tier; the simulator
+            solves the expanded tier-aware equality below.
+          </p>
+          <pre className="simulator-formula"><code>{`P_liq = P_mark − d × margin_available / q / (1 − r_t × d)
+
+Equity(P_liq) = Maintenance(P_liq)
+N(P) = q × P
+r_t = 1 / (2 × L_t)
+D_0 = 0
+D_t = D_(t−1) + B_t × (r_t − r_(t−1))
+MM(P) = N(P) × r_t − D_t`}</code></pre>
+          {calculation.marginMode === "cross" ? (
+            <pre className="simulator-formula"><code>{`E_cross(P) = A_cross + d × q × (P − P_mark)
+MM_cross(P) = MM_other + MM(P)
+Solve E_cross(P_liq) = MM_cross(P_liq)`}</code></pre>
+          ) : (
+            <pre className="simulator-formula"><code>{`E_iso(P) = M_iso + d × q × (P − P_mark)
+Solve E_iso(P_liq) = MM(P_liq)`}</code></pre>
+          )}
+        </section>
+
+        <section>
+          <h3>Values in this scenario</h3>
+          <div className="simulator-liquidation-variables">
+            {variables.map((variable) => (
+              <div key={variable.symbol}>
+                <code>{variable.symbol}</code>
+                <span>{variable.name}</span>
+                <strong>{variable.value}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {calculation.equityAtLiquidation !== null &&
+        calculation.totalMaintenanceAtLiquidation !== null ? (
+          <section>
+            <h3>{evaluationLabel}</h3>
+            <div className="simulator-liquidation-equality">
+              <div>
+                <span>Equity at P_liq</span>
+                <strong>
+                  {formatCurrencyDetailed(calculation.equityAtLiquidation)}
+                </strong>
+              </div>
+              <span>≈</span>
+              <div>
+                <span>Total maintenance at P_liq</span>
+                <strong>
+                  {formatCurrencyDetailed(
+                    calculation.totalMaintenanceAtLiquidation,
+                  )}
+                </strong>
+              </div>
+            </div>
+            <small>
+              Difference after rounding: {formatSignedCurrency(difference)}.
+              {isExchangeReported
+                ? " This is an evaluation of the frozen snapshot, not a claim that the simulator reproduced Hyperliquid’s upstream calculation."
+                : " The solver retains full precision internally."}
+            </small>
+          </section>
+        ) : null}
+
+        <section>
+          <h3>Maintenance tiers</h3>
+          <div className="simulator-tier-table-scroll">
+            <table className="simulator-tier-table">
+              <thead>
+                <tr>
+                  <th>Notional from</th>
+                  <th>Max leverage</th>
+                  <th>Maintenance rate</th>
+                  <th>Deduction</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calculation.tiers.map((tier) => (
+                  <tr className={tier.active ? "active" : ""} key={tier.lowerBound}>
+                    <td>
+                      {formatCurrencyDetailed(tier.lowerBound)}
+                      {tier.active ? <span>Active</span> : null}
+                    </td>
+                    <td>{tier.maxLeverage}x</td>
+                    <td>{formatPercent(tier.maintenanceRate)}</td>
+                    <td>{formatCurrencyDetailed(tier.maintenanceDeduction)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="simulator-liquidation-method">
+          <h3>How the simulator finds the price</h3>
+          <p>
+            Other positions keep their frozen marks. For a long, the solver
+            searches between zero and the current mark. For a short, it expands
+            the upper price bound until the maintenance boundary is crossed.
+            It then uses 100 bounded bisection steps, recalculating the active
+            tier and maintenance deduction at every candidate price.
+          </p>
+          <div>
+            <a
+              href="https://hyperliquid.gitbook.io/hyperliquid-docs/trading/liquidations"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Hyperliquid liquidation formula <ExternalLink size={13} />
+            </a>
+            <a
+              href="https://hyperliquid.gitbook.io/hyperliquid-docs/trading/margin-tiers"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Hyperliquid margin tiers <ExternalLink size={13} />
+            </a>
+          </div>
+        </section>
+
+        <div className="simulator-modal-actions">
+          <button className="button-primary" onClick={onClose} type="button">
+            Done
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function LiquidationStatusNotice({
+  calculation,
+}: {
+  calculation: HyperliquidLiquidationCalculation;
+}) {
+  const content: Record<
+    HyperliquidLiquidationCalculation["status"],
+    string
+  > = {
+    "exchange-reported":
+      "No simulated change affects this account. This price comes directly from Hyperliquid at the snapshot time.",
+    calculated:
+      "This price was calculated from the frozen marks, account equity, position size, and margin tiers shown below.",
+    flat: "The simulated position is flat, so it has no liquidation price.",
+    invalid:
+      "This position has invalid simulated inputs, so a reliable liquidation price is unavailable.",
+    "no-finite-price":
+      "The position stays above maintenance throughout the bounded price search, so no finite liquidation price is shown.",
+    "already-liquidatable":
+      "Equity is already at or below maintenance at the frozen mark, so the simulator returns the mark price.",
+  };
+  const warning =
+    calculation.status === "invalid" ||
+    calculation.status === "already-liquidatable";
+  return (
+    <p
+      className={`simulator-liquidation-status ${warning ? "warning" : calculation.status}`}
+    >
+      {warning ? <AlertTriangle aria-hidden="true" size={16} /> : <ShieldCheck aria-hidden="true" size={16} />}
+      {content[calculation.status]}
+    </p>
+  );
+}
+
 function ScenarioPanel({ draft, result, marginChanges, onCollateralChange, onReset, onReview }: { draft: HyperliquidSimulationDraft; result: HyperliquidSimulationResult; marginChanges: string[]; onCollateralChange: (value: number) => void; onReset: () => void; onReview: () => void }) {
   const pending = [
     ...result.trades.map((trade) =>
@@ -763,13 +1132,14 @@ function ReviewMetric({ label, before, after }: { label: string; before: number;
   return <div><span>{label}</span><strong>{formatCurrency(after)}</strong><small>Current {formatCurrency(before)}</small></div>;
 }
 
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function Modal({ title, children, onClose, wide = false }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+  const titleId = useId();
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
-  return <div className="simulator-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section aria-modal="true" className="simulator-modal" role="dialog"><header><h2>{title}</h2><button aria-label="Close dialog" className="icon-button" onClick={onClose} type="button"><X size={18} /></button></header>{children}</section></div>;
+  return <div className="simulator-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section aria-labelledby={titleId} aria-modal="true" className={`simulator-modal${wide ? " simulator-modal-wide" : ""}`} role="dialog"><header><h2 id={titleId}>{title}</h2><button aria-label="Close dialog" className="icon-button" onClick={onClose} type="button"><X size={18} /></button></header>{children}</section></div>;
 }
 
 function CurrentSimulated({ current, simulated, emphasize = false }: { current: React.ReactNode; simulated: React.ReactNode; emphasize?: boolean }) {
@@ -812,6 +1182,7 @@ function formatCurrency(value: number | null | undefined) { return value === nul
 function formatCurrencyDetailed(value: number | null | undefined) { return value === null || value === undefined || !Number.isFinite(value) ? "—" : value.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function formatSignedCurrency(value: number | null | undefined) { if (value === null || value === undefined || !Number.isFinite(value)) return "—"; const formatted = Math.abs(value).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }); return `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatted}`; }
 function formatPrice(value: number | null | undefined) { if (value === null || value === undefined || !Number.isFinite(value)) return "—"; return value.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: value < 10 ? 2 : 0, maximumFractionDigits: value < 10 ? 6 : 2 }); }
+function formatPercent(value: number) { return value.toLocaleString("en-US", { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 4 }); }
 function formatSize(value: number) { return value.toLocaleString("en-US", { maximumFractionDigits: 8 }); }
 function formatDelta(value: number) { if (Math.abs(value) < 0.005) return "Unchanged"; return `${formatSignedCurrency(value)} vs. current`; }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value)); }

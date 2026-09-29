@@ -393,6 +393,41 @@ export type HyperliquidDerivedTrade = {
   marginImpact: number;
 };
 
+export type HyperliquidMaintenanceTierCalculation = {
+  lowerBound: number;
+  maxLeverage: number;
+  maintenanceRate: number;
+  maintenanceDeduction: number;
+  active: boolean;
+};
+
+export type HyperliquidLiquidationCalculation = {
+  status:
+    | "exchange-reported"
+    | "calculated"
+    | "flat"
+    | "invalid"
+    | "no-finite-price"
+    | "already-liquidatable";
+  marginMode: "cross" | "isolated";
+  side: "long" | "short";
+  direction: 1 | -1;
+  signedSize: number;
+  positionSize: number;
+  markPrice: number;
+  liquidationPrice: number | null;
+  baseEquity: number;
+  otherMaintenance: number;
+  positionMaintenanceAtMark: number;
+  totalMaintenanceAtMark: number;
+  marginAvailableAtMark: number;
+  notionalAtLiquidation: number | null;
+  equityAtLiquidation: number | null;
+  positionMaintenanceAtLiquidation: number | null;
+  totalMaintenanceAtLiquidation: number | null;
+  tiers: HyperliquidMaintenanceTierCalculation[];
+};
+
 export type HyperliquidSimulatedPosition = {
   id: string;
   marketId: string;
@@ -414,6 +449,7 @@ export type HyperliquidSimulatedPosition = {
   leverage: number;
   accruedFunding: number | null;
   changed: boolean;
+  liquidationCalculation: HyperliquidLiquidationCalculation;
 };
 
 export type HyperliquidSimulationResult = {

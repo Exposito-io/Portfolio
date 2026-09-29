@@ -95,6 +95,14 @@ describe("Hyperliquid simulator", () => {
       69.736842,
       5,
     );
+    const calculation = result.positions[0].liquidationCalculation;
+    expect(calculation.status).toBe("calculated");
+    expect(calculation.marginMode).toBe("cross");
+    expect(calculation.otherMaintenance).toBe(0);
+    expect(calculation.equityAtLiquidation).toBeCloseTo(
+      calculation.totalMaintenanceAtLiquidation!,
+      6,
+    );
     expect(result.trades[0].description).toContain("Increase BTC long by 3");
     expect(result.positions[0].accruedFunding).toBe(-4.5);
   });
@@ -177,6 +185,18 @@ describe("Hyperliquid simulator", () => {
       73.68421,
       5,
     );
+    expect(result.positions[0].liquidationCalculation).toMatchObject({
+      status: "calculated",
+      marginMode: "isolated",
+      otherMaintenance: 0,
+    });
+    expect(
+      result.positions[0].liquidationCalculation.equityAtLiquidation,
+    ).toBeCloseTo(
+      result.positions[0].liquidationCalculation
+        .totalMaintenanceAtLiquidation!,
+      6,
+    );
     expect(result.metrics.simulatedMarginBuffer).toBe(440);
   });
 
@@ -188,6 +208,88 @@ describe("Hyperliquid simulator", () => {
     expect(calculateMaintenanceMargin(999, tiers)).toBeCloseTo(49.95);
     expect(calculateMaintenanceMargin(1000, tiers)).toBeCloseTo(50);
     expect(calculateMaintenanceMargin(1500, tiers)).toBeCloseTo(100);
+  });
+
+  it("exposes the active tier, maintenance rate, and tier deduction", () => {
+    const tiers = [
+      { lowerBound: 0, maxLeverage: 10 },
+      { lowerBound: 1000, maxLeverage: 5 },
+    ];
+    const source = snapshot({
+      accountEquity: 300,
+      crossMaintenance: 100,
+      positions: [
+        position({
+          signedSize: -15,
+          positionValue: 1500,
+          liquidationPrice: 112,
+          marginTiers: tiers,
+        }),
+      ],
+      markets: [{ ...market, marginTiers: tiers }],
+    });
+    const draft = createHyperliquidSimulationDraft(source);
+    draft.collateralAdjustment = 1;
+
+    const calculation = simulateHyperliquidPositions(source, draft).positions[0]
+      .liquidationCalculation;
+    const activeTier = calculation.tiers.find((tier) => tier.active);
+
+    expect(activeTier).toMatchObject({
+      lowerBound: 1000,
+      maxLeverage: 5,
+      maintenanceRate: 0.1,
+      maintenanceDeduction: 50,
+    });
+    expect(calculation.equityAtLiquidation).toBeCloseTo(
+      calculation.totalMaintenanceAtLiquidation!,
+      6,
+    );
+  });
+
+  it("labels reported, flat, invalid, no-price, and liquidatable calculations", () => {
+    const source = snapshot();
+    const unchanged = simulateHyperliquidPositions(
+      source,
+      createHyperliquidSimulationDraft(source),
+    );
+    expect(unchanged.positions[0].liquidationCalculation.status).toBe(
+      "exchange-reported",
+    );
+
+    const flatDraft = createHyperliquidSimulationDraft(source);
+    flatDraft.positions[0].targetSize = 0;
+    expect(
+      simulateHyperliquidPositions(source, flatDraft).positions[0]
+        .liquidationCalculation.status,
+    ).toBe("flat");
+
+    const invalidDraft = createHyperliquidSimulationDraft(source);
+    invalidDraft.positions[0].leverage = 11;
+    expect(
+      simulateHyperliquidPositions(source, invalidDraft).positions[0]
+        .liquidationCalculation.status,
+    ).toBe("invalid");
+
+    const safeSource = snapshot({
+      accountEquity: 1000,
+      crossMaintenance: 5,
+      positions: [position({ signedSize: 1, positionValue: 100 })],
+    });
+    const safeDraft = createHyperliquidSimulationDraft(safeSource);
+    safeDraft.collateralAdjustment = 1;
+    expect(
+      simulateHyperliquidPositions(safeSource, safeDraft).positions[0]
+        .liquidationCalculation.status,
+    ).toBe("no-finite-price");
+
+    const unsafeSource = snapshot({ accountEquity: 20, crossMaintenance: 25 });
+    const unsafeDraft = createHyperliquidSimulationDraft(unsafeSource);
+    unsafeDraft.collateralAdjustment = 1;
+    expect(
+      simulateHyperliquidPositions(unsafeSource, unsafeDraft).positions[0]
+        .liquidationCalculation.status,
+    ).toBe("already-liquidatable");
   });
 
   it("warns about precision, leverage, isolated-only markets, and unsafe margin", () => {

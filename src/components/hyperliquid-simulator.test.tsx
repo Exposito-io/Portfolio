@@ -63,7 +63,7 @@ const snapshot: HyperliquidSimulatorSnapshot = {
       signedSize: 1,
       entryPrice: 90,
       markPrice: 100,
-      liquidationPrice: null,
+      liquidationPrice: 40,
       positionValue: 100,
       unrealizedPnl: 10,
       marginMode: "cross",
@@ -177,6 +177,47 @@ describe("HyperliquidSimulator", () => {
     await user.type(targetSize, "3");
     expect(screen.getByText(/Pending changes \(1\)/)).toBeInTheDocument();
     expect(screen.getByText("Increase BTC long by 2")).toBeInTheDocument();
+  });
+
+  it("explains each position liquidation price with formulas and live values", async () => {
+    const user = userEvent.setup();
+    render(<HyperliquidSimulator />);
+    const help = await screen.findByRole("button", {
+      name: "Explain BTC liquidation price",
+    });
+
+    expect(
+      screen.getAllByRole("button", { name: /Explain .* liquidation price/ }),
+    ).toHaveLength(1);
+    await user.click(help);
+
+    let dialog = screen.getByRole("dialog", {
+      name: "Liquidation price — BTC",
+    });
+    expect(dialog).toHaveTextContent("Reported by Hyperliquid");
+    expect(dialog).toHaveTextContent("Matches reported value");
+    expect(dialog).toHaveTextContent("Equity(P_liq) = Maintenance(P_liq)");
+    expect(dialog).toHaveTextContent("E_cross(P)");
+    expect(dialog).toHaveTextContent("A_cross");
+    expect(dialog).toHaveTextContent("margin_available");
+    expect(dialog).toHaveTextContent("r_(t−1)");
+    expect(dialog).toHaveTextContent("Maintenance tiers");
+    expect(dialog).toHaveTextContent("Active");
+    expect(within(dialog).getAllByText("$40").length).toBeGreaterThan(0);
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const size = screen.getByRole("spinbutton", { name: "BTC target size" });
+    await user.clear(size);
+    await user.type(size, "20");
+    await user.click(
+      screen.getByRole("button", { name: "Explain BTC liquidation price" }),
+    );
+    dialog = screen.getByRole("dialog", { name: "Liquidation price — BTC" });
+    expect(dialog).toHaveTextContent("Calculated for this scenario");
+    expect(dialog).toHaveTextContent("Solved liquidation equality");
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
   });
 
   it("shows the configured-account empty state", async () => {

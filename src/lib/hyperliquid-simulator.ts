@@ -1,5 +1,6 @@
 import type {
   HyperliquidDerivedTrade,
+  HyperliquidLiquidationCalculation,
   HyperliquidMarginTier,
   HyperliquidSimulatedPosition,
   HyperliquidSimulationDraft,
@@ -16,8 +17,18 @@ import type {
 
 const EPSILON = 1e-9;
 const MAX_LIQUIDATION_PRICE = 1e15;
+const INVALID_LIQUIDATION_WARNING_CODES = new Set([
+  "invalid-fill",
+  "invalid-leverage",
+  "invalid-size",
+  "unsupported-margin-mode",
+  "missing-market",
+]);
 
-type WorkingPosition = HyperliquidSimulatedPosition & {
+type WorkingPosition = Omit<
+  HyperliquidSimulatedPosition,
+  "liquidationCalculation"
+> & {
   signedSize: number;
   marginTiers: HyperliquidMarginTier[];
   sizeDecimals: number;
@@ -422,7 +433,18 @@ export function simulateHyperliquidPositions(
       simulatedMarginBuffer,
       nearestLiquidation,
     },
-    positions: positions.map(stripWorkingFields),
+    positions: positions.map((position) =>
+      stripWorkingFields(
+        position,
+        createLiquidationCalculation(
+          position,
+          scenarioChanged,
+          crossAvailable,
+          simulatedCrossMaintenance,
+          warnings,
+        ),
+      ),
+    ),
     trades,
     warnings,
   };
@@ -433,20 +455,46 @@ export function calculateMaintenanceMargin(
   tiers: HyperliquidMarginTier[],
 ) {
   if (notional <= 0 || !tiers.length) return 0;
+  const selected = buildMaintenanceTierCalculations(tiers, notional).find(
+    (tier) => tier.active,
+  );
+  if (!selected) return 0;
+  return Math.max(
+    0,
+    notional * selected.maintenanceRate - selected.maintenanceDeduction,
+  );
+}
+
+function buildMaintenanceTierCalculations(
+  tiers: HyperliquidMarginTier[],
+  activeNotional: number,
+) {
   const ordered = [...tiers].sort((a, b) => a.lowerBound - b.lowerBound);
-  let selected = ordered[0];
-  let previousRate = 1 / (2 * selected.maxLeverage);
+  let previousRate = 0;
   let deduction = 0;
-
-  for (const tier of ordered.slice(1)) {
-    const rate = 1 / (2 * tier.maxLeverage);
-    if (notional < tier.lowerBound) break;
-    deduction += tier.lowerBound * (rate - previousRate);
-    previousRate = rate;
-    selected = tier;
+  const calculations = ordered.map((tier, index) => {
+    const maintenanceRate = 1 / (2 * tier.maxLeverage);
+    if (index > 0) {
+      deduction += tier.lowerBound * (maintenanceRate - previousRate);
+    }
+    previousRate = maintenanceRate;
+    return {
+      lowerBound: tier.lowerBound,
+      maxLeverage: tier.maxLeverage,
+      maintenanceRate,
+      maintenanceDeduction: deduction,
+      active: false,
+    };
+  });
+  let activeIndex = 0;
+  for (let index = 1; index < calculations.length; index += 1) {
+    if (activeNotional < calculations[index].lowerBound) break;
+    activeIndex = index;
   }
-
-  return Math.max(0, notional / (2 * selected.maxLeverage) - deduction);
+  return calculations.map((tier, index) => ({
+    ...tier,
+    active: index === activeIndex,
+  }));
 }
 
 function calculateEntryPrice(
@@ -856,7 +904,96 @@ function createOrderDerivedTrade(
   };
 }
 
-function stripWorkingFields(position: WorkingPosition): HyperliquidSimulatedPosition {
+function createLiquidationCalculation(
+  position: WorkingPosition,
+  scenarioChanged: boolean,
+  crossAvailable: number,
+  simulatedCrossMaintenance: number,
+  warnings: HyperliquidSimulationWarning[],
+): HyperliquidLiquidationCalculation {
+  const positionSize = Math.abs(position.signedSize);
+  const liquidationPrice = position.simulatedLiquidationPrice;
+  const positionMaintenanceAtMark = calculateMaintenanceMargin(
+    positionSize * position.markPrice,
+    position.marginTiers,
+  );
+  const baseEquity =
+    position.marginMode === "cross"
+      ? crossAvailable
+      : position.simulatedMarginUsed;
+  const otherMaintenance =
+    position.marginMode === "cross"
+      ? simulatedCrossMaintenance - positionMaintenanceAtMark
+      : 0;
+  const referencePrice = liquidationPrice ?? position.markPrice;
+  const notionalAtLiquidation =
+    liquidationPrice === null ? null : positionSize * liquidationPrice;
+  const positionMaintenanceAtLiquidation =
+    notionalAtLiquidation === null
+      ? null
+      : calculateMaintenanceMargin(
+          notionalAtLiquidation,
+          position.marginTiers,
+        );
+  const totalMaintenanceAtLiquidation =
+    positionMaintenanceAtLiquidation === null
+      ? null
+      : otherMaintenance + positionMaintenanceAtLiquidation;
+  const equityAtLiquidation =
+    liquidationPrice === null
+      ? null
+      : baseEquity +
+        position.signedSize * (liquidationPrice - position.markPrice);
+  const hasInvalidWarning = warnings.some(
+    (warning) =>
+      warning.positionId === position.id &&
+      INVALID_LIQUIDATION_WARNING_CODES.has(warning.code),
+  );
+  const maintenanceAtMark = otherMaintenance + positionMaintenanceAtMark;
+  let status: HyperliquidLiquidationCalculation["status"];
+  if (positionSize <= EPSILON) {
+    status = "flat";
+  } else if (hasInvalidWarning) {
+    status = "invalid";
+  } else if (!scenarioChanged && liquidationPrice !== null) {
+    status = "exchange-reported";
+  } else if (scenarioChanged && baseEquity - maintenanceAtMark <= EPSILON) {
+    status = "already-liquidatable";
+  } else if (liquidationPrice === null) {
+    status = "no-finite-price";
+  } else {
+    status = "calculated";
+  }
+
+  return {
+    status,
+    marginMode: position.marginMode,
+    side: position.signedSize >= 0 ? "long" : "short",
+    direction: position.signedSize >= 0 ? 1 : -1,
+    signedSize: position.signedSize,
+    positionSize,
+    markPrice: position.markPrice,
+    liquidationPrice,
+    baseEquity,
+    otherMaintenance,
+    positionMaintenanceAtMark,
+    totalMaintenanceAtMark: maintenanceAtMark,
+    marginAvailableAtMark: baseEquity - maintenanceAtMark,
+    notionalAtLiquidation,
+    equityAtLiquidation,
+    positionMaintenanceAtLiquidation,
+    totalMaintenanceAtLiquidation,
+    tiers: buildMaintenanceTierCalculations(
+      position.marginTiers,
+      positionSize * referencePrice,
+    ),
+  };
+}
+
+function stripWorkingFields(
+  position: WorkingPosition,
+  liquidationCalculation: HyperliquidLiquidationCalculation,
+): HyperliquidSimulatedPosition {
   return {
     id: position.id,
     marketId: position.marketId,
@@ -878,6 +1015,7 @@ function stripWorkingFields(position: WorkingPosition): HyperliquidSimulatedPosi
     leverage: position.leverage,
     accruedFunding: position.accruedFunding,
     changed: position.changed,
+    liquidationCalculation,
   };
 }
 

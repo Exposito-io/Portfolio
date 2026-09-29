@@ -3337,6 +3337,36 @@ textarea {
   font-weight: 700;
 }
 
+.simulator-liquidation-cell {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.simulator-liquidation-help {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: #66716c;
+  display: flex;
+  flex: 0 0 auto;
+  height: 1.8rem;
+  justify-content: center;
+  padding: 0;
+  width: 1.8rem;
+}
+
+.simulator-liquidation-help:hover {
+  background: #edf4ef;
+  color: #1f7a68;
+}
+
+.simulator-liquidation-help:focus-visible {
+  box-shadow: 0 0 0 2px rgba(31, 122, 104, 0.2);
+  outline: 1px solid #1f7a68;
+}
+
 .simulator-number-input,
 .simulator-side-select {
   background: #fff;
@@ -3534,6 +3564,10 @@ textarea {
   width: 100%;
 }
 
+.simulator-modal-wide {
+  max-width: 48rem;
+}
+
 .simulator-modal > header {
   align-items: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.09);
@@ -3563,6 +3597,230 @@ textarea {
   gap: 0.55rem;
   justify-content: flex-end;
   margin-top: 0.3rem;
+}
+
+.simulator-liquidation-explanation {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.simulator-liquidation-explanation section > h3 {
+  font-size: 0.9rem;
+  font-weight: 750;
+  margin-bottom: 0.5rem;
+}
+
+.simulator-liquidation-explanation section > p,
+.simulator-liquidation-explanation section > small {
+  color: #68716d;
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.simulator-liquidation-summary {
+  align-items: center;
+  background: #f4f7f4;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: 1fr auto 1fr;
+  padding: 0.9rem;
+}
+
+.simulator-liquidation-summary > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.simulator-liquidation-summary > div:last-child {
+  text-align: right;
+}
+
+.simulator-liquidation-summary span,
+.simulator-liquidation-summary small {
+  color: #737c78;
+  font-size: 0.7rem;
+}
+
+.simulator-liquidation-summary strong {
+  font-size: 1.2rem;
+}
+
+.simulator-liquidation-summary > div:last-child strong {
+  color: #1f7a68;
+}
+
+.simulator-liquidation-status {
+  align-items: flex-start;
+  background: #edf7f1;
+  border-radius: 7px;
+  color: #245c47;
+  display: flex;
+  font-size: 0.78rem;
+  gap: 0.5rem;
+  line-height: 1.45;
+  padding: 0.7rem;
+}
+
+.simulator-liquidation-status.warning {
+  background: #fff4e8;
+  color: #875017;
+}
+
+.simulator-liquidation-status.flat,
+.simulator-liquidation-status.no-finite-price,
+.simulator-liquidation-status.exchange-reported {
+  background: #f1f3f1;
+  color: #56615c;
+}
+
+.simulator-liquidation-status svg {
+  flex: 0 0 auto;
+  margin-top: 0.05rem;
+}
+
+.simulator-formula {
+  background: #17231f;
+  border-radius: 7px;
+  color: #e9f4ed;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  margin-top: 0.55rem;
+  overflow-x: auto;
+  padding: 0.75rem;
+}
+
+.simulator-liquidation-variables {
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.simulator-liquidation-variables > div {
+  align-items: center;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: 8.25rem minmax(0, 1fr) auto;
+  padding: 0.55rem 0.7rem;
+}
+
+.simulator-liquidation-variables > div + div {
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.simulator-liquidation-variables code {
+  color: #1f7a68;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.simulator-liquidation-variables span {
+  color: #65706b;
+  font-size: 0.75rem;
+}
+
+.simulator-liquidation-variables strong {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.simulator-liquidation-equality {
+  align-items: center;
+  background: #f4f7f4;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: 1fr auto 1fr;
+  margin-bottom: 0.45rem;
+  padding: 0.75rem;
+}
+
+.simulator-liquidation-equality > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.simulator-liquidation-equality > div:last-child {
+  text-align: right;
+}
+
+.simulator-liquidation-equality span {
+  color: #707975;
+  font-size: 0.7rem;
+}
+
+.simulator-liquidation-equality strong {
+  font-size: 0.9rem;
+}
+
+.simulator-tier-table-scroll {
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.simulator-tier-table {
+  border-collapse: collapse;
+  min-width: 32rem;
+  width: 100%;
+}
+
+.simulator-tier-table th,
+.simulator-tier-table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  font-size: 0.72rem;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+}
+
+.simulator-tier-table th {
+  color: #68716d;
+  font-weight: 750;
+}
+
+.simulator-tier-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.simulator-tier-table tr.active {
+  background: #edf7f1;
+}
+
+.simulator-tier-table td span {
+  background: #d5eadc;
+  border-radius: 999px;
+  color: #236146;
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 750;
+  margin-left: 0.45rem;
+  padding: 0.12rem 0.38rem;
+  text-transform: uppercase;
+}
+
+.simulator-liquidation-method {
+  background: #f7f7f4;
+  border-radius: 8px;
+  padding: 0.8rem;
+}
+
+.simulator-liquidation-method > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  margin-top: 0.65rem;
+}
+
+.simulator-liquidation-method a {
+  align-items: center;
+  color: #1f6f60;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  gap: 0.3rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .simulator-order-form {
@@ -3832,6 +4090,30 @@ textarea {
   .simulator-order-comparisons,
   .simulator-order-preview dl {
     grid-template-columns: 1fr;
+  }
+
+  .simulator-liquidation-summary,
+  .simulator-liquidation-equality {
+    grid-template-columns: 1fr;
+  }
+
+  .simulator-liquidation-summary > svg,
+  .simulator-liquidation-equality > span {
+    transform: rotate(90deg);
+  }
+
+  .simulator-liquidation-summary > div:last-child,
+  .simulator-liquidation-equality > div:last-child {
+    text-align: left;
+  }
+
+  .simulator-liquidation-variables > div {
+    align-items: start;
+    grid-template-columns: 7.75rem minmax(0, 1fr);
+  }
+
+  .simulator-liquidation-variables strong {
+    grid-column: 2;
   }
 
   .simulator-scenario > div,
