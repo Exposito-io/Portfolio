@@ -273,11 +273,6 @@ export function HyperliquidSimulator() {
         </div>
       </section>
 
-      <div className="simulator-notice" role="note">
-        <span><ShieldCheck size={18} />Simulation only — no orders will be sent.</span>
-        <small>This tool is for analysis and planning purposes only.</small>
-      </div>
-
       {error ? <div className="alert alert-error">{error}</div> : null}
       {snapshot?.unsupportedPositionCount ? (
         <div className="alert alert-warning">

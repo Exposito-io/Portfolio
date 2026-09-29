@@ -3165,31 +3165,6 @@ textarea {
   text-align: right;
 }
 
-.simulator-notice {
-  align-items: center;
-  background: #edf7f1;
-  border: 1px solid #c8dfd1;
-  border-radius: 8px;
-  color: #123d34;
-  display: flex;
-  justify-content: space-between;
-  min-height: 3.2rem;
-  padding: 0.7rem 1rem;
-}
-
-.simulator-notice span {
-  align-items: center;
-  display: flex;
-  font-size: 0.9rem;
-  font-weight: 700;
-  gap: 0.65rem;
-}
-
-.simulator-notice small {
-  color: #4f625b;
-  font-size: 0.78rem;
-}
-
 .simulator-loading {
   align-items: center;
   background: rgba(255, 255, 255, 0.8);
@@ -3826,14 +3801,9 @@ textarea {
     padding-top: 1.25rem;
   }
 
-  .simulator-account-controls > div,
-  .simulator-notice {
+  .simulator-account-controls > div {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .simulator-notice {
-    gap: 0.45rem;
   }
 
   .simulator-metrics,
