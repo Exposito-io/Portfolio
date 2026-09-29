@@ -239,6 +239,8 @@ describe("Hyperliquid simulator", () => {
     expect(preview.errors).toEqual([]);
     expect(preview.order?.effectiveNotional).toBeCloseTo(249.7);
     expect(preview.resultingSignedSize).toBe(7.27);
+    expect(preview.liquidationPriceBefore).toBe(42.11);
+    expect(preview.liquidationPriceAfter).toBeCloseTo(65.112575, 5);
     expect(preview.order?.additionalInitialMargin).toBeCloseTo(49.94);
     expect(preview.marginAfter).toBeCloseTo(145.4);
     expect(preview.draft?.collateralAdjustment).toBe(0);

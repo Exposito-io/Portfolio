@@ -78,6 +78,8 @@ export function createHyperliquidOrderPreview(
     (position) => position.marketId === input.marketId,
   );
   const currentSignedSize = currentPosition?.targetSignedSize ?? 0;
+  const liquidationPriceBefore =
+    currentPosition?.simulatedLiquidationPrice ?? null;
   const size =
     market && input.fillPrice > 0 && input.requestedNotional > 0
       ? quantizeOrderSize(
@@ -107,6 +109,8 @@ export function createHyperliquidOrderPreview(
       result: null,
       currentSignedSize,
       resultingSignedSize,
+      liquidationPriceBefore,
+      liquidationPriceAfter: null,
       marginBefore: currentPosition?.simulatedMarginUsed ?? 0,
       marginAfter: currentPosition?.simulatedMarginUsed ?? 0,
       marginChange: 0,
@@ -178,6 +182,9 @@ export function createHyperliquidOrderPreview(
     ),
   };
   result = simulateHyperliquidPositions(snapshot, nextDraft);
+  const liquidationPriceAfter =
+    result.positions.find((position) => position.id === positionId)
+      ?.simulatedLiquidationPrice ?? null;
 
   return {
     order: completedOrder,
@@ -185,6 +192,8 @@ export function createHyperliquidOrderPreview(
     result,
     currentSignedSize,
     resultingSignedSize,
+    liquidationPriceBefore,
+    liquidationPriceAfter,
     marginBefore,
     marginAfter,
     marginChange: marginImpact,

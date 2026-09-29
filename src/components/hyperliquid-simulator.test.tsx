@@ -141,6 +141,7 @@ describe("HyperliquidSimulator", () => {
     await user.clear(value);
     await user.type(value, "100");
     expect(dialog).toHaveTextContent("Calculated size2");
+    expect(dialog).toHaveTextContent("Liquidation price—");
     expect(dialog).toHaveTextContent("Additional initial margin$20.00");
     await user.click(
       within(dialog).getByRole("button", { name: "Apply to scenario" }),

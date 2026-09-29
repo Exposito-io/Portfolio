@@ -695,10 +695,23 @@ function OrderPreview({ preview }: { preview: NonNullable<ReturnType<typeof crea
         <div><span>Calculated size</span><strong>{order ? formatSize(order.size) : "—"}</strong></div>
         <div><span>Effective notional</span><strong>{order ? formatCurrencyDetailed(order.effectiveNotional) : "—"}</strong></div>
       </div>
-      <div className="simulator-order-position">
-        <span>{formatSignedPosition(preview.currentSignedSize)}</span>
-        <ArrowRight size={15} />
-        <strong>{formatSignedPosition(preview.resultingSignedSize)}</strong>
+      <div className="simulator-order-comparisons">
+        <div>
+          <span>Position size</span>
+          <div className="simulator-order-change">
+            <span>{formatSignedPosition(preview.currentSignedSize)}</span>
+            <ArrowRight size={15} />
+            <strong>{formatSignedPosition(preview.resultingSignedSize)}</strong>
+          </div>
+        </div>
+        <div>
+          <span>Liquidation price</span>
+          <div className="simulator-order-change">
+            <span>{formatPrice(preview.liquidationPriceBefore)}</span>
+            <ArrowRight size={15} />
+            <strong>{formatPrice(preview.liquidationPriceAfter)}</strong>
+          </div>
+        </div>
       </div>
       <dl>
         <div><dt>Additional initial margin</dt><dd>{order ? formatCurrencyDetailed(order.additionalInitialMargin) : "—"}</dd></div>

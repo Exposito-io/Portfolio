@@ -3640,14 +3640,29 @@ textarea {
   font-weight: 720;
 }
 
-.simulator-order-position {
-  align-items: center;
+.simulator-order-comparisons {
   background: #fff;
   border-radius: 6px;
-  display: flex;
-  gap: 0.55rem;
-  justify-content: center;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: 1fr 1fr;
   padding: 0.55rem;
+}
+
+.simulator-order-comparisons > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.simulator-order-change {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.simulator-order-change svg {
+  color: #8a928e;
+  flex: 0 0 auto;
 }
 
 .simulator-order-preview dl {
@@ -3814,6 +3829,7 @@ textarea {
 
   .simulator-order-fields,
   .simulator-order-preview-heading,
+  .simulator-order-comparisons,
   .simulator-order-preview dl {
     grid-template-columns: 1fr;
   }

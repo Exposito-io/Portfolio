@@ -352,6 +352,8 @@ export type HyperliquidSimulationOrderPreview = {
   result: HyperliquidSimulationResult | null;
   currentSignedSize: number;
   resultingSignedSize: number;
+  liquidationPriceBefore: number | null;
+  liquidationPriceAfter: number | null;
   marginBefore: number;
   marginAfter: number;
   marginChange: number;
