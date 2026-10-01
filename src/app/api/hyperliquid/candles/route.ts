@@ -6,6 +6,8 @@ import {
   HYPERLIQUID_CANDLE_INTERVALS,
   type HyperliquidCandleInterval,
 } from "@/lib/hyperliquid";
+import { getHyperliquidCandleCache } from "@/lib/hyperliquid-candle-cache";
+import { getCacheDb } from "@/lib/mongodb";
 
 export async function GET(request: Request) {
   const authorizationError = await getApiAuthorizationError();
@@ -35,11 +37,24 @@ export async function GET(request: Request) {
       );
     }
 
-    const candles = await fetchHyperliquidCandles({
-      coin,
-      interval: interval as HyperliquidCandleInterval,
-      days,
-    });
+    let candles;
+    try {
+      candles = await getHyperliquidCandleCache(await getCacheDb()).getCandles({
+        coin,
+        interval: interval as HyperliquidCandleInterval,
+        days,
+      });
+    } catch (cacheError) {
+      console.warn(
+        "[hyperliquid-candles] Persistent cache unavailable; fetching directly.",
+        cacheError,
+      );
+      candles = await fetchHyperliquidCandles({
+        coin,
+        interval: interval as HyperliquidCandleInterval,
+        days,
+      });
+    }
 
     return NextResponse.json({ candles });
   } catch (error) {

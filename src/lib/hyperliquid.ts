@@ -308,6 +308,28 @@ export async function fetchHyperliquidCandles(
 ): Promise<HyperliquidCandle[]> {
   const endTime = Date.now();
   const startTime = endTime - days * 24 * 60 * 60 * 1000;
+  return fetchHyperliquidCandlesByTime(
+    { coin, interval, startTime, endTime },
+    fetcher,
+    JSON.stringify({ coin, interval, days }),
+  );
+}
+
+export async function fetchHyperliquidCandlesByTime(
+  {
+    coin,
+    interval,
+    startTime,
+    endTime,
+  }: {
+    coin: string;
+    interval: HyperliquidCandleInterval;
+    startTime: number;
+    endTime: number;
+  },
+  fetcher: typeof fetch = fetch,
+  cacheKey?: string,
+): Promise<HyperliquidCandle[]> {
   const response = await postInfo<HyperliquidCandleResponse>(
     {
       type: "candleSnapshot",
@@ -320,7 +342,7 @@ export async function fetchHyperliquidCandles(
     },
     fetcher,
     "Hyperliquid candles",
-    JSON.stringify({ coin, interval, days }),
+    cacheKey,
   );
 
   return response

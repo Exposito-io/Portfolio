@@ -1,6 +1,10 @@
 import { Db, MongoClient } from "mongodb";
 
-import { getMongoDatabaseName, requireMongoUri } from "@/lib/config";
+import {
+  getMongoCacheDatabaseName,
+  getMongoDatabaseName,
+  requireMongoUri,
+} from "@/lib/config";
 
 // Route bundles and development reloads must share both the connection and
 // services keyed by this client (including per-wallet fill synchronization).
@@ -25,4 +29,9 @@ export async function getDb(): Promise<Db> {
   const uri = requireMongoUri();
   const client = await getMongoClient();
   return client.db(getMongoDatabaseName(uri));
+}
+
+export async function getCacheDb(): Promise<Db> {
+  const client = await getMongoClient();
+  return client.db(getMongoCacheDatabaseName());
 }

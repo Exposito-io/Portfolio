@@ -22,3 +22,7 @@ export function getMongoDatabaseName(uri: string) {
   const pathname = parsed.pathname.replace(/^\//, "");
   return pathname || "portfolio";
 }
+
+export function getMongoCacheDatabaseName() {
+  return process.env.MONGODB_CACHE_DATABASE?.trim() || "cache";
+}
