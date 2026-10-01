@@ -3680,10 +3680,49 @@ textarea {
   margin-top: 0.05rem;
 }
 
+.simulator-main-formula,
 .simulator-formula {
   background: #17231f;
   border-radius: 7px;
   color: #e9f4ed;
+}
+
+.simulator-main-formula {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.92rem;
+  gap: 0.65rem;
+  justify-content: center;
+  line-height: 1.4;
+  margin-top: 0.55rem;
+  padding: 1rem;
+}
+
+.simulator-formula-prefix {
+  white-space: nowrap;
+}
+
+.simulator-main-formula sub {
+  font-size: 0.68em;
+}
+
+.simulator-formula-fraction {
+  display: inline-grid;
+  min-width: 13.5rem;
+  text-align: center;
+}
+
+.simulator-formula-fraction > span {
+  padding: 0.18rem 0.45rem;
+}
+
+.simulator-formula-fraction > span:first-child {
+  border-bottom: 1px solid rgba(233, 244, 237, 0.8);
+}
+
+.simulator-formula {
   font-size: 0.74rem;
   line-height: 1.55;
   margin-top: 0.55rem;

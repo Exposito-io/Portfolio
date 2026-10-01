@@ -196,6 +196,11 @@ describe("HyperliquidSimulator", () => {
     });
     expect(dialog).toHaveTextContent("Reported by Hyperliquid");
     expect(dialog).toHaveTextContent("Matches reported value");
+    expect(
+      within(dialog).getByRole("math", {
+        name: /P liq equals P mark minus d times margin available/i,
+      }),
+    ).toHaveTextContent("marginavailable");
     expect(dialog).toHaveTextContent("Equity(P_liq) = Maintenance(P_liq)");
     expect(dialog).toHaveTextContent("E_cross(P)");
     expect(dialog).toHaveTextContent("A_cross");

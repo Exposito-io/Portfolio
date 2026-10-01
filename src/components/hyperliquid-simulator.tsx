@@ -941,9 +941,20 @@ function LiquidationExplanationDialog({
             reference form assumes one fixed maintenance tier; the simulator
             solves the expanded tier-aware equality below.
           </p>
-          <pre className="simulator-formula"><code>{`P_liq = P_mark − d × margin_available / q / (1 − r_t × d)
-
-Equity(P_liq) = Maintenance(P_liq)
+          <div
+            aria-label="P liq equals P mark minus d times margin available divided by q times one minus r t times d"
+            className="simulator-main-formula"
+            role="math"
+          >
+            <span className="simulator-formula-prefix">
+              P<sub>liq</sub> = P<sub>mark</sub> − d ×
+            </span>
+            <span className="simulator-formula-fraction">
+              <span>margin<sub>available</sub></span>
+              <span>q × (1 − r<sub>t</sub> × d)</span>
+            </span>
+          </div>
+          <pre className="simulator-formula"><code>{`Equity(P_liq) = Maintenance(P_liq)
 N(P) = q × P
 r_t = 1 / (2 × L_t)
 D_0 = 0
