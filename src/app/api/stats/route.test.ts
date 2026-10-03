@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/accounts", () => ({ listAccounts: vi.fn() }));
 vi.mock("@/lib/authorization", () => ({ getApiAuthorizationError: vi.fn() }));
-vi.mock("@/lib/mongodb", () => ({ getDb: vi.fn() }));
+vi.mock("@/lib/mongodb", () => ({ getCacheDb: vi.fn(), getDb: vi.fn() }));
 vi.mock("@/lib/stats-service", () => ({ loadStats: vi.fn() }));
 
 import { GET } from "@/app/api/stats/route";
 import { listAccounts } from "@/lib/accounts";
 import { getApiAuthorizationError } from "@/lib/authorization";
-import { getDb } from "@/lib/mongodb";
+import { getCacheDb, getDb } from "@/lib/mongodb";
 import { loadStats } from "@/lib/stats-service";
 
 beforeEach(() => vi.resetAllMocks());
@@ -20,6 +20,7 @@ describe("GET /api/stats", () => {
     );
     expect((await GET()).status).toBe(401);
     expect(getDb).not.toHaveBeenCalled();
+    expect(getCacheDb).not.toHaveBeenCalled();
     expect(loadStats).not.toHaveBeenCalled();
   });
 

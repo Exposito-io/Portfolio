@@ -160,8 +160,8 @@ type CacheRuntime = {
 };
 
 function mongoStore(db: Db, runtime: CacheRuntime): FillHistoryStore {
-  const fills = db.collection<StoredHyperliquidFill>("hyperliquidFills");
-  const syncs = db.collection<SyncState>("hyperliquidFillSyncs");
+  const fills = db.collection<StoredHyperliquidFill>("hyperliquid_fills_v1");
+  const syncs = db.collection<SyncState>("hyperliquid_fill_syncs_v1");
   function ensureIndex() {
     runtime.index ??= fills
       .createIndex({ wallet: 1, time: 1 })

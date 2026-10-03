@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getApiAuthorizationError } from "@/lib/authorization";
 import { isValidDateKey } from "@/lib/date";
-import { getDb } from "@/lib/mongodb";
+import { getCacheDb, getDb } from "@/lib/mongodb";
 import { getPortfolio } from "@/lib/portfolio-service";
 
 export async function GET(request: Request) {
@@ -21,7 +21,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const portfolio = await getPortfolio(await getDb(), date, { refresh });
+    const [db, cacheDb] = await Promise.all([getDb(), getCacheDb()]);
+    const portfolio = await getPortfolio(db, date, { refresh }, cacheDb);
     return NextResponse.json(portfolio);
   } catch (error) {
     return NextResponse.json(

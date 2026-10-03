@@ -66,8 +66,8 @@ type CachedNewsResult = {
   error?: string;
 };
 
-const QUERY_CACHE_COLLECTION = "journalNewsQueryCaches";
-const ARTICLE_COLLECTION = "journalNewsArticles";
+const QUERY_CACHE_COLLECTION = "google_news_queries_v1";
+const ARTICLE_COLLECTION = "google_news_articles_v1";
 const READ_RECEIPT_COLLECTION = "journalNewsReadReceipts";
 const GOOGLE_NEWS_EDITION = "US:en";
 const GOOGLE_EMPTY_WARNING =
@@ -75,7 +75,8 @@ const GOOGLE_EMPTY_WARNING =
 const REFRESH_WAIT_TIMEOUT_MS = 12_000;
 const REFRESH_WAIT_POLL_MS = 100;
 const refreshes = new Map<string, Promise<void>>();
-const indexPromises = new Map<string, Promise<void>>();
+const cacheIndexPromises = new Map<string, Promise<void>>();
+const readReceiptIndexPromises = new Map<string, Promise<void>>();
 
 function queryCacheCollection(db: Db): Collection<NewsQueryCacheDocument> {
   return db.collection<NewsQueryCacheDocument>(QUERY_CACHE_COLLECTION);
@@ -145,7 +146,7 @@ export async function getCachedGoogleNews(
 }
 
 export async function getJournalNewsReadItemIds(db: Db, journalId: ObjectId) {
-  await ensureJournalNewsCacheIndexes(db);
+  await ensureJournalNewsReadReceiptIndexes(db);
   const receipts = await readReceiptCollection(db)
     .find({ journalId })
     .project({ _id: 0, itemId: 1 })
@@ -158,7 +159,7 @@ export async function saveJournalNewsReadReceipts(
   journalId: ObjectId,
   itemIds: string[],
 ) {
-  await ensureJournalNewsCacheIndexes(db);
+  await ensureJournalNewsReadReceiptIndexes(db);
   const now = new Date();
   const uniqueItemIds = [...new Set(itemIds)];
   if (uniqueItemIds.length === 0) return;
@@ -359,7 +360,7 @@ async function loadCachedArticles(
 
 async function ensureJournalNewsCacheIndexes(db: Db) {
   const databaseKey = db.databaseName;
-  let promise = indexPromises.get(databaseKey);
+  let promise = cacheIndexPromises.get(databaseKey);
   if (!promise) {
     promise = Promise.all([
       articleCollection(db).createIndex({ queryKeys: 1, publishedAt: -1 }),
@@ -367,17 +368,29 @@ async function ensureJournalNewsCacheIndexes(db: Db) {
         { publishedAt: 1 },
         { expireAfterSeconds: JOURNAL_NEWS_MAX_AGE_MS / 1_000 },
       ),
-      readReceiptCollection(db).createIndex(
-        { journalId: 1, itemId: 1 },
-        { unique: true },
-      ),
     ])
       .then(() => undefined)
       .catch((error) => {
-        indexPromises.delete(databaseKey);
+        cacheIndexPromises.delete(databaseKey);
         throw error;
       });
-    indexPromises.set(databaseKey, promise);
+    cacheIndexPromises.set(databaseKey, promise);
+  }
+  return promise;
+}
+
+async function ensureJournalNewsReadReceiptIndexes(db: Db) {
+  const databaseKey = db.databaseName;
+  let promise = readReceiptIndexPromises.get(databaseKey);
+  if (!promise) {
+    promise = readReceiptCollection(db)
+      .createIndex({ journalId: 1, itemId: 1 }, { unique: true })
+      .then(() => undefined)
+      .catch((error) => {
+        readReceiptIndexPromises.delete(databaseKey);
+        throw error;
+      });
+    readReceiptIndexPromises.set(databaseKey, promise);
   }
   return promise;
 }

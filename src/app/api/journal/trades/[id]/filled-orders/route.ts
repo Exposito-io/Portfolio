@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getApiAuthorizationError } from "@/lib/authorization";
 import { getTrade } from "@/lib/journal";
 import { getJournalTradeFilledOrders } from "@/lib/journal-filled-orders";
-import { getDb } from "@/lib/mongodb";
+import { getCacheDb, getDb } from "@/lib/mongodb";
 
 type RouteContext = {
   params: Promise<{
@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const { id } = await context.params;
-    const db = await getDb();
+    const [db, cacheDb] = await Promise.all([getDb(), getCacheDb()]);
     const trade = await getTrade(db, id);
 
     if (!trade) {
@@ -31,7 +31,9 @@ export async function GET(_request: Request, context: RouteContext) {
       );
     }
 
-    return NextResponse.json(await getJournalTradeFilledOrders(db, trade));
+    return NextResponse.json(
+      await getJournalTradeFilledOrders(db, trade, cacheDb),
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Request failed." },

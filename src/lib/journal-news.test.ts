@@ -460,6 +460,40 @@ describe("Google News query cache", () => {
 });
 
 describe("journal news persistence", () => {
+  it("keeps query and article caches separate from durable journal data", async () => {
+    const journalId = new ObjectId();
+    const primary = fakeDbWithState([
+      {
+        _id: journalId,
+        newsFeeds: [feed(new ObjectId(), "Micron")],
+      },
+    ]);
+    const cache = fakeDbWithState([]);
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        `<rss><channel>${rssItem(
+          "separate-cache",
+          "Separate cache",
+          "2026-09-03T12:00:00Z",
+        )}</channel></rss>`,
+      ),
+    ) as NewsFetch;
+
+    const news = await getJournalNews(
+      primary.db,
+      journalId.toString(),
+      fetchImpl,
+      "journalTrades",
+      cache.db,
+    );
+
+    expect(news?.items).toHaveLength(1);
+    expect(primary.state.queryCaches.size).toBe(0);
+    expect(primary.state.articles.size).toBe(0);
+    expect(cache.state.queryCaches.size).toBe(1);
+    expect(cache.state.articles.size).toBe(1);
+  });
+
   it("supports legacy documents and stores normalized feeds with native dates", async () => {
     const journalId = new ObjectId();
     const updatedAt = new Date("2026-08-01T00:00:00Z");
@@ -991,8 +1025,8 @@ function fakeDbWithState(documents: StoredDocument[]) {
     databaseName: `fake-${new ObjectId().toString()}`,
     collection(name: string) {
       if (name === "journalTrades") return journalCollection;
-      if (name === "journalNewsQueryCaches") return queryCacheCollection;
-      if (name === "journalNewsArticles") return articleCollection;
+      if (name === "google_news_queries_v1") return queryCacheCollection;
+      if (name === "google_news_articles_v1") return articleCollection;
       if (name === "journalNewsReadReceipts") return readReceiptCollection;
       throw new Error(`Unexpected collection: ${name}`);
     },

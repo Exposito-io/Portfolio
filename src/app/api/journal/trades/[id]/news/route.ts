@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getApiAuthorizationError } from "@/lib/authorization";
 import { getJournalNews, JournalNewsHttpError } from "@/lib/journal-news";
-import { getDb } from "@/lib/mongodb";
+import { getCacheDb, getDb } from "@/lib/mongodb";
 
 type RouteContext = {
   params: Promise<{
@@ -16,7 +16,14 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const { id } = await context.params;
-    const news = await getJournalNews(await getDb(), id);
+    const [db, cacheDb] = await Promise.all([getDb(), getCacheDb()]);
+    const news = await getJournalNews(
+      db,
+      id,
+      fetch,
+      "journalTrades",
+      cacheDb,
+    );
 
     if (!news) {
       return NextResponse.json({ error: "Journal not found." }, { status: 404 });

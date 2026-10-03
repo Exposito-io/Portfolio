@@ -38,6 +38,7 @@ export async function getPortfolio(
   db: Db,
   selectedDateKey?: string,
   options: { refresh?: boolean } = {},
+  cacheDb: Db = db,
 ): Promise<PortfolioResponse> {
   const todayKey = getDateKey(new Date(), PORTFOLIO_TIMEZONE);
   const dateKey = selectedDateKey || todayKey;
@@ -82,7 +83,7 @@ export async function getPortfolio(
   }
 
   const liveSnapshot = await getCachedOrRefreshPortfolio(
-    db,
+    cacheDb,
     accounts,
     todayKey,
     Boolean(options.refresh),
@@ -106,7 +107,7 @@ export async function getPortfolio(
 }
 
 async function getCachedOrRefreshPortfolio(
-  db: Db,
+  cacheDb: Db,
   accounts: PortfolioAccount[],
   dateKey: string,
   forceRefresh = false,
@@ -122,7 +123,7 @@ async function getCachedOrRefreshPortfolio(
     return livePortfolioCache.snapshot;
   }
 
-  const snapshot = await refreshPortfolio(db, accounts, dateKey);
+  const snapshot = await refreshPortfolio(cacheDb, accounts, dateKey);
   livePortfolioCache = {
     key: cacheKey,
     capturedAtMs: now,
@@ -133,7 +134,7 @@ async function getCachedOrRefreshPortfolio(
 }
 
 async function refreshPortfolio(
-  db: Db,
+  cacheDb: Db,
   accounts: PortfolioAccount[],
   dateKey: string,
 ): Promise<PortfolioSnapshot> {
@@ -143,7 +144,7 @@ async function refreshPortfolio(
 
   for (const account of accounts) {
     try {
-      const result = await fetchAccount(db, account);
+      const result = await fetchAccount(cacheDb, account);
 
       sourceSummaries.push(result.summary);
       positions.push(...result.positions);
@@ -169,13 +170,13 @@ async function refreshPortfolio(
   };
 }
 
-async function fetchAccount(db: Db, account: PortfolioAccount) {
+async function fetchAccount(cacheDb: Db, account: PortfolioAccount) {
   if (account.source !== "aave") {
     return fetchHyperliquidAccount(account);
   }
 
   const reserveHints = await getAaveReserveHints(
-    db,
+    cacheDb,
     account.id,
     account.address,
   );
@@ -183,7 +184,7 @@ async function fetchAccount(db: Db, account: PortfolioAccount) {
 
   if (!reserveHints?.length) {
     await saveAaveReserveHints(
-      db,
+      cacheDb,
       account.id,
       account.address,
       extractAaveReserveHints(result.positions),

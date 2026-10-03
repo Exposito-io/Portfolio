@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 
 import { getApiAuthorizationError } from "@/lib/authorization";
 import { addJournalNewsFeed, JournalNewsHttpError } from "@/lib/journal-news";
-import { getDb } from "@/lib/mongodb";
+import { getCacheDb, getDb } from "@/lib/mongodb";
 
 type RouteContext = {
   params: Promise<{
@@ -17,10 +17,14 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const { id } = await context.params;
+    const [db, cacheDb] = await Promise.all([getDb(), getCacheDb()]);
     const news = await addJournalNewsFeed(
-      await getDb(),
+      db,
       id,
       await request.json(),
+      fetch,
+      "journalTrades",
+      cacheDb,
     );
 
     if (!news) {

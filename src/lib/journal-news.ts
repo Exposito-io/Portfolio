@@ -307,6 +307,7 @@ export async function getJournalNews(
   journalId: string,
   fetchImpl: NewsFetch = fetch,
   collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
+  cacheDb: Db = db,
 ): Promise<JournalNewsResponse | null> {
   const _id = toObjectId(journalId);
   if (!_id) return null;
@@ -314,12 +315,13 @@ export async function getJournalNews(
   const journal = await collection(db, collectionName).findOne({ _id });
   if (!journal) return null;
 
-  return getNewsForJournal(db, journal, fetchImpl);
+  return getNewsForJournal(db, cacheDb, journal, fetchImpl);
 }
 
 export async function getOpenJournalsNews(
   db: Db,
   fetchImpl: NewsFetch = fetch,
+  cacheDb: Db = db,
 ): Promise<OpenJournalNewsResponse> {
   const journals = await collection(db)
     .find({
@@ -332,7 +334,7 @@ export async function getOpenJournalsNews(
     journals.map(async (journal) => ({
       id: journal._id.toString(),
       title: journal.title?.trim() || "Untitled journal",
-      news: await getNewsForJournal(db, journal, fetchImpl),
+      news: await getNewsForJournal(db, cacheDb, journal, fetchImpl),
     })),
   );
 
@@ -344,6 +346,7 @@ export async function getOpenJournalsNews(
 
 async function getNewsForJournal(
   db: Db,
+  cacheDb: Db,
   journal: JournalNewsDocument,
   fetchImpl: NewsFetch,
 ) {
@@ -362,7 +365,7 @@ async function getNewsForJournal(
       }
 
       const cached = await getCachedGoogleNews(
-        db,
+        cacheDb,
         feed.keywords ?? "",
         readIds,
         () => fetchGoogleNewsFeed(feed.keywords ?? "", fetchImpl),
@@ -389,6 +392,7 @@ export async function addJournalNewsFeed(
   payload: unknown,
   fetchImpl: NewsFetch = fetch,
   collectionName: "journalTrades" | "journalTradeGroups" = "journalTrades",
+  cacheDb: Db = db,
 ) {
   const _id = toObjectId(journalId);
   if (!_id) return null;
@@ -445,7 +449,7 @@ export async function addJournalNewsFeed(
   }
 
   await collection(db, collectionName).updateOne({ _id }, { $push: { newsFeeds: feed } });
-  return getJournalNews(db, journalId, fetchImpl, collectionName);
+  return getJournalNews(db, journalId, fetchImpl, collectionName, cacheDb);
 }
 
 export async function removeJournalNewsFeed(

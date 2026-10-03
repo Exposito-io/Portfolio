@@ -35,6 +35,7 @@ export type JournalFilledOrdersResult = {
 export async function getJournalTradeFilledOrders(
   db: Db,
   trade: JournalTrade,
+  cacheDb: Db = db,
 ): Promise<JournalFilledOrdersResult> {
   if (trade.kind === "idea") {
     throw new Error("Trade ideas do not have filled orders or PnL.");
@@ -58,7 +59,7 @@ export async function getJournalTradeFilledOrders(
 
   for (const account of accounts) {
     try {
-      orders.push(...(await getHyperliquidFillCache(db).getOrders({
+      orders.push(...(await getHyperliquidFillCache(cacheDb).getOrders({
         account, startTime, endTime, coinAliases,
       })));
     } catch (error) {

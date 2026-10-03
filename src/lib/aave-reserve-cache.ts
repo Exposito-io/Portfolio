@@ -13,7 +13,7 @@ type AaveReserveCacheDocument = {
 const RESERVE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function collection(db: Db): Collection<AaveReserveCacheDocument> {
-  return db.collection<AaveReserveCacheDocument>("aaveReserveCaches");
+  return db.collection<AaveReserveCacheDocument>("aave_reserve_hints_v1");
 }
 
 export async function getAaveReserveHints(

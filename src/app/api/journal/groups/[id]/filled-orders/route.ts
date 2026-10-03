@@ -4,7 +4,7 @@ import { getApiAuthorizationError } from "@/lib/authorization";
 import { getJournalTradeFilledOrders } from "@/lib/journal-filled-orders";
 import { getGroup } from "@/lib/journal-groups";
 import { aggregateJournalTradePnlSummaries } from "@/lib/journal-pnl";
-import { getDb } from "@/lib/mongodb";
+import { getCacheDb, getDb } from "@/lib/mongodb";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,12 +13,12 @@ export async function GET(_request: Request, context: RouteContext) {
   if (authorizationError) return authorizationError;
   try {
     const { id } = await context.params;
-    const db = await getDb();
+    const [db, cacheDb] = await Promise.all([getDb(), getCacheDb()]);
     const group = await getGroup(db, id);
     if (!group) return NextResponse.json({ error: "Journal group not found." }, { status: 404 });
     if (group.kind === "idea") return NextResponse.json({ error: "Trade idea groups do not have filled orders or PnL." }, { status: 400 });
     const settled = await Promise.allSettled(
-      group.members.map(async (trade) => ({ tradeId: trade.id, result: await getJournalTradeFilledOrders(db, trade) })),
+      group.members.map(async (trade) => ({ tradeId: trade.id, result: await getJournalTradeFilledOrders(db, trade, cacheDb) })),
     );
     const positions = settled.map((item, index) =>
       item.status === "fulfilled"
