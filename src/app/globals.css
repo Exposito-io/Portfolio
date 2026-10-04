@@ -755,6 +755,195 @@ textarea {
   max-width: 100%;
 }
 
+.journal-metrics-content,
+.journal-metric-embed-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.journal-metric-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.journal-add-metric-menu {
+  position: relative;
+}
+
+.journal-add-metric-toggle {
+  min-height: 2.25rem;
+}
+
+.journal-add-metric-toggle[aria-expanded="true"] {
+  background: #e6efe9;
+  border-color: rgba(31, 122, 104, 0.3);
+  color: #1f6658;
+}
+
+.journal-add-metric-options {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.14);
+  min-width: 15rem;
+  padding: 0.35rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 20;
+}
+
+.journal-add-metric-options button {
+  align-items: center;
+  border-radius: 6px;
+  color: #26312d;
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.65rem 0.7rem;
+  text-align: left;
+  width: 100%;
+}
+
+.journal-add-metric-options button:hover,
+.journal-add-metric-options button:focus-visible {
+  background: #f1eee7;
+  outline: none;
+}
+
+.journal-add-metric-options button > span {
+  display: grid;
+}
+
+.journal-add-metric-options strong {
+  font-size: 0.84rem;
+}
+
+.journal-add-metric-options small {
+  color: #737a76;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.journal-metric-embed-manager {
+  background: #f8f6f1;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.journal-metric-embed-manager p {
+  color: #69706c;
+  font-size: 0.8rem;
+  margin-top: 0.2rem;
+}
+
+.journal-metric-embed-input {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.journal-metric-embed-draft-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.journal-metric-embed-draft-list li {
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 8px;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.journal-metric-embed-draft-list li > div {
+  display: grid;
+  min-width: 0;
+}
+
+.journal-metric-embed-draft-list strong {
+  color: #26312d;
+  font-size: 0.83rem;
+}
+
+.journal-metric-embed-draft-list span {
+  color: #737a76;
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journal-metric-embed-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.11);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(26, 31, 28, 0.05);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.journal-metric-embed-heading {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.75rem 0.9rem;
+}
+
+.journal-metric-embed-heading > div {
+  display: grid;
+}
+
+.journal-metric-embed-heading span {
+  color: #737a76;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.journal-metric-embed-heading strong {
+  color: #26312d;
+  font-size: 0.9rem;
+}
+
+.journal-metric-embed-heading a {
+  align-items: center;
+  color: #1f7a68;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.3rem;
+}
+
+.journal-metric-embed-card iframe {
+  border: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: block;
+  height: clamp(25rem, 58vw, 36rem);
+  width: 100%;
+}
+
+.journal-metric-dialog {
+  width: min(34rem, 100%);
+}
+
+.field-optional {
+  color: #868d89;
+  font-size: 0.65rem;
+  font-weight: 600;
+  margin-left: 0.35rem;
+  text-transform: none;
+}
+
 .journal-trade-description {
   max-height: 31.25rem;
   overflow-y: auto;

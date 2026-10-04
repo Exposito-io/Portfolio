@@ -12,8 +12,10 @@ import { getZonedJournalDateMs, isValidDateTimeKey } from "@/lib/date";
 import { createTrade, listTrades } from "@/lib/journal";
 import { deleteJournalDocumentsForGroup } from "@/lib/journal-documents";
 import { deleteJournalNewsReadReceipts } from "@/lib/journal-news-cache";
+import { journalMetricEmbedsSchema } from "@/lib/journal-metrics-schema";
 import type {
   JournalItem,
+  JournalMetricEmbed,
   JournalTrade,
   JournalTradeGroup,
   JournalTradeGroupEntry,
@@ -42,6 +44,7 @@ const groupInputSchema = z.object({
   title: z.string().trim().min(1).max(140),
   descriptionMarkdown: markdownSchema,
   metricsMarkdown: markdownSchema,
+  metricsEmbeds: journalMetricEmbedsSchema,
   primaryTradeId: objectIdStringSchema,
   memberTradeIds: z
     .array(objectIdStringSchema)
@@ -55,6 +58,7 @@ const groupUpdateSchema = z.object({
   title: z.string().trim().min(1).max(140).optional(),
   descriptionMarkdown: z.string().trim().max(12_000).optional(),
   metricsMarkdown: z.string().trim().max(12_000).optional(),
+  metricsEmbeds: journalMetricEmbedsSchema.optional(),
   primaryTradeId: objectIdStringSchema.optional(),
   memberTradeIds: z
     .array(objectIdStringSchema)
@@ -109,6 +113,7 @@ export type JournalTradeGroupDocument = {
   title: string;
   descriptionMarkdown: string;
   metricsMarkdown: string;
+  metricsEmbeds?: JournalMetricEmbed[];
   primaryTradeId: ObjectId;
   members: GroupMemberDocument[];
   entries: GroupEntryDocument[];
@@ -211,6 +216,7 @@ export async function createGroup(
     title: input.title,
     descriptionMarkdown: input.descriptionMarkdown,
     metricsMarkdown: input.metricsMarkdown,
+    metricsEmbeds: input.metricsEmbeds,
     primaryTradeId: new ObjectId(input.primaryTradeId),
     members: input.memberTradeIds.map((tradeId, order) => ({
       tradeId: new ObjectId(tradeId),
@@ -305,6 +311,7 @@ export async function updateGroup(db: Db, id: string, payload: unknown) {
   if (input.title !== undefined) update.title = input.title;
   if (input.descriptionMarkdown !== undefined) update.descriptionMarkdown = input.descriptionMarkdown;
   if (input.metricsMarkdown !== undefined) update.metricsMarkdown = input.metricsMarkdown;
+  if (input.metricsEmbeds !== undefined) update.metricsEmbeds = input.metricsEmbeds;
   if (input.primaryTradeId !== undefined) update.primaryTradeId = new ObjectId(primaryTradeId);
   if (input.memberTradeIds !== undefined) {
     update.members = memberTradeIds.map((tradeId, order) => ({
@@ -478,6 +485,7 @@ function serializeGroup(
     title: group.title,
     descriptionMarkdown: group.descriptionMarkdown,
     metricsMarkdown: group.metricsMarkdown,
+    metricsEmbeds: group.metricsEmbeds ?? [],
     primaryTradeId: group.primaryTradeId.toString(),
     members,
     entries: [...(group.entries ?? [])]

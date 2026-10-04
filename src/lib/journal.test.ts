@@ -133,6 +133,7 @@ describe("journal trades", () => {
     });
 
     expect(trade.metricsMarkdown).toBe("");
+    expect(trade.metricsEmbeds).toEqual([]);
 
     const updated = await updateTrade(db, trade.id, {
       metricsMarkdown: "- [Funding](https://example.com)\n- OI: 12k",
@@ -144,6 +145,37 @@ describe("journal trades", () => {
     expect((await getTrade(db, trade.id))?.metricsMarkdown).toBe(
       "- [Funding](https://example.com)\n- OI: 12k",
     );
+
+    const withEmbed = await updateTrade(db, trade.id, {
+      metricsEmbeds: [
+        {
+          id: "embed-1",
+          provider: "defillama",
+          name: "Ethereum TVL",
+          url: "https://defillama.com/chart/chain/Ethereum",
+        },
+      ],
+    });
+    expect(withEmbed?.metricsEmbeds).toEqual([
+      {
+        id: "embed-1",
+        provider: "defillama",
+        name: "Ethereum TVL",
+        url: "https://defillama.com/chart/chain/Ethereum",
+      },
+    ]);
+
+    await expect(
+      updateTrade(db, trade.id, {
+        metricsEmbeds: [
+          {
+            id: "embed-2",
+            provider: "defillama",
+            url: "https://example.com/not-defillama",
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(ZodError);
 
     const legacyId = new ObjectId();
     await db.collection("journalTrades").insertOne({
@@ -159,6 +191,7 @@ describe("journal trades", () => {
     });
 
     expect((await getTrade(db, legacyId.toString()))?.metricsMarkdown).toBe("");
+    expect((await getTrade(db, legacyId.toString()))?.metricsEmbeds).toEqual([]);
   });
 
   it("stores long and short direction for trades", async () => {

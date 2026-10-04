@@ -41,6 +41,7 @@ import { getDateTimeKey } from "@/lib/date";
 import type {
   HyperliquidCandle,
   JournalEntry,
+  JournalMetricEmbed,
   JournalTrade,
   JournalTradeAsset,
   JournalTradeGroup,
@@ -458,7 +459,10 @@ export function JournalDetail({
     [trade],
   );
 
-  async function saveMetrics(metricsMarkdown: string) {
+  async function saveMetrics(
+    metricsMarkdown: string,
+    metricsEmbeds: JournalMetricEmbed[],
+  ) {
     if (!trade) return;
     setSaving(true);
     setError("");
@@ -466,7 +470,7 @@ export function JournalDetail({
       const response = await fetch(`/api/journal/trades/${trade.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metricsMarkdown }),
+        body: JSON.stringify({ metricsMarkdown, metricsEmbeds }),
       });
       const result = await response.json();
       if (!response.ok) {

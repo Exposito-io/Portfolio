@@ -14,6 +14,7 @@ it("shows a newly listed market's price and available returns on its card", () =
       title: "OpenAI",
       descriptionMarkdown: "",
       metricsMarkdown: "",
+      metricsEmbeds: [],
       startDate: "2026-09-08T00:00:00.000Z",
       endDate: null,
       asset: { kind: "perp", label: "io:OAI perp", coin: "io:OAI", chartCoin: "io:OAI", dex: "io" },

@@ -121,6 +121,13 @@ export type JournalTradingViewChart = {
   symbol: string;
 };
 
+export type JournalMetricEmbed = {
+  id: string;
+  provider: "defillama";
+  name?: string;
+  url: string;
+};
+
 export type JournalTrade = {
   id: string;
   kind: JournalTradeKind;
@@ -128,6 +135,7 @@ export type JournalTrade = {
   title: string;
   descriptionMarkdown: string;
   metricsMarkdown: string;
+  metricsEmbeds: JournalMetricEmbed[];
   startDate: string;
   endDate: string | null;
   asset: JournalTradeAsset;
@@ -153,6 +161,7 @@ export type JournalTradeGroup = {
   title: string;
   descriptionMarkdown: string;
   metricsMarkdown: string;
+  metricsEmbeds: JournalMetricEmbed[];
   primaryTradeId: string;
   members: JournalTrade[];
   entries: JournalTradeGroupEntry[];

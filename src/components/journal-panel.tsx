@@ -580,6 +580,7 @@ function getItemDisplayTrade(item: JournalItem): JournalTrade {
     endDate: item.group.endDate,
     descriptionMarkdown: item.group.descriptionMarkdown,
     metricsMarkdown: item.group.metricsMarkdown,
+    metricsEmbeds: item.group.metricsEmbeds,
     updatedAt: item.group.updatedAt,
   };
 }

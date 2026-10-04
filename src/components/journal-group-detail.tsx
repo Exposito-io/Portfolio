@@ -148,6 +148,7 @@ export function JournalGroupDetail({
     title: group.title,
     descriptionMarkdown: group.descriptionMarkdown,
     metricsMarkdown: group.metricsMarkdown,
+    metricsEmbeds: group.metricsEmbeds,
     startDate: group.startDate,
     endDate: group.endDate,
     tradingViewCharts: group.tradingViewCharts,
@@ -371,12 +372,12 @@ export function JournalGroupDetail({
             onSaveCharts={async (tradingViewCharts) => {
               const updated = await patchGroup({ tradingViewCharts });
               const nextPrimary = updated.members.find((member) => member.id === updated.primaryTradeId) ?? updated.members[0];
-              return { ...nextPrimary, title: updated.title, descriptionMarkdown: updated.descriptionMarkdown, metricsMarkdown: updated.metricsMarkdown, startDate: updated.startDate, endDate: updated.endDate, tradingViewCharts: updated.tradingViewCharts };
+              return { ...nextPrimary, title: updated.title, descriptionMarkdown: updated.descriptionMarkdown, metricsMarkdown: updated.metricsMarkdown, metricsEmbeds: updated.metricsEmbeds, startDate: updated.startDate, endDate: updated.endDate, tradingViewCharts: updated.tradingViewCharts };
             }}
           />
         }
         journal={<GroupTimeline group={group} orderLoading={orders.loading} onDelete={deleteEntry} onNew={openEntry} />}
-        metrics={<JournalDetailMetrics trade={displayTrade} saving={saving} onSave={(metricsMarkdown) => patchGroup({ metricsMarkdown }).then(() => undefined)} />}
+        metrics={<JournalDetailMetrics trade={displayTrade} saving={saving} onSave={(metricsMarkdown, metricsEmbeds) => patchGroup({ metricsMarkdown, metricsEmbeds }).then(() => undefined)} />}
         documents={
           <JournalDocuments
             tradeId={group.id}

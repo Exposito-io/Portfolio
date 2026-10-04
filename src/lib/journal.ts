@@ -4,8 +4,10 @@ import { z } from "zod";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
 import { getZonedJournalDateMs, isValidDateTimeKey } from "@/lib/date";
 import { deleteJournalDocumentsForTrade } from "@/lib/journal-documents";
+import { journalMetricEmbedsSchema } from "@/lib/journal-metrics-schema";
 import type {
   JournalEntry,
+  JournalMetricEmbed,
   JournalTrade,
   JournalTradeAsset,
   JournalTradingViewChart,
@@ -39,6 +41,7 @@ const tradeBaseSchema = z.object({
   title: z.string().trim().min(1).max(140),
   descriptionMarkdown: markdownSchema,
   metricsMarkdown: markdownSchema,
+  metricsEmbeds: journalMetricEmbedsSchema,
   startDate: z.string().trim().refine(isValidDateTimeKey, {
     message: "Start date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
   }),
@@ -65,6 +68,7 @@ const tradeUpdateSchema = z.object({
   title: z.string().trim().min(1).max(140).optional(),
   descriptionMarkdown: z.string().trim().max(12_000).optional(),
   metricsMarkdown: z.string().trim().max(12_000).optional(),
+  metricsEmbeds: journalMetricEmbedsSchema.optional(),
   startDate: z.string().trim().refine(isValidDateTimeKey, {
     message: "Start date must use YYYY-MM-DD or YYYY-MM-DDTHH:mm format.",
   }).optional(),
@@ -106,6 +110,7 @@ type JournalTradeDocument = Omit<
   JournalTrade,
   | "id"
   | "metricsMarkdown"
+  | "metricsEmbeds"
   | "startDate"
   | "endDate"
   | "entries"
@@ -114,6 +119,7 @@ type JournalTradeDocument = Omit<
 > & {
   _id: ObjectId;
   metricsMarkdown?: string;
+  metricsEmbeds?: JournalMetricEmbed[];
   startDate: Date | string;
   endDate: Date | string | null;
   entries: JournalEntryDocument[];
@@ -140,6 +146,7 @@ export function serializeTrade(trade: JournalTradeDocument): JournalTrade {
     title: trade.title,
     descriptionMarkdown: trade.descriptionMarkdown,
     metricsMarkdown: trade.metricsMarkdown ?? "",
+    metricsEmbeds: trade.metricsEmbeds ?? [],
     startDate: serializeDate(trade.startDate),
     endDate: trade.endDate ? serializeDate(trade.endDate) : null,
     asset: trade.asset,
@@ -190,6 +197,7 @@ export async function createTrade(db: Db, payload: unknown, session?: ClientSess
     title: input.title,
     descriptionMarkdown: input.descriptionMarkdown,
     metricsMarkdown: input.metricsMarkdown,
+    metricsEmbeds: input.metricsEmbeds,
     startDate: parseInputDate(input.startDate, "start"),
     endDate: input.endDate ? parseInputDate(input.endDate, "end") : null,
     asset: normalizeAsset(input.asset),
@@ -250,6 +258,9 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
   }
   if (input.metricsMarkdown !== undefined) {
     update.metricsMarkdown = input.metricsMarkdown;
+  }
+  if (input.metricsEmbeds !== undefined) {
+    update.metricsEmbeds = input.metricsEmbeds;
   }
   if (input.startDate !== undefined) update.startDate = nextStartDate;
   if ("endDate" in input) update.endDate = nextEndDate;
