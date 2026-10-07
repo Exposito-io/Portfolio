@@ -11,6 +11,7 @@ import {
   RotateCcw,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   WalletCards,
   X,
 } from "lucide-react";
@@ -60,6 +61,7 @@ export function HyperliquidSimulator() {
   const [loadingSnapshot, setLoadingSnapshot] = useState(false);
   const [error, setError] = useState("");
   const [showReview, setShowReview] = useState(false);
+  const [showClearAll, setShowClearAll] = useState(false);
   const [orderForm, setOrderForm] = useState<OrderForm | null>(null);
   const [marginPositionId, setMarginPositionId] = useState<string | null>(null);
   const [liquidationPositionId, setLiquidationPositionId] = useState<
@@ -137,7 +139,8 @@ export function HyperliquidSimulator() {
       result &&
       (Math.abs(draft.collateralAdjustment) > 0 ||
         result.trades.length > 0 ||
-        marginChanges.length > 0),
+        marginChanges.length > 0 ||
+        draft.positions.length < (snapshot?.positions.length ?? 0)),
   );
 
   function selectAccount(accountId: string) {
@@ -159,6 +162,15 @@ export function HyperliquidSimulator() {
   function resetScenario() {
     if (!snapshot) return;
     setDraft(createHyperliquidSimulationDraft(snapshot));
+  }
+
+  function clearAllPositions() {
+    setDraft((current) =>
+      current ? { ...current, positions: [] } : current,
+    );
+    setMarginPositionId(null);
+    setLiquidationPositionId(null);
+    setShowClearAll(false);
   }
 
   function updatePosition(
@@ -325,14 +337,24 @@ export function HyperliquidSimulator() {
                 <h2>Positions</h2>
                 <p>Live positions from Hyperliquid with simulated edits</p>
               </div>
-              <button
-                className="button-primary"
-                disabled={!availableMarkets.length}
-                onClick={openOrderDialog}
-                type="button"
-              >
-                <Plus size={16} /> Simulate order
-              </button>
+              <div className="simulator-panel-actions">
+                <button
+                  className="button-secondary simulator-clear-button"
+                  disabled={!draft.positions.length}
+                  onClick={() => setShowClearAll(true)}
+                  type="button"
+                >
+                  <Trash2 size={16} /> Clear all
+                </button>
+                <button
+                  className="button-primary"
+                  disabled={!availableMarkets.length}
+                  onClick={openOrderDialog}
+                  type="button"
+                >
+                  <Plus size={16} /> Simulate order
+                </button>
+              </div>
             </div>
             <div className="simulator-table-scroll">
               <table className="simulator-table">
@@ -509,7 +531,11 @@ export function HyperliquidSimulator() {
                     );
                   })}
                   {!result.positions.length ? (
-                    <tr><td className="simulator-empty-row" colSpan={10}>No open or simulated positions.</td></tr>
+                    <tr>
+                      <td className="simulator-empty-row" colSpan={10}>
+                        <span>No open or simulated positions.</span>
+                      </td>
+                    </tr>
                   ) : null}
                 </tbody>
               </table>
@@ -519,6 +545,7 @@ export function HyperliquidSimulator() {
           <ScenarioPanel
             draft={draft}
             marginChanges={marginChanges}
+            canReset={isDirty}
             onCollateralChange={(collateralAdjustment) =>
               setDraft((current) =>
                 current ? { ...current, collateralAdjustment } : current,
@@ -656,6 +683,33 @@ export function HyperliquidSimulator() {
               <button className="button-primary" disabled={orderPreview.errors.length > 0} type="submit"><Plus size={16} /> Apply to scenario</button>
             </div>
           </form>
+        </Modal>
+      ) : null}
+
+      {showClearAll ? (
+        <Modal onClose={() => setShowClearAll(false)} title="Clear all positions?">
+          <div className="simulator-modal-form">
+            <p>
+              This removes every position and simulated transaction from the
+              current scenario. Your Hyperliquid account will not be changed.
+            </p>
+            <div className="simulator-modal-actions">
+              <button
+                className="button-secondary"
+                onClick={() => setShowClearAll(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="button-primary simulator-confirm-clear"
+                onClick={clearAllPositions}
+                type="button"
+              >
+                <Trash2 size={16} /> Clear all
+              </button>
+            </div>
+          </div>
         </Modal>
       ) : null}
 
@@ -1113,7 +1167,7 @@ function LiquidationStatusNotice({
   );
 }
 
-function ScenarioPanel({ draft, result, marginChanges, onCollateralChange, onReset, onReview }: { draft: HyperliquidSimulationDraft; result: HyperliquidSimulationResult; marginChanges: string[]; onCollateralChange: (value: number) => void; onReset: () => void; onReview: () => void }) {
+function ScenarioPanel({ draft, result, marginChanges, canReset, onCollateralChange, onReset, onReview }: { draft: HyperliquidSimulationDraft; result: HyperliquidSimulationResult; marginChanges: string[]; canReset: boolean; onCollateralChange: (value: number) => void; onReset: () => void; onReview: () => void }) {
   const pending = [
     ...result.trades.map((trade) =>
       trade.orderId
@@ -1127,7 +1181,7 @@ function ScenarioPanel({ draft, result, marginChanges, onCollateralChange, onRes
       <div className="simulator-scenario-control">
         <h2>Scenario</h2><p>Adjust collateral and position sizes to see the impact on liquidation prices.</p>
         <label className="mt-5 block"><span className="field-label">USDC collateral adjustment</span><div className="simulator-collateral-input"><input className="input" onChange={(event) => onCollateralChange(Number(event.target.value))} step="any" type="number" value={draft.collateralAdjustment} /><span>USDC</span></div><small>Positive adds collateral. Negative removes collateral.</small></label>
-        <button className="button-secondary mt-6" disabled={!pending.length && draft.collateralAdjustment === 0} onClick={onReset} type="button"><RotateCcw size={16} /> Reset scenario</button>
+        <button className="button-secondary mt-6" disabled={!canReset} onClick={onReset} type="button"><RotateCcw size={16} /> Reset scenario</button>
       </div>
       <div className="simulator-pending"><h3>Pending changes ({pending.length + (draft.collateralAdjustment ? 1 : 0)})</h3>{draft.collateralAdjustment ? <div className="simulator-change"><span>Adjust USDC collateral by {formatSignedCurrency(draft.collateralAdjustment)}</span></div> : null}{pending.map((description) => <div className="simulator-change" key={description}><span>{description}</span></div>)}{!pending.length && !draft.collateralAdjustment ? <p className="simulator-no-changes">Edit a position or collateral amount to build a scenario.</p> : null}</div>
       <div className="simulator-legend"><h3>Value display</h3><p><span className="legend-dot current" />Current value<small>Live value from Hyperliquid</small></p><p><span className="legend-dot simulated" />Simulated value<small>Hypothetical value based on your changes</small></p><p><span className="legend-square changed" />Row has simulated changes</p><p><span className="legend-square risk" />Liquidation risk under 10%</p><button className="button-primary mt-auto" onClick={onReview} type="button"><BarChart3 size={16} /> Review impact <ArrowRight size={16} /></button></div>

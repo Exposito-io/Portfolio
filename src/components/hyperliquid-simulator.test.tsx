@@ -179,6 +179,67 @@ describe("HyperliquidSimulator", () => {
     expect(screen.getByText("Increase BTC long by 2")).toBeInTheDocument();
   });
 
+  it("clears every simulated transaction and position after confirmation", async () => {
+    const user = userEvent.setup();
+    render(<HyperliquidSimulator />);
+    await screen.findByRole("spinbutton", { name: "BTC target size" });
+
+    await user.click(screen.getByRole("button", { name: "Simulate order" }));
+    const orderDialog = screen.getByRole("dialog", {
+      name: "Simulate buy or sell order",
+    });
+    await user.selectOptions(
+      within(orderDialog).getByRole("combobox", { name: "Market" }),
+      "default:ETH",
+    );
+    const orderValue = within(orderDialog).getByRole("spinbutton", {
+      name: "Order value",
+    });
+    await user.clear(orderValue);
+    await user.type(orderValue, "100");
+    await user.click(
+      within(orderDialog).getByRole("button", { name: "Apply to scenario" }),
+    );
+
+    expect(
+      screen.getByRole("spinbutton", { name: "BTC target size" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("spinbutton", { name: "ETH target size" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Buy \$100 of ETH/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    const clearDialog = screen.getByRole("dialog", {
+      name: "Clear all positions?",
+    });
+    expect(clearDialog).toHaveTextContent(
+      "Your Hyperliquid account will not be changed",
+    );
+    await user.click(
+      within(clearDialog).getByRole("button", { name: "Clear all" }),
+    );
+
+    expect(
+      screen.getByText("No open or simulated positions."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("spinbutton", { name: "BTC target size" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("spinbutton", { name: "ETH target size" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Buy \$100 of ETH/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear all" })).toBeDisabled();
+    const reset = screen.getByRole("button", { name: "Reset scenario" });
+    expect(reset).toBeEnabled();
+    await user.click(reset);
+    expect(
+      screen.getByRole("spinbutton", { name: "BTC target size" }),
+    ).toBeInTheDocument();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
   it("explains each position liquidation price with formulas and live values", async () => {
     const user = userEvent.setup();
     render(<HyperliquidSimulator />);

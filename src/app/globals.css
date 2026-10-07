@@ -3439,6 +3439,26 @@ textarea {
   font-weight: 750;
 }
 
+.simulator-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.simulator-clear-button {
+  color: #9b3d30;
+}
+
+.simulator-confirm-clear {
+  background: #9b3d30;
+  border-color: #9b3d30;
+}
+
+.simulator-confirm-clear:hover {
+  background: #813226;
+  border-color: #813226;
+}
+
 .simulator-table-scroll {
   overflow-x: auto;
 }
@@ -3613,7 +3633,14 @@ textarea {
 .simulator-empty-row {
   color: #69706c;
   padding: 2.5rem !important;
+}
+
+.simulator-empty-row > span {
+  display: block;
+  left: 1.15rem;
+  position: sticky;
   text-align: center;
+  width: min(80rem, calc(100vw - 5rem));
 }
 
 .simulator-scenario {
