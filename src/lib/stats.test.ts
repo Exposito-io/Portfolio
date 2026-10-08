@@ -80,7 +80,17 @@ describe("stats realized P/L", () => {
 
 describe("stats history", () => {
   it("loads all markets from enabled, distinct Hyperliquid wallets only", async () => {
-    const fetchOrders = vi.fn().mockResolvedValue([order]);
+    const source = {
+      syncAccount: vi.fn().mockResolvedValue(undefined),
+      getStats: vi.fn().mockResolvedValue({
+        orders: [order],
+        orderCount: 1,
+        points: [{ time: 1, pnlUsd: 10 }],
+        totalPnlUsd: 10,
+        cumulativePnlByOrderId: { a: 10 },
+        historyStartTime: 1,
+      }),
+    };
     const result = await loadStats(
       [
         account,
@@ -89,15 +99,24 @@ describe("stats history", () => {
         { ...account, id: "aave", address: "0x123", source: "aave" },
       ],
       100,
-      fetchOrders,
+      source,
     );
-    expect(fetchOrders).toHaveBeenCalledExactlyOnceWith({
-      account,
-      startTime: 0,
-      endTime: 100,
+    expect(source.syncAccount).toHaveBeenCalledExactlyOnceWith(account, 100);
+    expect(source.getStats).toHaveBeenCalledWith({
+      accounts: [account],
+      page: 0,
+      pageSize: 50,
+      includeOrders: true,
     });
     expect(result).toEqual({
       orders: [order],
+      orderCount: 1,
+      page: 0,
+      pageSize: 50,
+      points: [{ time: 1, pnlUsd: 10 }],
+      totalPnlUsd: 10,
+      cumulativePnlByOrderId: { a: 10 },
+      historyStartTime: 1,
       accountsCount: 1,
       endTime: 100,
       sourceErrors: [],
@@ -105,17 +124,27 @@ describe("stats history", () => {
   });
 
   it("retains successful wallets and reports failures without inventing results", async () => {
-    const fetchOrders = vi
-      .fn()
-      .mockResolvedValueOnce([order])
-      .mockRejectedValueOnce(new Error("Rate limited"));
+    const source = {
+      syncAccount: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("Rate limited")),
+      getStats: vi.fn().mockResolvedValue({
+        orders: [order],
+        orderCount: 1,
+        points: [{ time: 1, pnlUsd: 10 }],
+        totalPnlUsd: 10,
+        cumulativePnlByOrderId: { a: 10 },
+        historyStartTime: 1,
+      }),
+    };
     const result = await loadStats(
       [
         account,
         { ...account, id: "second", address: "0xDEF", label: "Second" },
       ],
       100,
-      fetchOrders,
+      source,
     );
     expect(result.orders).toEqual([order]);
     expect(result.accountsCount).toBe(2);
@@ -130,12 +159,23 @@ describe("stats history", () => {
   });
 
   it("does not contact Hyperliquid with no enabled wallets", async () => {
-    const fetchOrders = vi.fn();
-    expect(await loadStats([], 100, fetchOrders)).toMatchObject({
+    const source = {
+      syncAccount: vi.fn(),
+      getStats: vi.fn().mockResolvedValue({
+        orders: [],
+        orderCount: 0,
+        points: [],
+        totalPnlUsd: null,
+        cumulativePnlByOrderId: {},
+        historyStartTime: null,
+      }),
+    };
+    expect(await loadStats([], 100, source)).toMatchObject({
       orders: [],
+      orderCount: 0,
       accountsCount: 0,
       sourceErrors: [],
     });
-    expect(fetchOrders).not.toHaveBeenCalled();
+    expect(source.syncAccount).not.toHaveBeenCalled();
   });
 });

@@ -78,6 +78,10 @@ export class HyperliquidFillCache {
     return aggregateFillsToOrders(fills);
   }
 
+  async syncAccount(account: PortfolioAccount, endTime: number) {
+    await this.ensureSynced(account, account.address.toLowerCase(), endTime);
+  }
+
   private async ensureSynced(
     account: PortfolioAccount,
     wallet: string,

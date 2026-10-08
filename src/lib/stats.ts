@@ -3,10 +3,19 @@ import type { HyperliquidFilledOrder, SourceError } from "@/lib/types";
 
 export type StatsResponse = {
   orders: HyperliquidFilledOrder[];
+  orderCount: number;
+  page: number;
+  pageSize: number;
+  points: StatsPnlPoint[];
+  totalPnlUsd: number | null;
+  cumulativePnlByOrderId: Record<string, number>;
+  historyStartTime: number | null;
   accountsCount: number;
   sourceErrors: SourceError[];
   endTime: number;
 };
+
+export type StatsPnlPoint = { time: number; pnlUsd: number };
 
 export function buildStatsPnl(orders: HyperliquidFilledOrder[]) {
   // Match the journal: sum reported closed PnL, booking each order at its last fill.

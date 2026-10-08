@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { AllocationChart } from "@/components/allocation-chart";
-import { buildStatsPnl, type StatsResponse } from "@/lib/stats";
+import type { StatsResponse } from "@/lib/stats";
 import type { PortfolioResponse } from "@/lib/types";
 
 const StatsPnlChart = dynamic(
@@ -90,7 +90,7 @@ export function PortfolioDashboard() {
       setStatsLoading(true);
       setStatsError("");
       try {
-        const response = await fetch("/api/stats", {
+        const response = await fetch("/api/stats?summary=1", {
           signal: controller.signal,
         });
         const payload = await response.json();
@@ -150,10 +150,8 @@ export function PortfolioDashboard() {
       : snapshot
         ? ` Snapshot captured ${formatDateTime(snapshot.capturedAt)}. Use Refresh to retry live account data.`
         : null;
-  const { points: statsPoints, totalPnlUsd: statsTotalPnlUsd } = useMemo(
-    () => buildStatsPnl(statsData?.orders ?? []),
-    [statsData?.orders],
-  );
+  const statsPoints = statsData?.points ?? [];
+  const statsTotalPnlUsd = statsData?.totalPnlUsd ?? null;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">

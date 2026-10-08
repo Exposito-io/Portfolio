@@ -50,27 +50,14 @@ const statsPayload = {
   accountsCount: 1,
   sourceErrors: [],
   endTime: 1,
-  orders: [
-    {
-      id: "order-1",
-      accountId: "account-1",
-      accountLabel: "Wallet",
-      coin: "BTC",
-      side: "Sell",
-      direction: "Close Long",
-      averagePrice: 100,
-      totalSize: 1,
-      notionalUsd: 100,
-      fee: 0,
-      feeToken: "USDC",
-      closedPnl: 5,
-      realizedPnlBasisUsd: 95,
-      firstTime: 1,
-      lastTime: 1,
-      orderId: 1,
-      fillCount: 1,
-    },
-  ],
+  orders: [],
+  orderCount: 1,
+  page: 0,
+  pageSize: 50,
+  points: [{ time: 1, pnlUsd: 5 }],
+  totalPnlUsd: 5,
+  cumulativePnlByOrderId: {},
+  historyStartTime: 1,
 };
 
 describe("PortfolioDashboard", () => {
@@ -80,7 +67,7 @@ describe("PortfolioDashboard", () => {
       return Promise.resolve(
         new Response(
           JSON.stringify(
-            url === "/api/stats" ? statsPayload : portfolioPayload,
+            url === "/api/stats?summary=1" ? statsPayload : portfolioPayload,
           ),
           { status: 200 },
         ),
@@ -97,18 +84,20 @@ describe("PortfolioDashboard", () => {
       screen.getByRole("heading", { name: "Cumulative realized P/L" }),
     ).toBeVisible();
     expect(fetcher).toHaveBeenCalledWith(
-      "/api/stats",
+      "/api/stats?summary=1",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
 
     expect(screen.getAllByText("$5")).toHaveLength(2);
 
     const statsRequestsBeforeRefresh = fetcher.mock.calls.filter(
-      ([input]) => String(input) === "/api/stats",
+      ([input]) => String(input) === "/api/stats?summary=1",
     ).length;
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(
-      fetcher.mock.calls.filter(([input]) => String(input) === "/api/stats"),
+      fetcher.mock.calls.filter(
+        ([input]) => String(input) === "/api/stats?summary=1",
+      ),
     ).toHaveLength(statsRequestsBeforeRefresh + 1);
   });
 });

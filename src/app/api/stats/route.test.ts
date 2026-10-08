@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/accounts", () => ({ listAccounts: vi.fn() }));
 vi.mock("@/lib/authorization", () => ({ getApiAuthorizationError: vi.fn() }));
 vi.mock("@/lib/mongodb", () => ({ getCacheDb: vi.fn(), getDb: vi.fn() }));
+vi.mock("@/lib/hyperliquid-fill-cache", () => ({
+  getHyperliquidFillCache: vi.fn(() => ({ syncAccount: vi.fn() })),
+}));
+vi.mock("@/lib/hyperliquid-stats-cache", () => ({
+  getHyperliquidStatsCache: vi.fn(() => ({ getStats: vi.fn() })),
+}));
 vi.mock("@/lib/stats-service", () => ({ loadStats: vi.fn() }));
 
 import { GET } from "@/app/api/stats/route";
@@ -29,6 +35,13 @@ describe("GET /api/stats", () => {
     vi.mocked(listAccounts).mockResolvedValue([]);
     const payload = {
       orders: [],
+      orderCount: 0,
+      page: 0,
+      pageSize: 50,
+      points: [],
+      totalPnlUsd: null,
+      cumulativePnlByOrderId: {},
+      historyStartTime: null,
       accountsCount: 0,
       sourceErrors: [],
       endTime: 100,
@@ -40,7 +53,39 @@ describe("GET /api/stats", () => {
     expect(loadStats).toHaveBeenCalledWith(
       [],
       expect.any(Number),
-      expect.any(Function),
+      expect.objectContaining({
+        syncAccount: expect.any(Function),
+        getStats: expect.any(Function),
+      }),
+      { page: 0, pageSize: 50, includeOrders: true },
+    );
+  });
+
+  it("requests summary-only data and validates page numbers", async () => {
+    vi.mocked(getApiAuthorizationError).mockResolvedValue(null);
+    vi.mocked(listAccounts).mockResolvedValue([]);
+    vi.mocked(loadStats).mockResolvedValue({
+      orders: [],
+      orderCount: 0,
+      page: 0,
+      pageSize: 50,
+      points: [],
+      totalPnlUsd: null,
+      cumulativePnlByOrderId: {},
+      historyStartTime: null,
+      accountsCount: 0,
+      sourceErrors: [],
+      endTime: 100,
+    });
+    expect(
+      (await GET(new Request("http://localhost/api/stats?page=-1"))).status,
+    ).toBe(400);
+    await GET(new Request("http://localhost/api/stats?summary=1"));
+    expect(loadStats).toHaveBeenLastCalledWith(
+      [],
+      expect.any(Number),
+      expect.any(Object),
+      { page: 0, pageSize: 50, includeOrders: false },
     );
   });
 

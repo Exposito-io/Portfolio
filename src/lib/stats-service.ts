@@ -1,15 +1,33 @@
-import type { FillHistoryQuery } from "@/lib/hyperliquid-fill-cache";
+import type {
+  StatsHistoryQuery,
+  StatsHistoryResult,
+} from "@/lib/hyperliquid-stats-cache";
 import type { StatsResponse } from "@/lib/stats";
 import type {
-  HyperliquidFilledOrder,
   PortfolioAccount,
   SourceError,
 } from "@/lib/types";
 
+export type StatsHistorySource = {
+  syncAccount(account: PortfolioAccount, endTime: number): Promise<void>;
+  getStats(query: StatsHistoryQuery): Promise<StatsHistoryResult>;
+};
+
+export type LoadStatsOptions = {
+  page?: number;
+  pageSize?: number;
+  includeOrders?: boolean;
+};
+
 export async function loadStats(
   accounts: PortfolioAccount[],
   endTime: number,
-  fetchOrders: (query: FillHistoryQuery) => Promise<HyperliquidFilledOrder[]>,
+  source: StatsHistorySource,
+  {
+    page = 0,
+    pageSize = 50,
+    includeOrders = true,
+  }: LoadStatsOptions = {},
 ): Promise<StatsResponse> {
   // Settings permits repeated addresses. Count each wallet only once.
   const wallets = new Map<string, PortfolioAccount>();
@@ -19,30 +37,38 @@ export async function loadStats(
       if (!wallets.has(address)) wallets.set(address, account);
     }
   }
-  const orders: HyperliquidFilledOrder[] = [];
   const sourceErrors: SourceError[] = [];
-  await Promise.all(
-    [...wallets.values()].map(async (account) => {
-      try {
-        orders.push(...(await fetchOrders({ account, startTime: 0, endTime })));
-      } catch (error) {
-        sourceErrors.push({
-          source: account.source,
-          accountId: account.id,
-          accountLabel: account.label,
-          message:
-            error instanceof Error ? error.message : "Unable to load orders.",
-        });
-      }
-    }),
-  );
+  const successfulAccounts = (
+    await Promise.all(
+      [...wallets.values()].map(async (account) => {
+        try {
+          await source.syncAccount(account, endTime);
+          return account;
+        } catch (error) {
+          sourceErrors.push({
+            source: account.source,
+            accountId: account.id,
+            accountLabel: account.label,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Unable to load orders.",
+          });
+          return null;
+        }
+      }),
+    )
+  ).filter((account): account is PortfolioAccount => account !== null);
+  const history = await source.getStats({
+    accounts: successfulAccounts,
+    page,
+    pageSize,
+    includeOrders,
+  });
   return {
-    orders: orders.sort(
-      (a, b) =>
-        b.lastTime - a.lastTime ||
-        b.firstTime - a.firstTime ||
-        b.id.localeCompare(a.id),
-    ),
+    ...history,
+    page,
+    pageSize,
     accountsCount: wallets.size,
     sourceErrors,
     endTime,

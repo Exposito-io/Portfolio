@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { FilledOrdersTable } from "@/components/filled-orders-table";
 import { PORTFOLIO_TIMEZONE } from "@/lib/config";
-import { buildStatsPnl, type StatsResponse } from "@/lib/stats";
+import type { StatsResponse } from "@/lib/stats";
 
 const StatsPnlChart = dynamic(
   () =>
@@ -43,7 +43,7 @@ export function StatsPanel() {
       setLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/stats", {
+        const response = await fetch(`/api/stats?page=${page}`, {
           signal: controller.signal,
         });
         const payload = await response.json();
@@ -51,7 +51,6 @@ export function StatsPanel() {
           throw new Error(payload.error || "Unable to load stats.");
         if (!controller.signal.aborted) {
           setData(payload);
-          setPage(0);
         }
       } catch (loadError) {
         if (!controller.signal.aborted)
@@ -66,13 +65,15 @@ export function StatsPanel() {
     }
     void load();
     return () => controller.abort();
-  }, [refreshNonce]);
+  }, [page, refreshNonce]);
 
-  const { points, totalPnlUsd, cumulativePnlByOrderId } = useMemo(
-    () => buildStatsPnl(data?.orders ?? []),
-    [data?.orders],
+  const cumulativePnlByOrderId = useMemo(
+    () => new Map(Object.entries(data?.cumulativePnlByOrderId ?? {})),
+    [data?.cumulativePnlByOrderId],
   );
-  const orderCount = data?.orders.length ?? 0;
+  const points = data?.points ?? [];
+  const totalPnlUsd = data?.totalPnlUsd ?? null;
+  const orderCount = data?.orderCount ?? 0;
   const allFailed = Boolean(
     data?.accountsCount && data.sourceErrors.length === data.accountsCount,
   );
@@ -89,7 +90,10 @@ export function StatsPanel() {
         <button
           className="button-secondary disabled:opacity-60"
           disabled={loading}
-          onClick={() => setRefreshNonce((value) => value + 1)}
+          onClick={() => {
+            setPage(0);
+            setRefreshNonce((value) => value + 1);
+          }}
           type="button"
         >
           <RefreshCw
@@ -158,6 +162,9 @@ export function StatsPanel() {
         <p className="mt-3 text-xs text-[#69706c]">
           Orders are booked at their last fill, matching the journal.
           Unavailable P/L is excluded. Chart times use {PORTFOLIO_TIMEZONE}.
+          {data?.historyStartTime
+            ? ` Cached transaction history begins ${formatHistoryStart(data.historyStartTime)}.`
+            : ""}
         </p>
       </section>
 
@@ -197,10 +204,7 @@ export function StatsPanel() {
         {orderCount > 0 ? (
           <>
             <FilledOrdersTable
-              orders={data!.orders.slice(
-                page * PAGE_SIZE,
-                (page + 1) * PAGE_SIZE,
-              )}
+              orders={data!.orders}
               cumulativePnlByOrderId={cumulativePnlByOrderId}
               showAccountAndAsset
             />
@@ -214,7 +218,7 @@ export function StatsPanel() {
                   <button
                     type="button"
                     className="button-secondary disabled:opacity-40"
-                    disabled={page === 0}
+                    disabled={loading || page === 0}
                     onClick={() => setPage((value) => value - 1)}
                   >
                     Previous
@@ -222,7 +226,9 @@ export function StatsPanel() {
                   <button
                     type="button"
                     className="button-secondary disabled:opacity-40"
-                    disabled={(page + 1) * PAGE_SIZE >= orderCount}
+                    disabled={
+                      loading || (page + 1) * PAGE_SIZE >= orderCount
+                    }
                     onClick={() => setPage((value) => value + 1)}
                   >
                     Next
@@ -241,4 +247,11 @@ export function StatsPanel() {
       </section>
     </main>
   );
+}
+
+function formatHistoryStart(time: number) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: PORTFOLIO_TIMEZONE,
+  }).format(new Date(time));
 }

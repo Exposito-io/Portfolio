@@ -39,7 +39,29 @@ const orders: HyperliquidFilledOrder[] = Array.from(
     fillCount: 1,
   }),
 );
-const payload = { orders, accountsCount: 1, sourceErrors: [], endTime: 100 };
+function payload(page: number) {
+  const pageOrders = page === 0 ? orders.slice(0, 50) : orders.slice(50);
+  return {
+    orders: pageOrders,
+    orderCount: orders.length,
+    page,
+    pageSize: 50,
+    points: orders
+      .toReversed()
+      .map((order, index) => ({ time: order.lastTime, pnlUsd: (index + 1) * 1.25 })),
+    totalPnlUsd: 63.75,
+    cumulativePnlByOrderId: Object.fromEntries(
+      pageOrders.map((order, index) => [
+        order.id,
+        page === 0 ? 63.75 - index * 1.25 : 1.25,
+      ]),
+    ),
+    historyStartTime: 50,
+    accountsCount: 1,
+    sourceErrors: [],
+    endTime: 100,
+  };
+}
 
 function respond(body: unknown, ok = true) {
   return { ok, json: async () => body };
@@ -48,7 +70,11 @@ function respond(body: unknown, ok = true) {
 describe("StatsPanel", () => {
   it("paginates the table while keeping the full-history cumulative total and refreshes back to page one", async () => {
     const user = userEvent.setup();
-    const fetcher = vi.fn().mockResolvedValue(respond(payload));
+    const fetcher = vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(
+        respond(String(input).endsWith("page=1") ? payload(1) : payload(0)),
+      ),
+    );
     vi.stubGlobal("fetch", fetcher);
     render(<StatsPanel />);
     await screen.findByText("Orders 1–50 of 51");
@@ -60,7 +86,7 @@ describe("StatsPanel", () => {
     ).toBeVisible();
     expect(screen.getAllByText("$0.0037295")).toHaveLength(50);
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Orders 51–51 of 51")).toBeVisible();
+    expect(await screen.findByText("Orders 51–51 of 51")).toBeVisible();
     expect(screen.getByText("ASSET50")).toBeVisible();
     expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(
       2,
@@ -69,7 +95,7 @@ describe("StatsPanel", () => {
     expect(screen.getByText("$63.75")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByText("Orders 1–50 of 51");
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
 
   it("shows a recoverable request error and retries", async () => {
@@ -81,7 +107,7 @@ describe("StatsPanel", () => {
         .mockResolvedValueOnce(
           respond({ error: "Temporarily unavailable" }, false),
         )
-        .mockResolvedValueOnce(respond(payload)),
+        .mockResolvedValueOnce(respond(payload(0))),
     );
     render(<StatsPanel />);
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -98,7 +124,7 @@ describe("StatsPanel", () => {
       vi
         .fn()
         .mockResolvedValue(
-          respond({ ...payload, orders: [], accountsCount: 0 }),
+          respond({ ...payload(0), orders: [], orderCount: 0, accountsCount: 0 }),
         ),
     );
     render(<StatsPanel />);
@@ -116,7 +142,7 @@ describe("StatsPanel", () => {
         .fn()
         .mockResolvedValue(
           respond({
-            ...payload,
+            ...payload(0),
             accountsCount: 2,
             sourceErrors: [
               {
@@ -142,8 +168,11 @@ describe("StatsPanel", () => {
         .fn()
         .mockResolvedValue(
           respond({
-            ...payload,
+            ...payload(0),
             orders: [],
+            orderCount: 0,
+            points: [],
+            totalPnlUsd: null,
             sourceErrors: [
               {
                 accountId: "wallet",
