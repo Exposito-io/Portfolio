@@ -124,6 +124,12 @@ export function JournalDetail({
       ),
     [filledOrdersState.data?.orders, filledOrdersState.data?.timezone],
   );
+  const lastTransactionDate = useMemo(() => {
+    const latestOrder = filledOrdersState.data?.orders[0];
+    return latestOrder
+      ? getDateTimeKey(new Date(latestOrder.lastTime), PORTFOLIO_TIMEZONE)
+      : null;
+  }, [filledOrdersState.data?.orders]);
   const existingTags = useMemo(
     () =>
       Array.from(
@@ -697,6 +703,7 @@ export function JournalDetail({
           editingEntry={editingEntry}
           error={error}
           form={entryForm}
+          lastTransactionDate={lastTransactionDate}
           saving={saving}
           tagSuggestions={existingTags}
           onChange={setEntryForm}

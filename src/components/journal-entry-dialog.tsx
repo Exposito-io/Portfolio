@@ -19,6 +19,7 @@ export function JournalEntryDialog({
   editingEntry,
   error,
   form,
+  lastTransactionDate,
   saving,
   tagSuggestions,
   onChange,
@@ -30,6 +31,7 @@ export function JournalEntryDialog({
   editingEntry: JournalEntry | null;
   error: string;
   form: JournalEntryFormState;
+  lastTransactionDate: string | null;
   saving: boolean;
   tagSuggestions: string[];
   onChange: (form: JournalEntryFormState) => void;
@@ -87,9 +89,23 @@ export function JournalEntryDialog({
           {error ? <div className="alert alert-error">{error}</div> : null}
           <form className="grid gap-4" onSubmit={onSubmit}>
             <div className="grid gap-2">
-              <label className="field-label" htmlFor="entry-date">
-                {closingTrade ? "Close date and time" : "Date and time"}
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="field-label" htmlFor="entry-date">
+                  {closingTrade ? "Close date and time" : "Date and time"}
+                </label>
+                {closingTrade && lastTransactionDate ? (
+                  <button
+                    className="text-xs font-bold text-[#1f7a68] underline decoration-[#1f7a68]/40 underline-offset-2 hover:decoration-[#1f7a68] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() =>
+                      onChange({ ...form, date: lastTransactionDate })
+                    }
+                    type="button"
+                  >
+                    Use last transaction date
+                  </button>
+                ) : null}
+              </div>
               <input
                 id="entry-date"
                 className="input"
