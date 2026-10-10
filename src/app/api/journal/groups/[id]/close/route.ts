@@ -3,7 +3,11 @@ import { z, ZodError } from "zod";
 
 import { getApiAuthorizationError } from "@/lib/authorization";
 import { closeTrade } from "@/lib/journal";
-import { createGroupEntry, getGroup } from "@/lib/journal-groups";
+import {
+  closeGroupNewsFeeds,
+  createGroupEntry,
+  getGroup,
+} from "@/lib/journal-groups";
 import { getDb, getMongoClient } from "@/lib/mongodb";
 
 const closeSchema = z.object({
@@ -30,6 +34,9 @@ export async function POST(request: Request, context: RouteContext) {
     const targets = group.members.filter(
       (member) => !member.endDate && (!requested || requested.has(member.id)),
     );
+    const closesGroup = targets.length === group.members.filter(
+      (member) => !member.endDate,
+    ).length;
     if (!targets.length) {
       return NextResponse.json({ error: "No open positions were selected." }, { status: 400 });
     }
@@ -50,6 +57,12 @@ export async function POST(request: Request, context: RouteContext) {
             tradeIds: targets.map((trade) => trade.id),
             descriptionMarkdown: input.descriptionMarkdown,
           }, session);
+        }
+        if (closesGroup) {
+          const feedsClosed = await closeGroupNewsFeeds(db, id, session);
+          if (!feedsClosed) {
+            throw new Error("Unable to close the journal group news feeds.");
+          }
         }
       });
     } finally {

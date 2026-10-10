@@ -280,6 +280,18 @@ describe("journal trades", () => {
       startDate: "2026-07-10",
       asset,
     });
+    const storedTrade = await db.collection("journalTrades").findOne({
+      _id: new ObjectId(trade.id),
+    });
+    if (!storedTrade) throw new Error("Expected stored trade.");
+    storedTrade.newsFeeds = [
+      {
+        _id: new ObjectId(),
+        keywords: "Solana",
+        normalizedKeywords: "solana",
+        createdAt: new Date(),
+      },
+    ];
 
     const closed = await closeTrade(db, trade.id, {
       date: "2026-07-12",
@@ -293,6 +305,7 @@ describe("journal trades", () => {
       tags: ["post-mortem"],
       descriptionMarkdown: "What worked and what did not.",
     });
+    expect(storedTrade.newsFeeds).toEqual([]);
 
     await expect(
       closeTrade(db, trade.id, {
@@ -303,6 +316,32 @@ describe("journal trades", () => {
     ).rejects.toBeInstanceOf(ZodError);
   });
 
+  it("closes news feeds when an end date is set through trade editing", async () => {
+    const db = fakeDb();
+    const trade = await createTrade(db, {
+      title: "ETH swing",
+      descriptionMarkdown: "",
+      startDate: "2026-07-10",
+      asset,
+    });
+    const storedTrade = await db.collection("journalTrades").findOne({
+      _id: new ObjectId(trade.id),
+    });
+    if (!storedTrade) throw new Error("Expected stored trade.");
+    storedTrade.newsFeeds = [
+      {
+        _id: new ObjectId(),
+        keywords: "Ethereum",
+        normalizedKeywords: "ethereum",
+        createdAt: new Date(),
+      },
+    ];
+
+    await updateTrade(db, trade.id, { endDate: "2026-07-12" });
+
+    expect(storedTrade.newsFeeds).toEqual([]);
+  });
+
   it("closes a trade without adding an entry when the note is blank", async () => {
     const db = fakeDb();
     const trade = await createTrade(db, {
@@ -311,6 +350,18 @@ describe("journal trades", () => {
       startDate: "2026-07-10",
       asset,
     });
+    const storedTrade = await db.collection("journalTrades").findOne({
+      _id: new ObjectId(trade.id),
+    });
+    if (!storedTrade) throw new Error("Expected stored trade.");
+    storedTrade.newsFeeds = [
+      {
+        _id: new ObjectId(),
+        keywords: "Solana",
+        normalizedKeywords: "solana",
+        createdAt: new Date(),
+      },
+    ];
 
     const closed = await closeTrade(db, trade.id, {
       date: "2026-07-12",
@@ -320,6 +371,7 @@ describe("journal trades", () => {
 
     expect(closed?.endDate).toBe("2026-07-12T04:00:00.000Z");
     expect(closed?.entries).toEqual([]);
+    expect(storedTrade.newsFeeds).toEqual([]);
   });
 
   it("still requires text for a regular journal entry", async () => {

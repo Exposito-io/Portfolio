@@ -627,7 +627,10 @@ export function JournalDetail({
         <JournalGroupScope activeTradeId={trade.id} group={scopeGroup} />
       ) : null}
 
-      <JournalNewsProvider key={trade.id} tradeId={trade.id}>
+      <JournalNewsProvider
+        key={`${trade.id}:${trade.endDate ?? "open"}`}
+        tradeId={trade.id}
+      >
         <JournalDetailSummary
           trade={trade}
           markets={markets}

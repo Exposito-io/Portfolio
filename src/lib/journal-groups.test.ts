@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
 import { createTrade } from "@/lib/journal";
-import { createGroup, createGroupEntry, createGroupWithNewTrades, listJournalItems } from "@/lib/journal-groups";
+import {
+  closeGroupNewsFeeds,
+  createGroup,
+  createGroupEntry,
+  createGroupWithNewTrades,
+  listJournalItems,
+} from "@/lib/journal-groups";
 
 const asset = (coin: string) => ({
   kind: "perp" as const,
@@ -92,6 +98,33 @@ describe("journal trade groups", () => {
     expect(group.primaryTradeId).toBe(group.members[1].id);
     const stored = await db.collection("journalTrades").findOne({ _id: new ObjectId(group.primaryTradeId) });
     expect(stored).not.toHaveProperty("groupId");
+  });
+
+  it("closes every news feed attached to a group", async () => {
+    const db = fakeDb();
+    const first = await createTrade(db, { title: "One", startDate: "2026-09-01", asset: asset("BTC") });
+    const second = await createTrade(db, { title: "Two", startDate: "2026-09-01", asset: asset("ETH") });
+    const group = await createGroup(db, {
+      kind: "trade",
+      title: "Pair",
+      primaryTradeId: first.id,
+      memberTradeIds: [first.id, second.id],
+    });
+    const storedGroup = await db.collection("journalTradeGroups").findOne({
+      _id: new ObjectId(group.id),
+    });
+    if (!storedGroup) throw new Error("Expected stored group.");
+    storedGroup.newsFeeds = [
+      {
+        _id: new ObjectId(),
+        keywords: "Crypto",
+        normalizedKeywords: "crypto",
+        createdAt: new Date(),
+      },
+    ];
+
+    expect(await closeGroupNewsFeeds(db, group.id)).toBe(true);
+    expect(storedGroup.newsFeeds).toEqual([]);
   });
 });
 

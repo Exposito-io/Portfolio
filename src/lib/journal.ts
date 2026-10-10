@@ -263,7 +263,10 @@ export async function updateTrade(db: Db, id: string, payload: unknown) {
     update.metricsEmbeds = input.metricsEmbeds;
   }
   if (input.startDate !== undefined) update.startDate = nextStartDate;
-  if ("endDate" in input) update.endDate = nextEndDate;
+  if ("endDate" in input) {
+    update.endDate = nextEndDate;
+    if (nextEndDate) update.newsFeeds = [];
+  }
   if (input.asset !== undefined) update.asset = normalizeAsset(input.asset);
   if (input.tradingViewCharts !== undefined) {
     update.tradingViewCharts = normalizeTradingViewCharts(input.tradingViewCharts);
@@ -357,9 +360,9 @@ export async function closeTrade(
               updatedAt: now,
             },
           },
-          $set: { endDate: closeDate, updatedAt: now },
+          $set: { endDate: closeDate, newsFeeds: [], updatedAt: now },
         }
-      : { $set: { endDate: closeDate, updatedAt: now } },
+      : { $set: { endDate: closeDate, newsFeeds: [], updatedAt: now } },
     { returnDocument: "after", session },
   );
 

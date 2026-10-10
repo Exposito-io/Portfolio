@@ -343,6 +343,22 @@ export async function deleteGroup(db: Db, id: string) {
   return result.deletedCount === 1;
 }
 
+export async function closeGroupNewsFeeds(
+  db: Db,
+  id: string,
+  session?: ClientSession,
+) {
+  const _id = toObjectId(id);
+  if (!_id) return false;
+
+  const result = await collection(db).findOneAndUpdate(
+    { _id },
+    { $set: { newsFeeds: [], updatedAt: new Date() } },
+    { returnDocument: "after", session },
+  );
+  return result !== null;
+}
+
 export async function findGroupForTrade(db: Db, tradeId: string) {
   const memberId = toObjectId(tradeId);
   if (!memberId) return null;
