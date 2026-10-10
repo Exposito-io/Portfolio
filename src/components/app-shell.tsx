@@ -5,17 +5,17 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/auth";
 import { AppNavigation } from "@/components/app-navigation";
 import {
-  getAllowedSession,
-  requireAllowedSession,
+  getAuthorizationState,
+  requireAuthorization,
 } from "@/lib/authorization";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const session = await getAllowedSession();
-  if (!session) redirect("/sign-in");
+  const authorization = await getAuthorizationState();
+  if (authorization.kind === "unauthorized") redirect("/sign-in");
 
   async function handleSignOut() {
     "use server";
-    await requireAllowedSession();
+    await requireAuthorization();
     await signOut({ redirectTo: "/sign-in" });
   }
 
@@ -33,8 +33,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
           <AppNavigation
-            email={session.user?.email}
-            signOutAction={handleSignOut}
+            email={authorization.session?.user?.email}
+            signOutAction={
+              authorization.kind === "session" ? handleSignOut : undefined
+            }
           />
         </div>
       </header>

@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { isAllowedEmail } from "@/lib/auth-allowlist";
+import { isDevelopmentAuthBypassEnabled } from "@/lib/auth-bypass";
 
 const AUTH_PATH_PREFIX = "/api/auth";
 const SIGN_IN_PATH = "/sign-in";
 
 export default auth((request) => {
   const { nextUrl } = request;
+  if (isDevelopmentAuthBypassEnabled(nextUrl.hostname)) {
+    return NextResponse.next();
+  }
+
   const isAuthRoute = nextUrl.pathname.startsWith(AUTH_PATH_PREFIX);
   const isSignInPage = nextUrl.pathname === SIGN_IN_PATH;
   const isAuthorized = isAllowedEmail(request.auth?.user?.email);

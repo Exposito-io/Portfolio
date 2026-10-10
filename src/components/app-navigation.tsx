@@ -15,7 +15,7 @@ import { useState } from "react";
 
 type AppNavigationProps = {
   email?: string | null;
-  signOutAction: () => Promise<void>;
+  signOutAction?: () => Promise<void>;
 };
 
 export function AppNavigation({ email, signOutAction }: AppNavigationProps) {
@@ -69,16 +69,18 @@ export function AppNavigation({ email, signOutAction }: AppNavigationProps) {
           <Settings size={16} aria-hidden="true" />
           Settings
         </Link>
-        <form action={signOutAction} className="w-full lg:ml-1 lg:w-auto">
-          <button
-            className="nav-link w-full lg:w-auto"
-            type="submit"
-            title={email ?? "Sign out"}
-          >
-            <LogOut size={16} aria-hidden="true" />
-            Sign out
-          </button>
-        </form>
+        {signOutAction ? (
+          <form action={signOutAction} className="w-full lg:ml-1 lg:w-auto">
+            <button
+              className="nav-link w-full lg:w-auto"
+              type="submit"
+              title={email ?? "Sign out"}
+            >
+              <LogOut size={16} aria-hidden="true" />
+              Sign out
+            </button>
+          </form>
+        ) : null}
       </nav>
     </>
   );

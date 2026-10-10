@@ -1,8 +1,8 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
-import { auth, signIn } from "@/auth";
-import { isAllowedEmail } from "@/lib/auth-allowlist";
+import { signIn } from "@/auth";
+import { getAuthorizationState } from "@/lib/authorization";
 
 type SignInPageProps = {
   searchParams: Promise<{
@@ -22,9 +22,12 @@ function safeCallbackUrl(value: string | string[] | undefined) {
 }
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
-  const [session, params] = await Promise.all([auth(), searchParams]);
+  const [authorization, params] = await Promise.all([
+    getAuthorizationState(),
+    searchParams,
+  ]);
 
-  if (isAllowedEmail(session?.user?.email)) {
+  if (authorization.kind !== "unauthorized") {
     redirect("/");
   }
 

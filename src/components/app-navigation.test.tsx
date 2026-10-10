@@ -11,6 +11,14 @@ import { AppNavigation } from "@/components/app-navigation";
 afterEach(cleanup);
 
 describe("AppNavigation", () => {
+  it("omits sign out when authentication is bypassed", () => {
+    render(<AppNavigation />);
+
+    expect(
+      screen.queryByRole("button", { name: "Sign out" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("opens the mobile menu and closes it after a navigation choice", async () => {
     const user = userEvent.setup();
     const signOutAction = vi.fn(async () => undefined);
