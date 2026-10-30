@@ -61,6 +61,7 @@ export function HyperliquidSimulator() {
   const [loadingSnapshot, setLoadingSnapshot] = useState(false);
   const [error, setError] = useState("");
   const [showReview, setShowReview] = useState(false);
+  const [showCollateral, setShowCollateral] = useState(false);
   const [showClearAll, setShowClearAll] = useState(false);
   const [orderForm, setOrderForm] = useState<OrderForm | null>(null);
   const [marginPositionId, setMarginPositionId] = useState<string | null>(null);
@@ -339,6 +340,13 @@ export function HyperliquidSimulator() {
               </div>
               <div className="simulator-panel-actions">
                 <button
+                  className="button-secondary"
+                  onClick={() => setShowCollateral(true)}
+                  type="button"
+                >
+                  <WalletCards size={16} /> Adjust USDC
+                </button>
+                <button
                   className="button-secondary simulator-clear-button"
                   disabled={!draft.positions.length}
                   onClick={() => setShowClearAll(true)}
@@ -551,11 +559,26 @@ export function HyperliquidSimulator() {
                 current ? { ...current, collateralAdjustment } : current,
               )
             }
+            onEditCollateral={() => setShowCollateral(true)}
             onReset={resetScenario}
             onReview={() => setShowReview(true)}
             result={result}
           />
         </>
+      ) : null}
+
+      {showCollateral && snapshot && draft ? (
+        <CollateralDialog
+          draft={draft}
+          snapshot={snapshot}
+          onApply={(collateralAdjustment) => {
+            setDraft((current) =>
+              current ? { ...current, collateralAdjustment } : current,
+            );
+            setShowCollateral(false);
+          }}
+          onClose={() => setShowCollateral(false)}
+        />
       ) : null}
 
       {orderForm && snapshot && orderPreview ? (
@@ -752,8 +775,12 @@ export function HyperliquidSimulator() {
         />
       ) : null}
 
-      {showReview && result ? (
-        <ReviewDialog onClose={() => setShowReview(false)} result={result} />
+      {showReview && result && draft ? (
+        <ReviewDialog
+          collateralAdjustment={draft.collateralAdjustment}
+          onClose={() => setShowReview(false)}
+          result={result}
+        />
       ) : null}
     </main>
   );
@@ -1167,7 +1194,113 @@ function LiquidationStatusNotice({
   );
 }
 
-function ScenarioPanel({ draft, result, marginChanges, canReset, onCollateralChange, onReset, onReview }: { draft: HyperliquidSimulationDraft; result: HyperliquidSimulationResult; marginChanges: string[]; canReset: boolean; onCollateralChange: (value: number) => void; onReset: () => void; onReview: () => void }) {
+function CollateralDialog({
+  draft,
+  snapshot,
+  onApply,
+  onClose,
+}: {
+  draft: HyperliquidSimulationDraft;
+  snapshot: HyperliquidSimulatorSnapshot;
+  onApply: (value: number) => void;
+  onClose: () => void;
+}) {
+  const [direction, setDirection] = useState(
+    draft.collateralAdjustment < 0 ? "remove" : "add",
+  );
+  const [amount, setAmount] = useState(
+    draft.collateralAdjustment ? String(Math.abs(draft.collateralAdjustment)) : "",
+  );
+  const numericAmount = Number(amount);
+  const valid =
+    amount.trim() !== "" && Number.isFinite(numericAmount) && numericAmount >= 0;
+  const adjustment = valid ? numericAmount * (direction === "add" ? 1 : -1) : 0;
+  const preview = useMemo(
+    () => simulateHyperliquidPositions(snapshot, {
+      ...draft,
+      collateralAdjustment: adjustment,
+    }),
+    [snapshot, draft, adjustment],
+  );
+
+  function apply(event: FormEvent) {
+    event.preventDefault();
+    if (valid) onApply(adjustment);
+  }
+
+  return (
+    <Modal onClose={onClose} title="Adjust USDC">
+      <form className="simulator-modal-form" onSubmit={apply}>
+        <p className="simulator-collateral-description">
+          Simulate adding or removing USDC from this account. This amount
+          replaces the total USDC adjustment for your scenario.
+        </p>
+        <fieldset className="simulator-order-side">
+          <legend className="field-label">USDC action</legend>
+          <button
+            aria-pressed={direction === "add"}
+            className={direction === "add" ? "active buy" : "buy"}
+            onClick={() => setDirection("add")}
+            type="button"
+          >
+            Add USDC
+          </button>
+          <button
+            aria-pressed={direction === "remove"}
+            className={direction === "remove" ? "active sell" : "sell"}
+            onClick={() => setDirection("remove")}
+            type="button"
+          >
+            Remove USDC
+          </button>
+        </fieldset>
+        <label>
+          <span className="field-label">USDC amount</span>
+          <div className="simulator-collateral-input">
+            <input
+              aria-label="USDC amount"
+              autoFocus
+              className="input"
+              min="0"
+              onChange={(event) => setAmount(event.target.value)}
+              required
+              step="any"
+              type="number"
+              value={amount}
+            />
+            <span>USDC</span>
+          </div>
+          <small>Enter a positive amount, or zero to clear the adjustment. Isolated position margin is unchanged.</small>
+        </label>
+        {!valid && amount !== "" ? <p className="simulator-order-warning" role="alert">Enter a finite USDC amount of zero or more.</p> : null}
+        <div aria-label="USDC impact preview" className="simulator-review-metrics simulator-collateral-preview">
+          <ReviewMetric label="Account equity" before={preview.metrics.currentAccountEquity} after={preview.metrics.simulatedAccountEquity} />
+          <ReviewMetric label="Margin buffer" before={preview.metrics.currentMarginBuffer} after={preview.metrics.simulatedMarginBuffer} />
+        </div>
+        {valid && preview.warnings.length ? (
+          <ul className="simulator-order-errors" aria-label="Scenario warnings">
+            {preview.warnings.map((warning, index) => (
+              <li className="simulator-order-warning" key={`${warning.code}:${index}`}>
+                <AlertTriangle size={15} />{warning.message}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="simulator-review-note"><ShieldCheck size={17} /><span>Simulation only. No funds will be moved.</span></div>
+        <div className="simulator-modal-actions">
+          <button className="button-secondary" onClick={onClose} type="button">Cancel</button>
+          <button className="button-primary" disabled={!valid} type="submit">Apply to scenario</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function describeCollateralAdjustment(value: number) {
+  return `${value < 0 ? "Remove" : "Add"} ${formatSize(Math.abs(value))} USDC ${value < 0 ? "from" : "to"} account`;
+}
+
+function ScenarioPanel({ draft, result, marginChanges, canReset, onCollateralChange, onEditCollateral, onReset, onReview }: { draft: HyperliquidSimulationDraft; result: HyperliquidSimulationResult; marginChanges: string[]; canReset: boolean; onCollateralChange: (value: number) => void; onEditCollateral: () => void; onReset: () => void; onReview: () => void }) {
   const pending = [
     ...result.trades.map((trade) =>
       trade.orderId
@@ -1180,17 +1313,24 @@ function ScenarioPanel({ draft, result, marginChanges, canReset, onCollateralCha
     <section className="simulator-scenario">
       <div className="simulator-scenario-control">
         <h2>Scenario</h2><p>Adjust collateral and position sizes to see the impact on liquidation prices.</p>
-        <label className="mt-5 block"><span className="field-label">USDC collateral adjustment</span><div className="simulator-collateral-input"><input className="input" onChange={(event) => onCollateralChange(Number(event.target.value))} step="any" type="number" value={draft.collateralAdjustment} /><span>USDC</span></div><small>Positive adds collateral. Negative removes collateral.</small></label>
+        <div className="simulator-collateral-summary">
+          <span className="field-label">USDC adjustment</span>
+          <p>{draft.collateralAdjustment ? describeCollateralAdjustment(draft.collateralAdjustment) : "No USDC adjustment"}</p>
+          <div className="flex flex-wrap gap-2">
+            <button className="button-secondary" onClick={onEditCollateral} type="button"><WalletCards size={16} />{draft.collateralAdjustment ? "Edit USDC adjustment" : "Add or remove USDC"}</button>
+            {draft.collateralAdjustment ? <button aria-label="Clear USDC adjustment" className="icon-button" onClick={() => onCollateralChange(0)} type="button"><X size={16} /></button> : null}
+          </div>
+        </div>
         <button className="button-secondary mt-6" disabled={!canReset} onClick={onReset} type="button"><RotateCcw size={16} /> Reset scenario</button>
       </div>
-      <div className="simulator-pending"><h3>Pending changes ({pending.length + (draft.collateralAdjustment ? 1 : 0)})</h3>{draft.collateralAdjustment ? <div className="simulator-change"><span>Adjust USDC collateral by {formatSignedCurrency(draft.collateralAdjustment)}</span></div> : null}{pending.map((description) => <div className="simulator-change" key={description}><span>{description}</span></div>)}{!pending.length && !draft.collateralAdjustment ? <p className="simulator-no-changes">Edit a position or collateral amount to build a scenario.</p> : null}</div>
+      <div className="simulator-pending"><h3>Pending changes ({pending.length + (draft.collateralAdjustment ? 1 : 0)})</h3>{draft.collateralAdjustment ? <div className="simulator-change"><span>{describeCollateralAdjustment(draft.collateralAdjustment)}</span></div> : null}{pending.map((description) => <div className="simulator-change" key={description}><span>{description}</span></div>)}{!pending.length && !draft.collateralAdjustment ? <p className="simulator-no-changes">Edit a position or collateral amount to build a scenario.</p> : null}</div>
       <div className="simulator-legend"><h3>Value display</h3><p><span className="legend-dot current" />Current value<small>Live value from Hyperliquid</small></p><p><span className="legend-dot simulated" />Simulated value<small>Hypothetical value based on your changes</small></p><p><span className="legend-square changed" />Row has simulated changes</p><p><span className="legend-square risk" />Liquidation risk under 10%</p><button className="button-primary mt-auto" onClick={onReview} type="button"><BarChart3 size={16} /> Review impact <ArrowRight size={16} /></button></div>
     </section>
   );
 }
 
-function ReviewDialog({ result, onClose }: { result: HyperliquidSimulationResult; onClose: () => void }) {
-  return <Modal onClose={onClose} title="Scenario impact"><div className="simulator-review"><div className="simulator-review-metrics"><ReviewMetric label="Account equity" before={result.metrics.currentAccountEquity} after={result.metrics.simulatedAccountEquity} /><ReviewMetric label="Cross maintenance" before={result.metrics.currentCrossMaintenance} after={result.metrics.simulatedCrossMaintenance} /><ReviewMetric label="Margin buffer" before={result.metrics.currentMarginBuffer} after={result.metrics.simulatedMarginBuffer} /></div><div><h3>Hypothetical changes</h3>{result.trades.length ? <ul>{result.trades.map((trade, index) => <li key={trade.orderId ?? `${trade.positionId}:${index}`}><strong>{trade.description}</strong> at {formatPrice(trade.fillPrice)}{trade.orderId ? <small>{formatSize(Math.abs(trade.deltaSize))} {trade.coin} · effective {formatCurrencyDetailed(trade.effectiveNotional)} · additional initial margin {formatCurrencyDetailed(trade.additionalInitialMargin)} · margin change {formatSignedCurrency(trade.marginImpact)}</small> : null}</li>)}</ul> : <p>No position changes.</p>}</div><div><h3>Warnings</h3>{result.warnings.length ? <ul className="simulator-warning-list">{result.warnings.map((warning, index) => <li key={`${warning.code}:${index}`}><AlertTriangle size={15} />{warning.message}</li>)}</ul> : <p>No scenario warnings.</p>}</div><div className="simulator-review-note"><ShieldCheck size={17} /><span>This is an estimate only. Nothing will be sent to Hyperliquid.</span></div><div className="simulator-modal-actions"><button className="button-primary" onClick={onClose} type="button">Done</button></div></div></Modal>;
+function ReviewDialog({ result, collateralAdjustment, onClose }: { result: HyperliquidSimulationResult; collateralAdjustment: number; onClose: () => void }) {
+  return <Modal onClose={onClose} title="Scenario impact"><div className="simulator-review"><div className="simulator-review-metrics"><ReviewMetric label="Account equity" before={result.metrics.currentAccountEquity} after={result.metrics.simulatedAccountEquity} /><ReviewMetric label="Cross maintenance" before={result.metrics.currentCrossMaintenance} after={result.metrics.simulatedCrossMaintenance} /><ReviewMetric label="Margin buffer" before={result.metrics.currentMarginBuffer} after={result.metrics.simulatedMarginBuffer} /></div><div><h3>Hypothetical changes</h3>{collateralAdjustment ? <p>{describeCollateralAdjustment(collateralAdjustment)}</p> : null}{result.trades.length ? <ul>{result.trades.map((trade, index) => <li key={trade.orderId ?? `${trade.positionId}:${index}`}><strong>{trade.description}</strong> at {formatPrice(trade.fillPrice)}{trade.orderId ? <small>{formatSize(Math.abs(trade.deltaSize))} {trade.coin} · effective {formatCurrencyDetailed(trade.effectiveNotional)} · additional initial margin {formatCurrencyDetailed(trade.additionalInitialMargin)} · margin change {formatSignedCurrency(trade.marginImpact)}</small> : null}</li>)}</ul> : <p>No position changes.</p>}</div><div><h3>Warnings</h3>{result.warnings.length ? <ul className="simulator-warning-list">{result.warnings.map((warning, index) => <li key={`${warning.code}:${index}`}><AlertTriangle size={15} />{warning.message}</li>)}</ul> : <p>No scenario warnings.</p>}</div><div className="simulator-review-note"><ShieldCheck size={17} /><span>This is an estimate only. Nothing will be sent to Hyperliquid.</span></div><div className="simulator-modal-actions"><button className="button-primary" onClick={onClose} type="button">Done</button></div></div></Modal>;
 }
 
 function ReviewMetric({ label, before, after }: { label: string; before: number; after: number }) {

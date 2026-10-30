@@ -81,6 +81,20 @@ function snapshot(
 }
 
 describe("Hyperliquid simulator", () => {
+  it.each([100, -100])("applies a %s USDC adjustment to equity, buffer, and cross liquidation", (adjustment) => {
+    const source = snapshot();
+    const draft = createHyperliquidSimulationDraft(source);
+    draft.collateralAdjustment = adjustment;
+    const result = simulateHyperliquidPositions(source, draft);
+
+    expect(result.metrics.simulatedAccountEquity).toBe(300 + adjustment);
+    expect(result.metrics.simulatedMarginBuffer).toBe(275 + adjustment);
+    expect(result.positions[0].simulatedLiquidationPrice).toBeCloseTo((500 - 300 - adjustment) / 4.75);
+    expect(result.positions[0].targetSignedSize).toBe(5);
+    expect(result.trades).toHaveLength(0);
+    expect(source.accountEquity).toBe(300);
+  });
+
   it("blends an increased same-side entry and applies fill-price equity impact", () => {
     const source = snapshot();
     const draft = createHyperliquidSimulationDraft(source);

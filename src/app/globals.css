@@ -3674,6 +3674,27 @@ textarea {
   margin-top: 0.5rem;
 }
 
+.simulator-collateral-summary {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.simulator-collateral-summary > p {
+  color: #23453b;
+  font-size: 0.85rem;
+}
+
+.simulator-collateral-description {
+  color: #69706c;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.simulator-review-metrics.simulator-collateral-preview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .simulator-collateral-input .input {
   border-radius: 8px 0 0 8px;
 }

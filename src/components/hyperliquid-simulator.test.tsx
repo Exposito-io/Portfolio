@@ -102,6 +102,48 @@ afterEach(() => {
 });
 
 describe("HyperliquidSimulator", () => {
+  it("previews, applies, edits, and resets USDC changes without network writes", async () => {
+    const user = userEvent.setup();
+    render(<HyperliquidSimulator />);
+    await screen.findByRole("spinbutton", { name: "BTC target size" });
+
+    await user.click(screen.getByRole("button", { name: "Adjust USDC", exact: true }));
+    let dialog = screen.getByRole("dialog", { name: "Adjust USDC" });
+    const apply = within(dialog).getByRole("button", { name: "Apply to scenario" });
+    expect(apply).toBeDisabled();
+    await user.type(within(dialog).getByRole("spinbutton", { name: "USDC amount" }), "250.50");
+    expect(within(dialog).getByLabelText("USDC impact preview")).toHaveTextContent("$1,251");
+    await user.click(apply);
+    expect(screen.getByRole("heading", { name: "Pending changes (1)" })).toBeInTheDocument();
+    expect(screen.getAllByText("Add 250.5 USDC to account")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: /Review impact/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Add 250.5 USDC to account");
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: "Edit USDC adjustment" }));
+    dialog = screen.getByRole("dialog", { name: "Adjust USDC" });
+    expect(within(dialog).getByRole("spinbutton", { name: "USDC amount" })).toHaveValue(250.5);
+    await user.click(within(dialog).getByRole("button", { name: "Remove USDC" }));
+    expect(within(dialog).getByLabelText("USDC impact preview")).toHaveTextContent("$750");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.getAllByText("Add 250.5 USDC to account")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Adjust USDC", exact: true }));
+    dialog = screen.getByRole("dialog", { name: "Adjust USDC" });
+    await user.click(within(dialog).getByRole("button", { name: "Remove USDC" }));
+    const amount = within(dialog).getByRole("spinbutton", { name: "USDC amount" });
+    await user.clear(amount);
+    await user.type(amount, "990");
+    expect(within(dialog).getByLabelText("Scenario warnings")).toHaveTextContent("transfer-margin requirement");
+    await user.click(within(dialog).getByRole("button", { name: "Apply to scenario" }));
+    expect(screen.getAllByText("Remove 990 USDC from account")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Reset scenario" }));
+    expect(screen.getByText("No USDC adjustment")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset scenario" })).toBeDisabled();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
   it("loads live positions and updates the analysis when target size changes", async () => {
     const user = userEvent.setup();
     render(<HyperliquidSimulator />);
